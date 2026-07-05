@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script src="/config.js?v=1"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="stylesheet" href="/shared.css" />
+<title>Contact Us | 34VaultVideo</title>
+<meta name="robots" content="noindex" />
+<style>
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg); color: var(--text); min-height: 100dvh;
+  padding-top: var(--topH);
+  padding-bottom: 32px;
+  overflow-x: hidden;
+}
+a { color: inherit; text-decoration: none; }
+
+/* ── TOPBAR ── */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 800;
+  height: var(--topH); background: rgba(10,11,14,.97);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
+.topbar-inner {
+  height: 100%; max-width: var(--maxW); margin: 0 auto;
+  display: flex; align-items: center; gap: 10px; padding: 0 14px;
+}
+.back-btn {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: var(--panel2); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all .15s; flex-shrink: 0;
+}
+.back-btn:hover { border-color: var(--accent); }
+.brand { font-size: 20px; font-weight: 900; cursor: pointer; user-select: none; flex-shrink: 0; }
+.brand em { color: var(--accent); font-style: normal; }
+.spacer { flex: 1; }
+.desktop-nav { display: none; }
+@media (min-width: 900px) {
+  .desktop-nav { display: flex; gap: 6px; align-items: center; }
+  .desktop-nav a {
+    height: 34px; padding: 0 12px; border-radius: 8px;
+    background: var(--panel2); border: 1px solid var(--border);
+    font-size: 12px; font-weight: 700; color: var(--muted);
+    display: flex; align-items: center; transition: all .15s;
+  }
+  .desktop-nav a:hover { color: var(--text); border-color: var(--accent); }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ── PAGE ── */
+.page { max-width: 680px; margin: 0 auto; padding: 16px 14px; }
+
+.page-title {
+  font-size: 18px; font-weight: 900; margin-bottom: 16px;
+}
+
+.info-card {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px;
+}
+.info-text {
+  font-size: 14px; color: var(--muted); line-height: 1.6; margin-bottom: 18px;
+}
+.info-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 0; border-top: 1px solid var(--border);
+}
+.info-row:first-of-type { border-top: none; }
+.info-label {
+  font-size: 13px; font-weight: 700; color: var(--muted); min-width: 60px;
+}
+.info-value {
+  font-size: 14px; font-weight: 700;
+}
+.info-value a {
+  color: var(--accent); transition: color .15s;
+}
+.info-value a:hover {
+  color: var(--accent2); text-decoration: underline;
+}
+.info-hint {
+  font-size: 13px; color: var(--muted); margin-top: 16px; padding-top: 14px;
+  border-top: 1px solid var(--border); line-height: 1.5;
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="back-btn" onclick="history.length>1?history.back():location.href='index.html'">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </div>
+    <div class="brand" onclick="location.href='index.html'">34<em>Vault</em><em>Video</em></div>
+    <div class="spacer"></div>
+    <div class="desktop-nav">
+      <a href="index.html">Browse</a>
+      <a href="policy.html">Terms &amp; Privacy</a>
+    </div>
+  </div>
+</div>
+
+<div class="page">
+  <div class="page-title">Contact Us</div>
+
+  <div class="info-card">
+    <div class="info-text">
+      Have a question, partnership inquiry, removal request, or need help? Reach out to us.
+    </div>
+
+    <div class="info-row">
+      <div class="info-label">Email</div>
+      <div class="info-value"><a href="mailto:admin@34vault.com">admin@34vault.com</a></div>
+    </div>
+
+    <div class="info-hint">
+      For content removal requests, include the full video URL (watch.html?slug=…) so we can find the listing quickly.
+      34VaultVideo is part of the <a href="https://34vault.com/" rel="noopener" style="color:var(--accent);font-weight:700">34Vault</a> network.
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

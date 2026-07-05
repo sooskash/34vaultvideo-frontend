@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script src="/config.js?v=1"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#0a0b0e" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="preconnect" href="https://api.34vault.com" />
+<link rel="dns-prefetch" href="https://api.34vault.com" />
+<link rel="preconnect" href="https://rule34video.com" />
+<link rel="dns-prefetch" href="https://rule34video.com" />
+<link rel="stylesheet" href="/shared.css" />
+<title>34VaultVideo - Free Rule34 &amp; Hentai Videos</title>
+<meta name="description" content="Watch thousands of free rule34 videos, hentai animations, and NSFW video clips. Streamed in up to 1080p, updated daily. Filter by tag, search, and sort by newest or most viewed." />
+<meta name="keywords" content="rule34 videos, hentai videos, r34 video, porn videos, nsfw animation, rule 34 porn, hentai animation, adult videos, xxx animation, free hentai videos, cartoon porn videos" />
+<meta name="rating" content="adult" />
+<meta name="rating" content="RTA-5042-1996-1400-1577-RTA" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="34VaultVideo" />
+<meta property="og:title" content="34VaultVideo - Free Rule34 &amp; Hentai Videos" />
+<meta property="og:description" content="Watch thousands of free rule34 videos, hentai animations, and NSFW clips in up to 1080p. Updated daily." />
+<meta property="og:image" content="https://34vaultvideo.com/favicon.svg" />
+<meta property="og:url" content="https://34vaultvideo.com/" />
+<meta property="og:locale" content="en_US" />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="34VaultVideo - Free Rule34 &amp; Hentai Videos" />
+<meta name="twitter:description" content="Watch thousands of free rule34 and hentai videos. Updated daily." />
+<meta name="twitter:image" content="https://34vaultvideo.com/favicon.svg" />
+<link rel="canonical" href="https://34vaultvideo.com/" />
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"WebSite","name":"34VaultVideo","url":"https://34vaultvideo.com/","description":"Free rule34 videos, hentai animations, and NSFW video clips","potentialAction":{"@type":"SearchAction","target":"https://34vaultvideo.com/?q={search_term_string}","query-input":"required name=search_term_string"}}
+</script>
+<style>
+:root {
+  --bg:#0a0b0e;
+  --surface:#111318;
+  --surface2:#181b22;
+  --border:#1e222e;
+  --border2:#262b3a;
+  --text:#eef1f8;
+  --sub:#8891a8;
+  --red:#e11d48;
+  --topH:60px;
+  --filterH:52px;
+  --maxW:1280px;
+  --r:10px;
+  /* Fallback if config.js hasn't set it (it computes --grad-accent from the accent + Settings toggle) */
+  --accent-lt:#ffce54;
+  --grad-accent:linear-gradient(135deg,#ffce54,var(--accent) 55%,var(--accent2));
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{background:var(--bg)}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--bg);color:var(--text);min-height:100dvh;
+  padding-top:calc(var(--topH) + var(--filterH));
+  overscroll-behavior-y:none;
+}
+a{color:inherit;text-decoration:none}
+img{display:block}
+button{font-family:inherit}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ━━━ TOPBAR ━━━ */
+.topbar{
+  position:fixed;top:0;left:0;right:0;z-index:900;
+  height:var(--topH);
+  background:var(--bg);
+  border-bottom:1px solid var(--border);
+  transform:translateZ(0);
+  will-change:transform;
+}
+.topbar-inner{
+  height:100%;max-width:var(--maxW);margin:0 auto;
+  display:flex;align-items:center;gap:14px;padding:0 20px;
+}
+
+/* Brand — "Vault" and "Video" both use the gradient-text treatment */
+.brand{
+  font-size:21px;font-weight:900;letter-spacing:-1px;
+  cursor:pointer;user-select:none;flex-shrink:0;line-height:1;
+}
+.brand span{background:var(--grad-accent);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* Search */
+.search-wrap{flex:1;position:relative;max-width:400px}
+.search-icon{
+  position:absolute;left:11px;top:50%;transform:translateY(-50%);
+  color:var(--sub);font-size:14px;pointer-events:none;
+}
+.search-input{
+  width:100%;height:40px;border-radius:999px;
+  background:rgba(255,255,255,.045);border:1px solid var(--border2);
+  color:var(--text);font-size:13px;padding:0 34px 0 36px;
+  outline:none;transition:border-color .15s,background .15s,box-shadow .15s;
+  -webkit-appearance:none;
+}
+@media(max-width:859px){
+  /* Aurora mobile header: ONE row — logo · full-flex search · avatar. No burger. */
+  :root{--topH:64px}
+  .topbar-inner{gap:12px;padding:0 14px}
+  .search-wrap{flex:1;max-width:none}
+  /* Circular gradient avatar with amber ring (extra specificity beats the base rule below) */
+  .topbar-inner .avatar-btn{
+    width:36px;height:36px;border-radius:50%;
+    box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--accent);
+  }
+  .topbar-inner .avatar-btn img{width:100%;height:100%;border-radius:50%!important}
+  /* Prominent amber-lit search — full-strength amber border + soft glow ring */
+  .search-input{
+    font-size:16px;height:42px;border-radius:14px;
+    background:var(--surface);border-color:var(--accent);
+    box-shadow:0 0 0 3px var(--accent-15,rgba(245,158,11,.15));
+  }
+  .search-input:focus{box-shadow:0 0 0 3px var(--accent-22,rgba(245,158,11,.22))}
+  /* Chips row: FLEX-FIT — the controls SHARE the row width on ANY phone. Text pills
+     grow/shrink together (segmented-bar style), the icon toggle stays fixed-size, so the
+     row can never overflow or slide regardless of device width.
+     .filter-inner prefix beats the base rules; background-color keeps the select chevrons. */
+  .filter-strip .filter-inner{overflow:hidden;gap:6px;padding:0 10px}
+  .filter-inner .filters-btn,.filter-inner .sort-select,.filter-inner .chip{
+    height:33px;border-radius:999px;
+    background-color:rgba(255,255,255,.05);border:1px solid var(--border2);
+    color:var(--sub);font-size:11.5px;font-weight:700;
+  }
+  .filter-inner .filters-btn,.filter-inner .chip,.filter-inner .sort-select,.filter-inner .sel-ico{
+    flex:1 1 0;min-width:0;max-width:150px;overflow:hidden;
+  }
+  .filter-inner .filters-btn{padding:0 8px;justify-content:center}
+  .filter-inner .chip{flex-grow:1.2;padding:0 8px;justify-content:center}
+  .filter-inner #sortSel{padding:0 20px 0 10px}
+  .filter-inner .sel-ico .sort-select{width:100%;max-width:none}
+  .filter-inner .gv-btn{flex:0 0 36px;width:36px;padding:0;justify-content:center}
+  .filter-inner #chipFavs{margin-left:0}
+}
+/* Narrow phones: slightly smaller type/padding so labels stay readable as pills shrink */
+@media(max-width:430px){
+  .filter-strip .filter-inner{gap:5px;padding:0 8px}
+  .filter-inner #sortSel{padding:0 16px 0 8px}
+  .filter-inner .sel-ico .sort-select{padding:0 6px 0 24px}
+  .filter-inner .sel-ico svg{left:8px}
+  .filter-inner .gv-btn{flex-basis:33px;width:33px}
+  .filter-inner .filters-btn,.filter-inner .sort-select,.filter-inner .chip{font-size:11px;height:32px}
+}
+.search-input:hover{background:rgba(255,255,255,.06)}
+.search-input:focus{border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 3px rgba(245,158,11,.14)}
+.search-input::placeholder{color:var(--sub)}
+.search-x{
+  position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  color:var(--sub);cursor:pointer;font-size:13px;
+  background:none;border:none;padding:2px;line-height:1;
+  display:none;border-radius:4px;transition:color .15s;
+}
+.search-x:hover{color:var(--text)}
+.search-x.vis{display:block}
+
+/* Nav pills — desktop */
+.nav-pills{display:none;gap:4px;align-items:center;flex-shrink:0}
+@media(min-width:860px){.nav-pills{display:flex}}
+.nav-pill{
+  height:32px;padding:0 13px;border-radius:8px;
+  background:transparent;border:1px solid transparent;
+  font-size:12px;font-weight:600;color:var(--sub);
+  cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.nav-pill:hover{background:var(--surface2);border-color:var(--border2);color:var(--text)}
+
+/* Profile avatar btn — points at the MAIN site's profile page */
+.avatar-btn{
+  width:38px;height:38px;border-radius:11px;flex-shrink:0;
+  background:var(--grad-accent);
+  padding:2px;
+  border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-size:15px;font-weight:900;color:#000;
+  transition:transform .15s,box-shadow .15s;
+  box-shadow:0 2px 12px var(--accent-35,rgba(245,158,11,.35));
+  overflow:visible;
+}
+.avatar-btn img{width:34px;height:34px;object-fit:cover;border-radius:9px}
+.avatar-btn:hover{transform:scale(1.06);box-shadow:0 4px 16px var(--accent-45,rgba(245,158,11,.5))}
+
+/* ━━━ FILTER STRIP ━━━ */
+.filter-strip{
+  position:fixed;top:var(--topH);left:0;right:0;z-index:799;
+  height:var(--filterH);
+  background:var(--bg);
+  border-bottom:1px solid var(--border);
+  box-shadow:0 8px 20px -12px rgba(0,0,0,.6);
+  display:flex;align-items:center;
+  overflow:hidden;
+}
+.filter-inner::-webkit-scrollbar{display:none}
+.filter-inner{
+  max-width:var(--maxW);width:100%;margin:0 auto;
+  display:flex;align-items:center;gap:9px;
+  padding:0 20px;
+  flex-wrap:nowrap;
+  overflow:hidden;
+}
+/* Push the Saved action to the far right so the view controls (Filters/Sort/Mode/Size)
+   read as one group on the left and don't feel crammed against it. */
+#chipFavs{margin-left:auto}
+
+/* At 600px and below: tighten spacing but keep all labels visible */
+@media(max-width:600px){
+  .filter-inner{gap:6px;padding:0 12px}
+  .filters-btn,.chip,.clear-filters-btn{height:28px;font-size:11px;padding:0 10px}
+  .sort-select{height:28px;font-size:11px;padding:0 20px 0 8px}
+}
+
+/* At 420px and below: hard-cap the dropdowns so they can't blow out the row. */
+@media(max-width:420px){
+  .filter-inner{gap:5px;padding:0 10px}
+  .sort-select{
+    max-width:72px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  #sortSel{max-width:72px}
+  #modeSel{max-width:68px}
+  .filters-btn,.chip,.clear-filters-btn{height:26px;font-size:10.5px;padding:0 8px}
+}
+
+.filters-btn{
+  height:30px;padding:0 13px;border-radius:999px;flex-shrink:0;
+  background:var(--surface2);border:1px solid var(--border2);
+  color:var(--sub);font-size:12px;font-weight:700;
+  cursor:pointer;user-select:none;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:6px;
+  transition:all .15s;
+}
+.filters-btn:hover{border-color:var(--accent);color:var(--text)}
+.filters-btn.on{border-color:var(--accent);color:var(--accent);background:var(--accent-08,rgba(245,158,11,.08))}
+.filters-badge{
+  min-width:16px;height:16px;padding:0 4px;border-radius:999px;
+  background:var(--accent);color:#000;font-size:10px;font-weight:900;
+  display:inline-flex;align-items:center;justify-content:center;
+}
+
+/* Chips */
+.chip{
+  height:30px;padding:0 13px;border-radius:999px;flex-shrink:0;
+  background:transparent;border:1px solid var(--border2);
+  color:var(--sub);font-size:12px;font-weight:700;
+  cursor:pointer;user-select:none;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:5px;
+  transition:all .15s;
+}
+.chip:hover{border-color:var(--accent);color:var(--text)}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#000;font-weight:800}
+
+#chipFavs{flex-shrink:0;padding:0 11px}
+#chipFavs .fav-star{
+  font-size:13px;line-height:1;
+  background:var(--grad-accent);-webkit-background-clip:text;background-clip:text;color:transparent;
+  transition:filter .15s;
+}
+#chipFavs.on .fav-star{-webkit-text-fill-color:#2a1500;background:none;color:#2a1500}
+
+.chip .cn{
+  min-width:15px;height:15px;padding:0 4px;
+  border-radius:999px;background:var(--accent-15,rgba(245,158,11,.15));
+  color:var(--accent);font-size:9px;font-weight:900;
+  display:inline-flex;align-items:center;justify-content:center;
+}
+.chip.on .cn{background:rgba(0,0,0,.22);color:#2a1500}
+
+.sort-select{
+  height:30px;padding:0 24px 0 10px;border-radius:999px;flex-shrink:1;min-width:0;
+  background:var(--surface2);border:1px solid var(--border2);
+  color:var(--sub);font-size:12px;font-weight:600;
+  outline:none;cursor:pointer;-webkit-appearance:none;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='9' height='5' viewBox='0 0 9 5'%3E%3Cpath d='M.5.5l4 4 4-4' stroke='%239499b0' stroke-width='1.3' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 9px center;
+  transition:all .15s;
+}
+.sort-select:hover{border-color:var(--border2);color:var(--text);background:var(--surface)}
+/* Icon'd dropdown (page mode): pages icon on the left, no chevron — still a native select */
+.sel-ico{position:relative;display:inline-flex;flex-shrink:0;min-width:0}
+.sel-ico svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--sub)}
+.sel-ico .sort-select{padding:0 12px 0 30px;background-image:none;max-width:none}
+.sort-select:focus{border-color:var(--accent);color:var(--text)}
+
+.clear-filters-btn{
+  height:30px;padding:0 12px;border-radius:999px;flex-shrink:0;
+  background:transparent;border:1px solid var(--border2);
+  color:var(--sub);font-size:12px;font-weight:700;cursor:pointer;
+  transition:all .15s;
+}
+.clear-filters-btn:hover{border-color:var(--red);color:var(--red)}
+
+/* ━━━ FILTERS SHEET (simplified: search + tags + sort live in the strip) ━━━ */
+.fsheet-back{
+  position:fixed;inset:0;z-index:1000;
+  background:rgba(0,0,0,.65);display:none;
+  backdrop-filter:blur(3px);
+}
+.fsheet-back.open{display:block}
+.fsheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:1001;
+  background:var(--surface);border-top:1px solid var(--border);
+  border-radius:20px 20px 0 0;
+  padding:16px 18px 22px;
+  display:none;flex-direction:column;
+  max-height:82dvh;
+  box-shadow:0 -16px 60px rgba(0,0,0,.6);
+  max-width:560px;margin:0 auto;
+  overscroll-behavior:contain;
+  overflow-x:hidden;
+  width:100%;
+}
+.fsheet.open{display:flex}
+@media(min-width:860px){
+  .fsheet{
+    left:auto;right:20px;bottom:auto;top:calc(var(--topH) + var(--filterH) + 8px);
+    border-radius:16px;border:1px solid var(--border);
+    width:380px;max-height:70dvh;
+    box-shadow:0 20px 60px rgba(0,0,0,.55);
+  }
+}
+.fsheet-handle{
+  width:40px;height:4px;border-radius:2px;
+  background:var(--border2);margin:0 auto 16px;flex-shrink:0;
+}
+@media(min-width:860px){.fsheet-handle{display:none}}
+.fsheet-head{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:14px;flex-shrink:0;
+}
+.fsheet-title{font-size:16px;font-weight:900}
+.fsheet-head-actions{display:flex;align-items:center;gap:10px}
+.fsheet-clear{
+  background:none;border:none;color:var(--sub);
+  font-size:12px;font-weight:700;cursor:pointer;padding:4px;
+}
+.fsheet-clear:hover{color:var(--red)}
+.fsheet-x{
+  width:28px;height:28px;border-radius:8px;flex-shrink:0;
+  background:var(--surface2);border:1px solid var(--border2);
+  color:var(--sub);font-size:13px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s;
+}
+.fsheet-x:hover{border-color:var(--accent);color:var(--text)}
+.fsheet-body{overflow-y:auto;overflow-x:hidden;flex:1;min-height:0;min-width:0;overscroll-behavior:contain}
+.fsheet-section{margin-bottom:18px}
+.fsheet-label{
+  font-size:11px;font-weight:800;color:var(--sub);
+  text-transform:uppercase;letter-spacing:.06em;margin-bottom:9px;
+}
+.fsheet-tagsearch{
+  width:100%;height:36px;border-radius:9px;margin-bottom:14px;flex-shrink:0;
+  background:var(--surface2);border:1px solid var(--border2);
+  color:var(--text);font-size:16px;padding:0 12px;outline:none;
+  -webkit-appearance:none;
+}
+.fsheet-tagsearch:focus{border-color:var(--accent)}
+.chip-wrap{display:flex;flex-wrap:wrap;gap:5px;min-width:0;max-width:100%}
+.chip-wrap .chip{height:26px;font-size:11px;padding:0 10px}
+.chip-x{margin-left:2px;font-weight:900;opacity:.7}
+.chip.selected-chip{background:var(--accent);border-color:var(--accent);color:#000;font-weight:800}
+.fsheet-empty{font-size:12px;color:var(--sub);padding:4px 0}
+.fsheet-done{
+  height:44px;border-radius:10px;border:none;flex-shrink:0;
+  background:var(--accent);color:#000;font-size:14px;font-weight:800;
+  cursor:pointer;margin-top:6px;transition:background .15s;
+}
+.fsheet-done:hover{background:var(--accent2)}
+
+/* ━━━ MAIN ━━━ */
+.main{max-width:var(--maxW);margin:0 auto;padding:20px 20px 60px}
+.grid-header{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:16px;
+}
+.grid-title{font-size:15px;font-weight:800;letter-spacing:-.3px}
+.grid-count{font-size:12px;color:var(--sub);font-weight:600}
+
+/* ━━━ GRID ━━━ */
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:480px){.grid{grid-template-columns:repeat(2,1fr);gap:11px}}
+@media(min-width:600px){.grid{grid-template-columns:repeat(3,1fr);gap:12px}}
+@media(min-width:860px){.grid{grid-template-columns:repeat(4,1fr);gap:14px}}
+@media(min-width:1100px){.grid{grid-template-columns:repeat(5,1fr);gap:16px}}
+@media(min-width:1300px){.grid{grid-template-columns:repeat(6,1fr)}}
+/* "videos per row" toggle. Default = dense responsive grid. .g1 = big,
+   fewer-per-row layout: 1 on mobile → 3 on desktop. */
+.grid.g1{grid-template-columns:1fr}
+@media(min-width:600px){.grid.g1{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:1100px){.grid.g1{grid-template-columns:repeat(3,1fr)}}
+.grid.g1 .ad-row{grid-column:1/-1}
+/* Video-size toggle button (icon reflects current mode) */
+.gv-btn{display:inline-flex;align-items:center;justify-content:center;padding:0 11px;cursor:pointer;color:var(--sub);background-image:none}
+.gv-btn svg{width:18px;height:18px}
+.gv-btn:hover{color:var(--text)}
+
+/* ━━━ CARD ━━━ */
+.card{
+  border-radius:14px;background:var(--surface);
+  border:1px solid var(--border);overflow:hidden;
+  position:relative;display:flex;flex-direction:column;
+  transition:transform .2s,border-color .2s,box-shadow .2s;
+  cursor:pointer;min-width:0;max-width:100%;
+}
+.card:hover{
+  transform:translateY(-5px);
+  border-color:var(--accent-45,rgba(245,158,11,.5));
+  box-shadow:0 16px 40px rgba(0,0,0,.55),0 0 0 1px var(--accent-10,rgba(245,158,11,.12));
+}
+.card:active{transform:translateY(-2px)}
+
+.c-cover{
+  position:relative;overflow:hidden;
+  aspect-ratio:16/9;background:#0d1018;flex-shrink:0;
+}
+.c-cover::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:38%;
+  background:linear-gradient(180deg,transparent,rgba(6,7,11,.72));
+  pointer-events:none;z-index:1;
+}
+.c-img{
+  width:100%;height:100%;object-fit:cover;display:block;
+  transition:transform .4s cubic-bezier(.4,0,.2,1);
+}
+.card:hover .c-img{transform:scale(1.07)}
+
+/* Title — fixed 2-line height so every card's footer aligns */
+.c-title{
+  padding:9px 9px 0;
+  font-size:11px;font-weight:800;color:var(--text);line-height:1.3;
+  letter-spacing:.1px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;
+  height:calc(9px + 2*11px*1.3);
+}
+
+/* Bookmark btn */
+.c-bk{
+  position:absolute;top:8px;right:8px;z-index:3;
+  width:28px;height:28px;border-radius:10px;
+  background:rgba(10,11,14,.7);border:1px solid rgba(255,255,255,.1);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:13px;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  transition:all .15s;
+}
+.c-bk:hover{border-color:var(--accent)}
+.c-bk.on{border-color:var(--accent);background:var(--accent-15,rgba(245,158,11,.18));color:var(--accent)}
+
+.c-new{
+  position:absolute;top:8px;left:8px;z-index:3;
+  height:20px;padding:0 8px;border-radius:7px;
+  font-size:9px;font-weight:900;letter-spacing:.4px;
+  display:flex;align-items:center;
+  box-shadow:0 2px 8px rgba(0,0,0,.4);
+}
+.c-new.badge-new{background:var(--grad-accent);color:#2a1500}
+.c-new.badge-hot{background:linear-gradient(120deg,#ff6b8b,#ff2d55);color:#fff}
+
+/* Duration chip on the cover (Aurora — was the page-count chip on the comic site) */
+.c-dur{
+  position:absolute;bottom:8px;right:8px;z-index:2;
+  height:20px;padding:0 8px;border-radius:7px;
+  background:rgba(10,11,14,.72);border:1px solid rgba(255,255,255,.08);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  color:#dfe3ee;font-size:9.5px;font-weight:800;
+  display:flex;align-items:center;gap:4px;
+}
+.c-dur svg{width:10px;height:10px;fill:currentColor;stroke:none;opacity:.85}
+
+/* Card footer */
+.c-foot{
+  padding:6px 9px 9px;
+  display:flex;align-items:center;justify-content:space-between;gap:6px;
+  min-height:30px;
+}
+.c-views{
+  display:inline-flex;align-items:center;gap:4px;flex-shrink:0;
+  font-size:10px;font-weight:800;color:var(--text);
+}
+.c-views .c-ico{opacity:.6}
+.c-ico{
+  width:11px;height:11px;flex-shrink:0;
+  fill:none;stroke:currentColor;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round;
+  opacity:.8;transition:stroke .2s,opacity .2s;
+}
+.card:hover .c-ico{opacity:1;stroke:var(--accent)}
+.c-tag1{
+  font-size:10px;font-weight:700;
+  background:var(--grad-accent);-webkit-background-clip:text;background-clip:text;color:transparent;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;
+}
+
+/* ━━━ SKELETON ━━━ */
+.sk{border-radius:var(--r);background:var(--surface);border:1px solid var(--border);overflow:hidden}
+.sk-c{
+  aspect-ratio:16/9;
+  background:linear-gradient(110deg,var(--surface) 30%,var(--surface2) 50%,var(--surface) 70%);
+  background-size:200% 100%;animation:sh 1.5s ease infinite;
+}
+.sk-b{padding:8px}
+.sk-l{
+  height:8px;border-radius:4px;margin-bottom:6px;
+  background:linear-gradient(110deg,var(--surface2) 30%,var(--border2) 50%,var(--surface2) 70%);
+  background-size:200% 100%;animation:sh 1.5s ease infinite;
+}
+.sk-l.s{width:55%}
+@keyframes sh{to{background-position:-200% 0}}
+
+/* ━━━ STATES ━━━ */
+.state-box{
+  grid-column:1/-1;padding:60px 20px;text-align:center;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+}
+.state-ico{font-size:38px;margin-bottom:14px}
+.state-t{font-size:17px;font-weight:800;margin-bottom:6px}
+.state-s{font-size:13px;color:var(--sub);margin-bottom:20px}
+.state-btn{
+  height:38px;padding:0 20px;border-radius:9px;
+  background:var(--accent);color:#000;font-size:13px;font-weight:800;
+  border:none;cursor:pointer;transition:background .15s;
+}
+.state-btn:hover{background:var(--accent2)}
+
+/* ━━━ IN-FEED AD CARD (blended, hdporncomics-style) ━━━
+   Ads blend INTO the video grid as cards: same surface, border, radius and shadow as a
+   video card, spanning 2 grid cells so the native/banner has room (on the 2-col mobile
+   grid that's full width). A small "Sponsored" label keeps it honest.
+   NOTE: slots only get created when window.ADS_ENABLED is true (off for launch). */
+.ad-row{
+  grid-column:span 2;
+  border-radius:var(--r);
+  background:var(--surface);
+  border:1px solid var(--border);
+  box-shadow:0 8px 24px rgba(0,0,0,.35);
+  position:relative;overflow:hidden;
+  min-height:120px;
+  padding:22px 8px 8px;
+  display:flex;align-items:center;justify-content:center;
+}
+.ad-row::before{
+  content:"Sponsored";
+  position:absolute;top:7px;left:10px;z-index:2;
+  font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+  color:var(--sub);opacity:.6;pointer-events:none;
+}
+/* Hide only truly-empty rows (pre-injection). :empty still matches despite ::before
+   (generated content isn't a child node), so unfilled slots collapse instead of showing
+   an empty Sponsored card. */
+.ad-row:empty{display:none}
+
+/* ━━━ PAGINATION ━━━ */
+.pag{
+  grid-column:1/-1;display:flex;align-items:center;
+  justify-content:center;gap:5px;padding:28px 0 8px;flex-wrap:wrap;
+}
+.pg{
+  min-width:34px;height:34px;padding:0 8px;border-radius:8px;
+  border:1px solid var(--border2);background:var(--surface2);color:var(--sub);
+  font-size:12px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s;user-select:none;
+}
+.pg:hover{border-color:var(--accent);color:var(--text)}
+.pg.on{background:var(--accent);border-color:var(--accent);color:#000;font-weight:800}
+.pg:disabled{opacity:.25;cursor:default;pointer-events:none}
+.pg-dots{width:28px;height:34px;display:flex;align-items:center;justify-content:center;color:var(--sub);font-size:13px}
+.pag-goto{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:6px}
+.pag-goto input{
+  width:90px;height:34px;border-radius:8px;text-align:center;
+  background:var(--surface2);border:1px solid var(--border2);
+  color:var(--text);font-size:16px;outline:none;-webkit-appearance:none;
+}
+.pag-goto input:focus{border-color:var(--accent)}
+.pag-goto button{
+  height:34px;padding:0 16px;border-radius:8px;
+  background:var(--accent);color:#000;border:none;
+  font-size:12px;font-weight:800;cursor:pointer;transition:background .15s;
+}
+.pag-goto button:hover{background:var(--accent2)}
+.scroll-sentinel{height:1px}
+
+/* Footer links */
+.foot-links{
+  max-width:var(--maxW);margin:0 auto;padding:0 20px 40px;
+  display:flex;gap:16px;justify-content:center;
+  font-size:11px;color:var(--sub);font-weight:600;
+}
+.foot-links a:hover{color:var(--text)}
+</style>
+</head>
+<body><noscript><div style="padding:40px 20px;text-align:center;font-family:sans-serif;color:#f0f0f0;background:#0a0b0e;min-height:100vh"><h1>34VaultVideo</h1><p style="margin-top:16px;color:#8b8fa8">This site requires JavaScript to function. Please enable JavaScript in your browser settings.</p></div></noscript>
+
+<!-- ━━━ TOPBAR ━━━ -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="brand" onclick="location.href='index.html'">34<span>Vault</span><span>Video</span></div>
+
+    <div class="nav-pills">
+      <button class="nav-pill" onclick="location.href='https://34vault.com/'">Comics</button>
+    </div>
+
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input class="search-input" id="searchInput" placeholder="Search videos" autocomplete="off" />
+      <button class="search-x" id="searchX" type="button">✕</button>
+    </div>
+
+    <button class="avatar-btn" onclick="location.href='https://34vault.com/profile.html'" title="Profile" type="button">V</button>
+  </div>
+</header>
+
+<!-- ━━━ FILTER STRIP ━━━ -->
+<div class="filter-strip">
+  <div class="filter-inner" id="filterInner">
+    <button class="filters-btn" id="filtersBtn" type="button">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg> Filters
+      <span class="filters-badge" id="filtersBadge" style="display:none">0</span>
+    </button>
+    <select class="sort-select" id="sortSel">
+      <option value="new">Newest</option>
+      <option value="views">Most Viewed</option>
+    </select>
+    <span class="sel-ico"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 9h8M8 13h8M8 17h4"/></svg><select class="sort-select" id="modeSel">
+      <option value="pages">Pages</option>
+      <option value="scroll">Scroll</option>
+    </select></span>
+    <button class="sort-select gv-btn" id="gridViewBtn" type="button" title="Video size (grid / large)" aria-label="Toggle video size"></button>
+    <div class="chip" id="chipFavs"><span class="fav-star">&#9733;</span> Saved <span class="cn" id="favCt">0</span></div>
+  </div>
+</div>
+
+<!-- ━━━ FILTERS SHEET (simplified: tag search + tag chips only) ━━━ -->
+<div class="fsheet-back" id="fsheetBack"></div>
+<div class="fsheet" id="fsheet">
+  <div class="fsheet-handle"></div>
+  <div class="fsheet-head">
+    <div class="fsheet-title">Filters</div>
+    <div class="fsheet-head-actions">
+      <button class="fsheet-clear" id="fsheetClear" type="button">Clear all</button>
+      <button class="fsheet-x" id="fsheetX" type="button" aria-label="Close">✕</button>
+    </div>
+  </div>
+  <input class="fsheet-tagsearch" id="filterSearchInput" placeholder="Search tags…" autocomplete="off" />
+  <div class="fsheet-body">
+    <div class="fsheet-section" id="selectedSection" style="display:none">
+      <div class="fsheet-label">Selected</div>
+      <div class="chip-wrap" id="selectedChips"></div>
+    </div>
+    <div class="fsheet-section" id="tagSection">
+      <div class="fsheet-label">Tags</div>
+      <div class="chip-wrap" id="tagChips"></div>
+      <div class="fsheet-empty" id="tagChipsEmpty" style="display:none">No tags match.</div>
+    </div>
+  </div>
+  <button class="fsheet-done" id="fsheetDone" type="button">Show Results</button>
+</div>
+
+<!-- ━━━ MAIN ━━━ -->
+<main class="main">
+  <div class="grid-header">
+    <div class="grid-title" id="gridTitle">Browse Videos</div>
+    <div class="grid-count" id="gridCount"></div>
+  </div>
+  <div class="grid" id="grid">
+    <div class="sk"><div class="sk-c"></div><div class="sk-b"><div class="sk-l"></div><div class="sk-l s"></div></div></div>
+    <div class="sk"><div class="sk-c"></div><div class="sk-b"><div class="sk-l"></div><div class="sk-l s"></div></div></div>
+    <div class="sk"><div class="sk-c"></div><div class="sk-b"><div class="sk-l"></div><div class="sk-l s"></div></div></div>
+    <div class="sk"><div class="sk-c"></div><div class="sk-b"><div class="sk-l"></div><div class="sk-l s"></div></div></div>
+    <div class="sk"><div class="sk-c"></div><div class="sk-b"><div class="sk-l"></div><div class="sk-l s"></div></div></div>
+    <div class="sk"><div class="sk-c"></div><div class="sk-b"><div class="sk-l"></div><div class="sk-l s"></div></div></div>
+  </div>
+  <div class="pag" id="pagArea"></div>
+  <div class="scroll-sentinel" id="scrollSentinel"></div>
+</main>
+
+<div class="foot-links">
+  <a href="policy.html">Terms &amp; Privacy</a>
+  <a href="contact.html">Contact</a>
+  <a href="https://34vault.com/" rel="noopener">34Vault Comics</a>
+</div>
+
+<script>
+window.ADS_ENABLED = false; // TODO: enable after the new ExoClick account zones for 34vaultvideo.com are created (see the ads.js comment block at the bottom of this file).
+
+const API   = window.__API__ || "";
+const K_FAV = "favoriteSlugs";
+const K_FIL = "videoIndexFilters_v1";
+const K_PMODE = "videoIndexPageMode_v1";
+const PAGE  = 24;
+const AD_N  = 6;
+
+let all=[], filtered=[], favOnly=false, page=1;
+let _adSeq=0;   // global unique-id counter for in-grid ad slots
+let pageMode="pages", loadedCount=PAGE;
+let activeTags=new Set(), sortMode="new";
+
+// Elements
+const grid       = document.getElementById("grid");
+// Videos-per-row toggle (persisted), DEFAULT = "2" (dense grid: 2 per row on mobile).
+// "1" = large layout.
+const gridViewBtn = document.getElementById("gridViewBtn");
+let gridMode = (function(){ try { return localStorage.getItem("videoGridMode_v1") || "2"; } catch(e) { return "2"; } })();
+const GV_ICON_GRID  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>';
+const GV_ICON_LARGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2.5"/></svg>';
+function applyGridMode(){ grid.classList.toggle("g1", gridMode === "1"); if(gridViewBtn) gridViewBtn.innerHTML = (gridMode === "1" ? GV_ICON_LARGE : GV_ICON_GRID); }
+if(gridViewBtn) gridViewBtn.addEventListener("click", function(){ gridMode = (gridMode === "1" ? "2" : "1"); try { localStorage.setItem("videoGridMode_v1", gridMode); } catch(e){} applyGridMode(); });
+applyGridMode();
+const srch       = document.getElementById("searchInput");
+const srchX      = document.getElementById("searchX");
+const chipFavs   = document.getElementById("chipFavs");
+const favCt      = document.getElementById("favCt");
+const gridTitle  = document.getElementById("gridTitle");
+const gridCount  = document.getElementById("gridCount");
+const pagArea    = document.getElementById("pagArea");
+const scrollSentinel = document.getElementById("scrollSentinel");
+const modeSel    = document.getElementById("modeSel");
+
+const filtersBtn   = document.getElementById("filtersBtn");
+const filtersBadge = document.getElementById("filtersBadge");
+const fsheetBack   = document.getElementById("fsheetBack");
+const fsheet       = document.getElementById("fsheet");
+const fsheetClear  = document.getElementById("fsheetClear");
+const fsheetX      = document.getElementById("fsheetX");
+const fsheetDone   = document.getElementById("fsheetDone");
+const tagChipsEl   = document.getElementById("tagChips");
+const tagChipsEmpty= document.getElementById("tagChipsEmpty");
+const filterSearchInput = document.getElementById("filterSearchInput");
+const selectedSection   = document.getElementById("selectedSection");
+const selectedChipsEl   = document.getElementById("selectedChips");
+const sortSel      = document.getElementById("sortSel");
+
+// ── SCROLL LOCK (iOS-safe) ──
+let _scrollLockY=0, _lockCount=0;
+function lockScroll(){
+  if(_lockCount===0){
+    _scrollLockY=window.scrollY||window.pageYOffset||0;
+    document.body.style.position="fixed";
+    document.body.style.top=`-${_scrollLockY}px`;
+    document.body.style.left="0";document.body.style.right="0";document.body.style.width="100%";
+  }
+  _lockCount++;
+}
+function unlockScroll(){
+  _lockCount=Math.max(0,_lockCount-1);
+  if(_lockCount===0){
+    document.body.style.position="";document.body.style.top="";
+    document.body.style.left="";document.body.style.right="";document.body.style.width="";
+    window.scrollTo(0,_scrollLockY);
+  }
+}
+
+// ── FAVORITES (localStorage only — no server sync on the video site) ──
+const getFavs=()=>{ try{ return new Set(JSON.parse(localStorage.getItem(K_FAV)||"[]")); }catch{ return new Set(); } };
+const setFavs=s=>{ try{ localStorage.setItem(K_FAV,JSON.stringify([...s])); }catch{} updFavCt(); };
+const updFavCt=()=>{ favCt.textContent=String(getFavs().size); };
+
+// Avatar: show the logged-in user's avatar/initial from the shared 34vault account
+// (cookie lives on api.34vault.com). Button itself links to the main site's profile.
+(function(){
+  fetch(`${API}/api/me`,{credentials:"include"}).then(r=>r.ok?r.json():null).then(me=>{
+    if(!me) return;
+    const av=document.querySelector(".avatar-btn");
+    if(!av) return;
+    if(me.avatarUrl) av.innerHTML=`<img src="${esc(me.avatarUrl)}" alt="">`;
+    else av.textContent=(me.displayName||"V").charAt(0).toUpperCase();
+  }).catch(()=>{});
+})();
+
+async function load(){
+  try{
+    try{ const m=localStorage.getItem(K_PMODE); if(m==="pages"||m==="scroll") pageMode=m; }catch{}
+    modeSel.value=pageMode;
+
+    // Show cached data instantly while fetching fresh data
+    var cached=null;
+    try{ cached=JSON.parse(sessionStorage.getItem("_videos")); }catch{}
+    if(cached&&Array.isArray(cached)&&cached.length>50){
+      all=cached;
+      calcAvgViewsPerDay(); restore(); applyUrlParams(); buildFilters(); apply();
+    } else {
+      // Cold start: fetch one small page first so the grid paints almost instantly,
+      // then the full catalog fetch below replaces it.
+      grid.innerHTML='<div style="text-align:center;padding:40px;color:var(--sub)"><div class="spinner" style="margin:0 auto 12px"></div>Loading videos...</div>';
+      try{
+        const fr=await fetch(`${API}/api/videos?limit=60&offset=0`);
+        if(fr.ok){
+          const fd=await fr.json();
+          const firstPage=Array.isArray(fd.videos)?fd.videos:[];
+          if(firstPage.length){
+            all=firstPage;
+            calcAvgViewsPerDay(); restore(); applyUrlParams(); buildFilters(); apply();
+          }
+        }
+      }catch{}
+    }
+
+    // Fetch the full catalog (limit capped at 30000 server-side)
+    const r=await fetch(`${API}/api/videos?limit=30000`);
+    if(!r.ok) throw 0;
+    const data=await r.json();
+    all=Array.isArray(data.videos)?data.videos:(Array.isArray(data)?data:[]);
+    try{ sessionStorage.setItem("_videos",JSON.stringify(all)); }catch{}
+    calcAvgViewsPerDay();
+    restore();
+    applyUrlParams();
+    buildFilters();
+    apply();
+  }catch{
+    if(!all.length) grid.innerHTML=`<div class="state-box">
+      <div class="state-ico">⚠️</div>
+      <div class="state-t">Couldn't load</div>
+      <div class="state-s">Check connection and try again.</div>
+      <button class="state-btn" onclick="location.reload()">Retry</button>
+    </div>`;
+  }
+}
+
+let allTagsSorted=[], popularTags=[];
+function buildFilters(){
+  const tagCount=new Map();
+  for(const v of all){
+    for(const t of normTags(v.tags)) tagCount.set(t,(tagCount.get(t)||0)+1);
+  }
+  allTagsSorted=[...tagCount.keys()].sort();
+  popularTags=[...tagCount.entries()].sort((a,b)=>b[1]-a[1]).slice(0,24).map(e=>e[0]);
+  renderFilterChips();
+  renderSelectedChips();
+}
+
+function renderFilterChips(){
+  const term=filterSearchInput.value.trim().toLowerCase();
+  const searching=term.length>0;
+  const tagList=searching?allTagsSorted.filter(t=>t.toLowerCase().includes(term)):popularTags;
+  tagChipsEl.innerHTML="";
+  if(!allTagsSorted.length){
+    tagChipsEl.innerHTML=`<div class="fsheet-empty">No tags yet.</div>`;
+    tagChipsEmpty.style.display="none";
+  } else {
+    tagChipsEmpty.style.display=tagList.length?"none":"block";
+    tagList.slice(0,200).forEach(tag=>{
+      const b=document.createElement("button");
+      b.type="button"; b.className="chip"+(activeTags.has(tag)?" on":"");
+      b.textContent=tag; b.dataset.tag=tag;
+      b.addEventListener("click",()=>toggleTag(tag));
+      tagChipsEl.appendChild(b);
+    });
+  }
+}
+
+function renderSelectedChips(){
+  const items=[...activeTags];
+  selectedSection.style.display=items.length?"block":"none";
+  selectedChipsEl.innerHTML="";
+  items.forEach(tag=>{
+    const b=document.createElement("button");
+    b.type="button"; b.className="chip selected-chip";
+    b.innerHTML=`${esc("#"+tag)} <span class="chip-x">✕</span>`;
+    b.addEventListener("click",()=>toggleTag(tag));
+    selectedChipsEl.appendChild(b);
+  });
+}
+
+function toggleTag(tag){ activeTags.has(tag)?activeTags.delete(tag):activeTags.add(tag); renderFilterChips(); renderSelectedChips(); apply(); }
+
+function apply(){
+  const q=srch.value.trim().toLowerCase();
+  const favs=getFavs();
+  filtered=all.filter(v=>{
+    if(favOnly&&!favs.has(v.slug)) return false;
+    if(activeTags.size){ const vt=normTags(v.tags); if(![...activeTags].some(t=>vt.includes(t))) return false; }
+    if(q){
+      const hay=[v.title,normTags(v.tags).join(" ")].map(x=>String(x||"").toLowerCase()).join(" ");
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  sortFiltered();
+  page=1; loadedCount=PAGE;
+  const bits=[];
+  if(favOnly) bits.push("Saved");
+  if(activeTags.size) bits.push([...activeTags].map(t=>"#"+t).join(", "));
+  if(q) bits.push(`"${q}"`);
+  gridTitle.textContent=bits.length?bits.join(" · "):"Browse Videos";
+  gridCount.textContent=filtered.length?`${filtered.length} videos`:"";
+  updateFiltersUI();
+  save();
+  render();
+}
+
+function sortFiltered(){
+  if(sortMode==="views") filtered.sort((a,b)=>Number(b.views||0)-Number(a.views||0));
+  // "new" = insertion order: id is an autoincrement int, so id desc = newest added first
+  else filtered.sort((a,b)=>Number(b.id||0)-Number(a.id||0));
+}
+
+function updateFiltersUI(){
+  const count=activeTags.size;
+  filtersBadge.style.display=count?"inline-flex":"none";
+  filtersBadge.textContent=String(count);
+  filtersBtn.classList.toggle("on",count>0);
+}
+
+function render(){
+  grid.innerHTML="";
+  if(!filtered.length){
+    grid.innerHTML=`<div class="state-box">
+      <div class="state-ico">🔍</div>
+      <div class="state-t">Nothing found</div>
+      <div class="state-s">Try different filters or clear your search.</div>
+      <button class="state-btn" onclick="clearAll()">Clear all</button>
+    </div>`;
+    pagArea.innerHTML=""; scrollSentinel.style.display="none"; return;
+  }
+  const favs=getFavs();
+  if(pageMode==="pages"){
+    scrollSentinel.style.display="none";
+    const total=Math.ceil(filtered.length/PAGE);
+    page=Math.min(Math.max(1,page),total);
+    const start=(page-1)*PAGE;
+    appendCards(filtered.slice(start,start+PAGE),favs);
+    pagArea.innerHTML=total>1?buildPag(page,total):"";
+    if(total>1){
+      pagArea.querySelectorAll(".pg[data-p]").forEach(b=>{
+        b.addEventListener("click",()=>{ page=Number(b.dataset.p); render(); window.scrollTo({top:0,behavior:"smooth"}); });
+      });
+      const goWrap=document.createElement("div");
+      goWrap.className="pag-goto";
+      goWrap.innerHTML=`<input type="number" min="1" max="${total}" id="gotoPageInput" placeholder="Page #" inputmode="numeric" /><button type="button" id="gotoPageBtn">Go</button>`;
+      pagArea.appendChild(goWrap);
+      const gotoInput=goWrap.querySelector("#gotoPageInput");
+      const gotoBtn=goWrap.querySelector("#gotoPageBtn");
+      const goToPage=()=>{ const v=Math.min(Math.max(1,parseInt(gotoInput.value,10)||1),total); page=v; render(); window.scrollTo({top:0,behavior:"smooth"}); };
+      gotoBtn.addEventListener("click",goToPage);
+      gotoInput.addEventListener("keydown",e=>{ if(e.key==="Enter") goToPage(); });
+    }
+  } else {
+    pagArea.innerHTML="";
+    loadedCount=Math.min(Math.max(loadedCount,PAGE),Math.max(filtered.length,PAGE));
+    appendCards(filtered.slice(0,Math.min(loadedCount,filtered.length)),favs);
+    scrollSentinel.style.display=loadedCount<filtered.length?"block":"none";
+  }
+}
+
+function appendCards(slice,favs){
+  slice.forEach((v,i)=>{
+    // In-grid ad slots — DISABLED for launch. Same rotation structure as the main site
+    // (r%4: native / outstream / multiformat / TS-video); flips on with window.ADS_ENABLED.
+    if(window.ADS_ENABLED && i>0 && i%AD_N===0){
+      const adId="gridAd_"+(_adSeq++);   // unique id per slot
+      const slot=grid.querySelectorAll(".ad-row").length;  // rotation position = slots already in the grid
+      const adDiv=document.createElement("div");
+      adDiv.className="ad-row";
+      adDiv.id=adId;
+      grid.appendChild(adDiv);
+      (function(id,r){
+        window.onAdsReady(function(){
+          var kw=window.AD_KEYWORDS||"hentai,rule34,video,porn,anime,adult,nsfw";
+          if(r%4===0 && window.injectRecommendationWidget)  injectRecommendationWidget(id,"grid_native",kw);
+          else if(r%4===1 && window.injectOutstreamVideo)   injectOutstreamVideo(id,"grid_out",kw);
+          else if(r%4===2 && window.injectMultiformat)      injectMultiformat(id,"grid_mf",kw);
+          else if(window.injectTSVideo)                     injectTSVideo(id,"grid_tsvideo");
+          setTimeout(function(){
+            var e=document.getElementById(id); if(!e) return;
+            var filled=e.querySelector("iframe,video,img") || e.getBoundingClientRect().height>90;
+            if(!filled) e.style.display="none";
+          },6000);
+        });
+      })(adId, slot);
+    }
+    grid.appendChild(mkCard(v,favs));
+  });
+}
+
+function setPageMode(mode){
+  if(mode===pageMode) return;
+  if(pageMode==="scroll" && mode==="pages"){
+    // Calculate approximate page from scroll position
+    const cards = grid.querySelectorAll('.card');
+    if(cards.length){
+      const scrollY = window.scrollY || window.pageYOffset;
+      let visibleIndex = 0;
+      for(let i=0;i<cards.length;i++){
+        if(cards[i].offsetTop < scrollY + 200) visibleIndex = i;
+      }
+      page = Math.floor(visibleIndex / PAGE) + 1;
+    }
+  }
+  pageMode=mode;
+  try{ localStorage.setItem(K_PMODE,pageMode); }catch{}
+  modeSel.value=pageMode; render();
+}
+modeSel.addEventListener("change",()=>setPageMode(modeSel.value));
+
+let _scrollLoading=false;
+new IntersectionObserver(entries=>{
+  if(!entries[0].isIntersecting) return;
+  if(pageMode!=="scroll"||_scrollLoading||loadedCount>=filtered.length) return;
+  _scrollLoading=true;
+  const prevCount=loadedCount;
+  loadedCount=Math.min(loadedCount+PAGE,filtered.length);
+  const favs=getFavs();
+  appendCards(filtered.slice(prevCount,loadedCount),favs);
+  scrollSentinel.style.display=loadedCount<filtered.length?"block":"none";
+  setTimeout(()=>{ _scrollLoading=false; },150);
+},{rootMargin:"300px"}).observe(scrollSentinel);
+
+function buildPag(cur,tot){
+  let h=`<button class="pg" data-p="${cur-1}" ${cur===1?"disabled":""}>‹</button>`;
+  const ps=[];
+  if(tot<=7){ for(let i=1;i<=tot;i++) ps.push(i); }
+  else{
+    ps.push(1);
+    if(cur>3) ps.push("…");
+    for(let i=Math.max(2,cur-1);i<=Math.min(tot-1,cur+1);i++) ps.push(i);
+    if(cur<tot-2) ps.push("…");
+    ps.push(tot);
+  }
+  for(const p of ps){
+    h+=p==="…"?`<span class="pg-dots">…</span>`:`<button class="pg${p===cur?" on":""}" data-p="${p}">${p}</button>`;
+  }
+  return h+`<button class="pg" data-p="${cur+1}" ${cur===tot?"disabled":""}>›</button>`;
+}
+
+let _avgViewsPerDay=10;
+function calcAvgViewsPerDay(){
+  if(!all.length) return;
+  const now=Date.now(), DAY=86400000;
+  let total=0, count=0;
+  for(const v of all){
+    const age=Math.max(1,(now-(v.createdAt?new Date(v.createdAt).getTime():now))/DAY);
+    const vpd=Number(v.views||0)/age;
+    if(vpd>0){total+=vpd;count++;}
+  }
+  _avgViewsPerDay=count?total/count:10;
+}
+
+function getBadge(v){
+  const now=Date.now();
+  const createdMs=v.createdAt?new Date(v.createdAt).getTime():0;
+  const DAY=86400000;
+  const daysSince=createdMs?Math.max(0.04,(now-createdMs)/DAY):null;
+  const viewsPerDay=daysSince?Number(v.views||0)/daysSince:0;
+  if(viewsPerDay>_avgViewsPerDay*3) return{text:"HOT",cls:"badge-hot"};
+  if(createdMs&&(now-createdMs)<2*DAY) return{text:"NEW",cls:"badge-new"};
+  return null;
+}
+
+function mkCard(v,favs){
+  const slug=v.slug||"",title=v.title||"Untitled",
+        thumb=v.thumbUrl||"",isFav=favs.has(slug);
+  const tags=normTags(v.tags);
+  const badge=getBadge(v);
+  const card=document.createElement("div");
+  card.className="card";
+  card.innerHTML=`
+    <a href="watch.html?slug=${encodeURIComponent(slug)}" style="display:contents">
+      <div class="c-cover">
+        ${badge?`<div class="c-new ${badge.cls}">${badge.text}</div>`:""}
+        <img class="c-img" src="${esc(thumb)}" alt="${esc(title)}" loading="lazy" decoding="async" referrerpolicy="no-referrer"
+          onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22320%22 height=%22180%22%3E%3Crect fill=%22%230d1018%22 width=%22320%22 height=%22180%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%231a1e2a%22 font-size=%2214%22 font-family=%22sans-serif%22%3ENo Thumb%3C/text%3E%3C/svg%3E'" />
+        ${v.duration?`<div class="c-dur"><svg viewBox="0 0 24 24"><polygon points="7 4 20 12 7 20 7 4"/></svg>${fmtDur(v.duration)}</div>`:""}
+      </div>
+      <div class="c-title">${esc(title)}</div>
+    </a>
+    <div class="c-bk${isFav?" on":""}" data-slug="${esc(slug)}">${isFav?"&#9733;":"&#9734;"}</div>
+    <div class="c-foot">
+      <div class="c-tag1">${tags.length?esc(tags[0]):""}</div>
+      <span class="c-views">
+        <svg class="c-ico" viewBox="0 0 24 24">
+          <path d="M2 12c2.5-5 6-7.5 10-7.5S19.5 7 22 12c-2.5 5-6 7.5-10 7.5S4.5 17 2 12Z"/>
+          <circle cx="12" cy="12" r="2.6"/>
+        </svg>${fmtNum(v.views)}
+      </span>
+    </div>
+  `;
+  card.querySelector(".c-bk").addEventListener("click",e=>{
+    e.preventDefault(); e.stopPropagation();
+    const s=getFavs(),sl=e.currentTarget.dataset.slug;
+    const adding=!s.has(sl);
+    adding?s.add(sl):s.delete(sl);
+    setFavs(s);
+    e.currentTarget.classList.toggle("on",adding);
+    e.currentTarget.innerHTML=adding?"&#9733;":"&#9734;";
+    if(favOnly) apply();
+  });
+  return card;
+}
+
+function clearAll(){
+  srch.value=""; activeTags=new Set();
+  favOnly=false; sortMode="new"; filterSearchInput.value="";
+  srchX.classList.remove("vis"); chipFavs.classList.remove("on");
+  sortSel.value=sortMode;
+  renderFilterChips(); renderSelectedChips(); apply();
+}
+window.clearAll=clearAll;
+
+function save(){
+  try{
+    localStorage.setItem(K_FIL,JSON.stringify({
+      q:srch.value,tags:[...activeTags],fav:favOnly,sort:sortMode,
+    }));
+  }catch{}
+}
+function restore(){
+  try{
+    const s=JSON.parse(localStorage.getItem(K_FIL)||"{}");
+    if(s.q){ srch.value=s.q; srchX.classList.add("vis"); }
+    if(Array.isArray(s.tags)) activeTags=new Set(s.tags);
+    if(s.fav) favOnly=true;
+    if(s.sort==="new"||s.sort==="views") sortMode=s.sort;
+    chipFavs.classList.toggle("on",favOnly);
+    sortSel.value=sortMode;
+  }catch{}
+}
+// URL params (?tag=… from watch-page tag chips, ?q=… from the SearchAction schema)
+// override whatever was restored from localStorage.
+function applyUrlParams(){
+  try{
+    const p=new URLSearchParams(location.search);
+    const t=p.get("tag"), uq=p.get("q");
+    if(t){
+      activeTags=new Set([t]); favOnly=false;
+      chipFavs.classList.remove("on");
+      if(!uq){ srch.value=""; srchX.classList.remove("vis"); }
+    }
+    if(uq){ srch.value=uq; srchX.classList.add("vis"); }
+    sortSel.value=sortMode;
+  }catch{}
+}
+
+// Debounce search so typing doesn't re-filter the whole catalog on every keystroke
+function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
+const applyDebounced=debounce(apply,250);
+
+srch.addEventListener("input",()=>{ srchX.classList.toggle("vis",!!srch.value); applyDebounced(); });
+srchX.addEventListener("click",()=>{ srch.value=""; srchX.classList.remove("vis"); srch.focus(); apply(); });
+chipFavs.addEventListener("click",()=>{ favOnly=!favOnly; chipFavs.classList.toggle("on",favOnly); apply(); });
+
+function openFsheet(){ fsheetBack.classList.add("open"); fsheet.classList.add("open"); lockScroll(); }
+function closeFsheet(){ fsheetBack.classList.remove("open"); fsheet.classList.remove("open"); unlockScroll(); }
+filtersBtn.addEventListener("click",openFsheet);
+fsheetBack.addEventListener("click",closeFsheet);
+fsheetX.addEventListener("click",closeFsheet);
+fsheetDone.addEventListener("click",closeFsheet);
+fsheetClear.addEventListener("click",clearAll);
+filterSearchInput.addEventListener("input",renderFilterChips);
+
+sortSel.addEventListener("change",()=>{ sortMode=sortSel.value; page=1; loadedCount=PAGE; _scrollLoading=false; window.scrollTo(0,0); apply(); });
+
+function normTags(t){ if(!t)return[]; if(Array.isArray(t))return t.map(x=>String(x).trim()).filter(Boolean); return String(t).split(",").map(x=>x.trim()).filter(Boolean); }
+function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function fmtNum(n){
+  n=Number(n||0);
+  if(n>=1000000) return(n/1000000).toFixed(1).replace(/\.0$/,"")+"M";
+  if(n>=1000) return(n/1000).toFixed(1).replace(/\.0$/,"")+"k";
+  return String(n);
+}
+// Seconds -> "m:ss" (or "h:mm:ss" for 1h+)
+function fmtDur(sec){
+  sec=Math.max(0,Math.floor(Number(sec)||0));
+  const h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60), s=sec%60;
+  if(h) return h+":"+String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");
+  return m+":"+String(s).padStart(2,"0");
+}
+
+// Save scroll position before leaving
+window.addEventListener('beforeunload', () => {
+  try { sessionStorage.setItem('indexScrollY', String(window.scrollY)); } catch {}
+});
+// Restore scroll position on load
+window.addEventListener('load', () => {
+  try {
+    const y = sessionStorage.getItem('indexScrollY');
+    if (y) { setTimeout(() => window.scrollTo(0, parseInt(y, 10)), 100); sessionStorage.removeItem('indexScrollY'); }
+  } catch {}
+});
+
+updFavCt();
+load();
+</script>
+
+<!-- ═══ ADS (disabled for launch) ═══
+  ads.js is NOT in this repo yet. It will be added once the NEW ExoClick account
+  zones for 34vaultvideo.com are created. When they are:
+    1. Copy ads.js from the main 34vault frontend and swap in the new zone IDs.
+    2. Uncomment the script tag below.
+    3. Flip window.ADS_ENABLED to true at the top of the page script above.
+  <script src="/ads.js?v=1" defer></script>
+-->
+<script>
+window.onAdsReady = window.onAdsReady || function(fn){
+  var t=0; var p=setInterval(function(){t++;if(window.__adsReady){clearInterval(p);fn();}else if(t>40)clearInterval(p);},100);
+};
+</script>
+</body>
+</html>

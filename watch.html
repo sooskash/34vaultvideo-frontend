@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script src="/config.js?v=1"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<!-- NO-REFERRER, page-wide: the source CDN 403s the mp4 stream + poster when a foreign
+     Referer is sent, but serves fine with none. <video> has no referrerpolicy attribute
+     in the HTML spec, so the meta tag is the only reliable way to strip it from media
+     requests. NOTE for later: when ad zones go live on this page, check whether the ad
+     network needs the referrer for domain verification. -->
+<meta name="referrer" content="no-referrer" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="preconnect" href="https://api.34vault.com" />
+<link rel="stylesheet" href="/shared.css" />
+<title>Loading... | 34VaultVideo</title>
+<meta name="description" content="" />
+<meta name="rating" content="adult" />
+<meta property="og:type" content="video.other" />
+<meta property="og:site_name" content="34VaultVideo" />
+<meta property="og:title" content="" />
+<meta property="og:description" content="" />
+<meta property="og:image" content="" />
+<meta property="og:url" content="" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="" />
+<meta name="twitter:image" content="" />
+<link rel="canonical" href="" />
+<style>
+body{padding-top:var(--topH);padding-bottom:32px}
+.page{max-width:1100px;margin:0 auto;padding:12px 14px 40px}
+
+/* Brand — gradient "Vault"+"Video" like the homepage */
+.brand span{background:var(--grad-accent,linear-gradient(135deg,#ffce54,var(--accent) 55%,#c07c08));-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* ── PLAYER ── */
+.player-shell{
+  position:relative;width:100%;aspect-ratio:16/9;
+  background:#000;border-radius:14px;overflow:hidden;
+  border:1px solid var(--border);box-shadow:var(--shadow);
+}
+.player-shell video{width:100%;height:100%;display:block;background:#000;outline:none}
+
+/* Quality pills */
+.q-row{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 2px;align-items:center}
+.q-label{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-right:2px}
+.q-pill{
+  height:28px;padding:0 12px;border-radius:999px;
+  background:var(--panel2);border:1px solid var(--border);
+  color:var(--muted);font-size:11px;font-weight:800;cursor:pointer;
+  transition:all .15s;
+}
+.q-pill:hover{border-color:var(--accent);color:var(--text)}
+.q-pill.on{background:var(--accent);border-color:var(--accent);color:#000}
+
+/* Resolve-error card (overlays the player, poster stays visible behind it) */
+.err-card{
+  position:absolute;inset:0;z-index:5;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  text-align:center;padding:20px;
+  background:rgba(10,11,14,.88);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+}
+.err-ico{font-size:32px}
+.err-t{font-size:15px;font-weight:900}
+.err-s{font-size:12px;color:var(--muted);max-width:360px;line-height:1.5}
+.src-btn{
+  height:40px;padding:0 20px;border-radius:10px;margin-top:4px;
+  background:var(--accent);color:#000;font-size:13px;font-weight:800;
+  display:inline-flex;align-items:center;gap:8px;transition:background .15s;
+}
+.src-btn:hover{background:var(--accent2)}
+
+/* ── META ── */
+.v-title{font-size:18px;font-weight:900;line-height:1.25;margin-top:10px;letter-spacing:-.2px}
+.v-meta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);font-weight:700;margin-top:7px}
+.v-meta span{display:inline-flex;align-items:center;gap:5px}
+.v-meta svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.8}
+.v-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}
+.v-tag{
+  height:24px;padding:0 10px;border-radius:999px;
+  background:var(--panel2);border:1px solid var(--border);
+  font-size:11px;font-weight:700;color:var(--muted);
+  display:inline-flex;align-items:center;cursor:pointer;transition:all .15s;
+}
+.v-tag:hover{border-color:var(--accent);color:var(--text)}
+
+/* Ad slot (gated behind window.ADS_ENABLED — off for launch) */
+.ad-slot{margin:20px 0 4px;display:flex;align-items:center;justify-content:center}
+.ad-slot:empty{display:none}
+
+/* ── MORE VIDEOS ── */
+.sec{margin-top:26px}
+.sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+.sec-title{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--accent);display:flex;align-items:center;gap:6px}
+
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:600px){.grid{grid-template-columns:repeat(3,1fr);gap:12px}}
+@media(min-width:900px){.grid{grid-template-columns:repeat(4,1fr);gap:14px}}
+
+/* Card — same component as the homepage (16/9 cover + duration chip + views) */
+.vcard{
+  border-radius:14px;background:var(--panel);
+  border:1px solid var(--border);overflow:hidden;
+  position:relative;display:flex;flex-direction:column;
+  transition:transform .2s,border-color .2s,box-shadow .2s;
+  cursor:pointer;min-width:0;
+}
+.vcard:hover{
+  transform:translateY(-5px);
+  border-color:var(--accent-45,rgba(245,158,11,.5));
+  box-shadow:0 16px 40px rgba(0,0,0,.55),0 0 0 1px var(--accent-10,rgba(245,158,11,.12));
+}
+.c-cover{position:relative;overflow:hidden;aspect-ratio:16/9;background:#0d1018;flex-shrink:0}
+.c-cover::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:38%;
+  background:linear-gradient(180deg,transparent,rgba(6,7,11,.72));
+  pointer-events:none;z-index:1;
+}
+.c-img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .4s cubic-bezier(.4,0,.2,1)}
+.vcard:hover .c-img{transform:scale(1.07)}
+.c-dur{
+  position:absolute;bottom:8px;right:8px;z-index:2;
+  height:20px;padding:0 8px;border-radius:7px;
+  background:rgba(10,11,14,.72);border:1px solid rgba(255,255,255,.08);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  color:#dfe3ee;font-size:9.5px;font-weight:800;
+  display:flex;align-items:center;gap:4px;
+}
+.c-dur svg{width:10px;height:10px;fill:currentColor;stroke:none;opacity:.85}
+.c-title{
+  padding:9px 9px 0;
+  font-size:11px;font-weight:800;color:var(--text);line-height:1.3;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
+  overflow:hidden;
+  height:calc(9px + 2*11px*1.3);
+}
+.c-foot{padding:6px 9px 9px;display:flex;align-items:center;justify-content:flex-end}
+.c-views{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;color:var(--text)}
+.c-views svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.6}
+
+.loading{text-align:center;padding:60px 20px;color:var(--muted)}
+.loading .spinner{margin:0 auto 12px}
+</style>
+</head>
+<body><noscript><div style="padding:40px 20px;text-align:center;font-family:sans-serif;color:#f0f0f0;background:#0a0b0e;min-height:100vh"><h1>34VaultVideo</h1><p style="margin-top:16px;color:#8b8fa8">This site requires JavaScript to function. Please enable JavaScript in your browser settings.</p></div></noscript>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="ico-btn" onclick="history.length>1&&document.referrer.includes('34vaultvideo')?history.back():location.href='index.html'">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </div>
+    <div class="brand" onclick="location.href='index.html'">34<span>Vault</span><span>Video</span></div>
+    <div class="spacer"></div>
+    <div class="desktop-nav"><a href="index.html">Browse</a><a href="https://34vault.com/" rel="noopener">Comics</a></div>
+  </div>
+</div>
+
+<div class="page" id="content">
+  <div class="loading"><div class="spinner"></div>Loading...</div>
+</div>
+
+<script>
+window.ADS_ENABLED = false; // TODO: enable after the new ExoClick account zones for 34vaultvideo.com are created (see the ads.js comment block at the bottom of this file).
+
+const API=window.__API__||"";
+const slug=new URLSearchParams(location.search).get("slug");
+
+let quals=[], curQ=-1;
+
+function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
+function fmtNum(n){n=Number(n||0);if(n>=1e6)return(n/1e6).toFixed(1).replace(/\.0$/,"")+"M";if(n>=1e3)return(n/1e3).toFixed(1).replace(/\.0$/,"")+"k";return String(n)}
+function fmtDur(sec){
+  sec=Math.max(0,Math.floor(Number(sec)||0));
+  const h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60), s=sec%60;
+  if(h) return h+":"+String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");
+  return m+":"+String(s).padStart(2,"0");
+}
+function normTags(t){ if(!t)return[]; if(Array.isArray(t))return t.map(x=>String(x).trim()).filter(Boolean); return String(t).split(",").map(x=>x.trim()).filter(Boolean); }
+
+const PLAY_ICO='<svg viewBox="0 0 24 24"><polygon points="7 4 20 12 7 20 7 4"/></svg>';
+const NO_THUMB="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22320%22 height=%22180%22%3E%3Crect fill=%22%230d1018%22 width=%22320%22 height=%22180%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%231a1e2a%22 font-size=%2214%22 font-family=%22sans-serif%22%3ENo Thumb%3C/text%3E%3C/svg%3E";
+
+function vcard(x){
+  return `<div class="vcard" onclick="location.href='watch.html?slug=${encodeURIComponent(x.slug)}'">
+    <div class="c-cover">
+      <img class="c-img" src="${esc(x.thumbUrl||"")}" alt="${esc(x.title||"")}" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.src='${NO_THUMB}'" />
+      ${x.duration?`<div class="c-dur">${PLAY_ICO}${fmtDur(x.duration)}</div>`:""}
+    </div>
+    <div class="c-title">${esc(x.title||"Untitled")}</div>
+    <div class="c-foot">
+      <span class="c-views"><svg viewBox="0 0 24 24"><path d="M2 12c2.5-5 6-7.5 10-7.5S19.5 7 22 12c-2.5 5-6 7.5-10 7.5S4.5 17 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>${fmtNum(x.views)}</span>
+    </div>
+  </div>`;
+}
+
+function renderPills(){
+  const row=document.getElementById("qRow");
+  if(!row) return;
+  if(!quals.length){ row.innerHTML=""; return; }
+  row.innerHTML='<span class="q-label">Quality</span>'+quals.map((q,i)=>
+    `<button type="button" class="q-pill${i===curQ?" on":""}" data-i="${i}">${esc(q.label)}</button>`
+  ).join("");
+  row.querySelectorAll(".q-pill").forEach(b=>{
+    b.addEventListener("click",()=>setQuality(Number(b.dataset.i)));
+  });
+}
+
+function setQuality(i){
+  if(i===curQ||!quals[i]) return;
+  const vid=document.getElementById("vid");
+  if(!vid) return;
+  const t=vid.currentTime||0;
+  const wasPlaying=!vid.paused&&!vid.ended;
+  curQ=i;
+  renderPills();
+  vid.src=quals[i].url;
+  vid.load();
+  vid.addEventListener("loadedmetadata",function once(){
+    vid.removeEventListener("loadedmetadata",once);
+    try{ vid.currentTime=t; }catch(e){}
+    if(wasPlaying) vid.play().catch(()=>{});
+  });
+}
+
+function showResolveError(v){
+  const shell=document.getElementById("playerShell");
+  if(!shell) return;
+  const o=document.createElement("div");
+  o.className="err-card";
+  o.innerHTML=`
+    <div class="err-ico">⚠️</div>
+    <div class="err-t">Playback unavailable</div>
+    <div class="err-s">The stream couldn't be loaded right now. It may be temporarily down — you can watch this video on the source site instead.</div>
+    <a class="src-btn" href="${esc(v.sourceUrl||"#")}" target="_blank" rel="noopener nofollow">Watch on source
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+    </a>`;
+  shell.appendChild(o);
+  const row=document.getElementById("qRow");
+  if(row) row.innerHTML="";
+}
+
+async function load(){
+  if(!slug){location.href="index.html";return}
+  try{
+    const r=await fetch(`${API}/api/videos/slug/${encodeURIComponent(slug)}`);
+    if(!r.ok) throw 0;
+    const d=await r.json();
+    const v=d.video||d;
+    if(!v||!v.slug) throw 0;
+
+    // SEO / social meta
+    const pageTitle=`${v.title||"Video"} | 34VaultVideo`;
+    document.title=pageTitle;
+    const desc=`Watch ${v.title||"this video"} free in up to 1080p on 34VaultVideo.`.slice(0,160);
+    const pageUrl=`https://34vaultvideo.com/watch.html?slug=${encodeURIComponent(v.slug)}`;
+    document.querySelector('meta[name="description"]')?.setAttribute("content",desc);
+    document.querySelector('meta[property="og:title"]')?.setAttribute("content",pageTitle);
+    document.querySelector('meta[property="og:description"]')?.setAttribute("content",desc);
+    document.querySelector('meta[name="twitter:title"]')?.setAttribute("content",pageTitle);
+    document.querySelector('meta[property="og:url"]')?.setAttribute("content",pageUrl);
+    document.querySelector('link[rel="canonical"]')?.setAttribute("href",pageUrl);
+    if(v.thumbUrl){
+      document.querySelector('meta[property="og:image"]')?.setAttribute("content",v.thumbUrl);
+      document.querySelector('meta[name="twitter:image"]')?.setAttribute("content",v.thumbUrl);
+    }
+
+    const tags=normTags(v.tags);
+
+    document.getElementById("content").innerHTML=`
+      <div class="player-shell" id="playerShell">
+        <video id="vid" controls playsinline preload="metadata" referrerpolicy="no-referrer" poster="${esc(v.thumbUrl||"")}"></video>
+      </div>
+      <div class="q-row" id="qRow"></div>
+      <h1 class="v-title">${esc(v.title||"Untitled")}</h1>
+      <div class="v-meta">
+        <span><svg viewBox="0 0 24 24"><path d="M2 12c2.5-5 6-7.5 10-7.5S19.5 7 22 12c-2.5 5-6 7.5-10 7.5S4.5 17 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>${fmtNum(v.views)} views</span>
+        ${v.duration?`<span><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${fmtDur(v.duration)}</span>`:""}
+      </div>
+      ${tags.length?`<div class="v-tags">${tags.slice(0,16).map(t=>`<span class="v-tag" onclick="location.href='index.html?tag=${encodeURIComponent(t)}'">${esc(t)}</span>`).join("")}</div>`:""}
+      <div class="ad-slot" id="watchAdSlot"></div>
+      <div class="sec">
+        <div class="sec-head"><div class="sec-title">More Videos</div></div>
+        <div class="grid" id="moreGrid"></div>
+      </div>
+    `;
+
+    const vid=document.getElementById("vid");
+
+    // Count OUR view once, on the first play (fire and forget)
+    vid.addEventListener("play",function(){
+      fetch(`${API}/api/videos/slug/${encodeURIComponent(v.slug)}/view`,{method:"POST"}).catch(()=>{});
+    },{once:true});
+
+    // Resolve fresh stream URLs (server scrapes sourceUrl, caches ~20 min)
+    try{
+      const rr=await fetch(`${API}/api/videos/slug/${encodeURIComponent(v.slug)}/resolve`);
+      if(!rr.ok) throw 0;
+      const rd=await rr.json();
+      quals=Array.isArray(rd.qualities)?rd.qualities.filter(q=>q&&q.url):[];
+      // Server returns highest-first; sort defensively anyway
+      quals.sort((a,b)=>(parseInt(b.label,10)||0)-(parseInt(a.label,10)||0));
+      if(!quals.length) throw 0;
+      curQ=0;
+      renderPills();
+      vid.src=quals[0].url;
+    }catch(e){
+      showResolveError(v);
+    }
+
+    // Ad keywords for when zones go live
+    var adKeywords=["hentai","rule34","video","porn","anime","adult","nsfw"];
+    tags.slice(0,5).forEach(function(t){ adKeywords.push(t.toLowerCase()); });
+    window.AD_KEYWORDS=adKeywords.join(",");
+
+    // One ad slot above the related grid — disabled for launch
+    if(window.ADS_ENABLED){
+      window.onAdsReady(function(){
+        var kw=window.AD_KEYWORDS;
+        if(window.injectMultiformat) injectMultiformat("watchAdSlot","watch_mf",kw);
+        else if(window.injectRecommendationWidget) injectRecommendationWidget("watchAdSlot","watch_native",kw);
+      });
+    }
+
+    // More videos (most viewed)
+    fetch(`${API}/api/videos?limit=12&sort=views`).then(r=>r.json()).then(md=>{
+      const list=(Array.isArray(md.videos)?md.videos:[]).filter(x=>x.slug!==v.slug).slice(0,12);
+      const g=document.getElementById("moreGrid");
+      if(!list.length){ g.parentElement.style.display="none"; return; }
+      g.innerHTML=list.map(vcard).join("");
+    }).catch(()=>{});
+
+  }catch{
+    document.getElementById("content").innerHTML=`<div class="loading">
+      <div style="font-size:28px;margin-bottom:12px">😕</div>
+      <div style="font-weight:800;margin-bottom:6px">Video not found</div>
+      <div style="font-size:13px;color:var(--muted)">It may have been removed or the URL is wrong.</div>
+      <button class="btn-primary" style="margin-top:16px" onclick="location.href='index.html'">Browse Videos</button>
+    </div>`;
+  }
+}
+load();
+</script>
+
+<!-- ═══ ADS (disabled for launch) ═══
+  ads.js is NOT in this repo yet. It will be added once the NEW ExoClick account
+  zones for 34vaultvideo.com are created. When they are:
+    1. Copy ads.js from the main 34vault frontend and swap in the new zone IDs.
+    2. Uncomment the script tag below.
+    3. Flip window.ADS_ENABLED to true at the top of the page script above.
+    4. Re-check the <meta name="referrer" content="no-referrer"> in <head> against the
+       ad network's domain-verification requirements.
+  <script src="/ads.js?v=1" defer></script>
+-->
+<script>
+window.onAdsReady = window.onAdsReady || function(fn){
+  var t=0; var p=setInterval(function(){t++;if(window.__adsReady){clearInterval(p);fn();}else if(t>40)clearInterval(p);},100);
+};
+</script>
+</body>
+</html>

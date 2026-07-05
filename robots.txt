@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+Disallow: /api/
+
+# Uncomment once the video sitemap endpoint exists on the backend:
+# Sitemap: https://api.34vault.com/video-sitemap.xml
