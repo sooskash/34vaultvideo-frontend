@@ -562,6 +562,9 @@ button{font-family:inherit}
   border:none;color:#2a1500;
   box-shadow:0 6px 16px -8px var(--accent-45,rgba(245,158,11,.6));
 }
+/* Sort tabs replace the old Sort dropdown; the Pages/Scroll dropdown is a comic-site
+   leftover (irrelevant to video). Both hidden — kept in DOM only so their JS is inert. */
+#sortSel,.filter-inner .sel-ico{display:none!important}
 
 /* ━━━ CATEGORIES BAR ━━━ */
 .cats-bar{margin:0 0 16px}
@@ -746,18 +749,14 @@ button{font-family:inherit}
 
 <!-- ━━━ MAIN ━━━ -->
 <main class="main">
-  <!-- Top Artists (rule34video DNA, Aurora skin) — hidden until populated, and only on the default view -->
-  <section class="artists-rail" id="artistsRail" style="display:none">
-    <div class="rail-head">
-      <div class="rail-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg> Top Artists</div>
-    </div>
-    <div class="rail-scroll" id="artistsRow"></div>
-  </section>
-  <!-- Categories bar (rule34video DNA) — top tags as quick chips; hidden until populated -->
+  <!-- Categories bar — top tags as quick chips; hidden until populated
+       (Top Artists rail removed from the homepage: low signal + no rating data;
+        artist credits still appear on cards/watch, and the /artists page remains) -->
   <section class="cats-bar" id="catsBar" style="display:none">
     <div class="rail-title"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg> Categories</div>
     <div class="cats-scroll" id="catsRow"></div>
   </section>
+  <div class="grid-title" id="gridTitle" style="display:none"></div>
   <div class="grid-header">
     <div class="sort-tabs" id="sortTabs">
       <button class="sort-tab on" data-sort="new" type="button" onclick="setSort('new')">Latest</button>
@@ -766,7 +765,6 @@ button{font-family:inherit}
     </div>
     <div class="grid-count" id="gridCount"></div>
   </div>
-  <div class="grid-title" id="gridTitle" style="display:none"></div>
   <div class="grid" id="grid">
     <div class="sk"><div class="sk-c"></div><div class="sk-b"><div class="sk-l"></div><div class="sk-l s"></div></div></div>
     <div class="sk"><div class="sk-c"></div><div class="sk-b"><div class="sk-l"></div><div class="sk-l s"></div></div></div>
@@ -912,7 +910,6 @@ async function load(){
     applyUrlParams();
     buildFilters();
     apply();
-    loadTopArtists();
     loadCategories();
   }catch{
     if(!all.length) grid.innerHTML=`<div class="state-box">
@@ -996,11 +993,10 @@ function apply(){
   if(activeArtist) bits.push("@"+(activeArtistName||activeArtist));
   if(activeTags.size) bits.push([...activeTags].map(t=>"#"+t).join(", "));
   if(q) bits.push(`"${q}"`);
-  // Filtering → show the context title, hide the sort tabs. Default → sort tabs.
+  // Sort tabs stay visible always; when filtering, show the context line above them.
   const filtering=bits.length>0;
   gridTitle.textContent=filtering?bits.join(" · "):"";
   gridTitle.style.display=filtering?"":"none";
-  const st=document.getElementById("sortTabs"); if(st) st.style.display=filtering?"none":"";
   updateRailVisibility();
   gridCount.textContent=filtered.length?`${filtered.length} videos`:"";
   updateFiltersUI();
