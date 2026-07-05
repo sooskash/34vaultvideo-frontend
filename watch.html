@@ -40,6 +40,7 @@ body{padding-top:var(--topH);padding-bottom:32px}
   border:1px solid var(--border);box-shadow:var(--shadow);
 }
 .player-shell video{width:100%;height:100%;display:block;background:#000;outline:none}
+.player-shell iframe{width:100%;height:100%;display:block;background:#000;border:0}
 
 /* Quality pills */
 .q-row{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 2px;align-items:center}
@@ -268,9 +269,8 @@ async function load(){
 
     document.getElementById("content").innerHTML=`
       <div class="player-shell" id="playerShell">
-        <video id="vid" controls playsinline preload="metadata" referrerpolicy="no-referrer" poster="${esc(v.thumbUrl||"")}"></video>
+        <iframe id="vid" src="https://rule34video.com/embed/${esc(v.sourceId)}/" allow="autoplay; fullscreen" allowfullscreen scrolling="no"></iframe>
       </div>
-      <div class="q-row" id="qRow"></div>
       <h1 class="v-title">${esc(v.title||"Untitled")}</h1>
       <div class="v-meta">
         <span><svg viewBox="0 0 24 24"><path d="M2 12c2.5-5 6-7.5 10-7.5S19.5 7 22 12c-2.5 5-6 7.5-10 7.5S4.5 17 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>${fmtNum(v.views)} views</span>
@@ -284,28 +284,10 @@ async function load(){
       </div>
     `;
 
-    const vid=document.getElementById("vid");
-
-    // Count OUR view once, on the first play (fire and forget)
-    vid.addEventListener("play",function(){
-      fetch(`${API}/api/videos/slug/${encodeURIComponent(v.slug)}/view`,{method:"POST"}).catch(()=>{});
-    },{once:true});
-
-    // Resolve fresh stream URLs (server scrapes sourceUrl, caches ~20 min)
-    try{
-      const rr=await fetch(`${API}/api/videos/slug/${encodeURIComponent(v.slug)}/resolve`);
-      if(!rr.ok) throw 0;
-      const rd=await rr.json();
-      quals=Array.isArray(rd.qualities)?rd.qualities.filter(q=>q&&q.url):[];
-      // Server returns highest-first; sort defensively anyway
-      quals.sort((a,b)=>(parseInt(b.label,10)||0)-(parseInt(a.label,10)||0));
-      if(!quals.length) throw 0;
-      curQ=0;
-      renderPills();
-      vid.src=quals[0].url;
-    }catch(e){
-      showResolveError(v);
-    }
+    // Playback is the source's own embed player (rule34video.com/embed/{id}) — zero
+    // bandwidth, native tokens/qualities, no IP-bound-token problem. The embed is
+    // cross-origin so there's no "play" event to hook; count OUR view once on load.
+    fetch(`${API}/api/videos/slug/${encodeURIComponent(v.slug)}/view`,{method:"POST"}).catch(()=>{});
 
     // Ad keywords for when zones go live
     var adKeywords=["hentai","rule34","video","porn","anime","adult","nsfw"];
