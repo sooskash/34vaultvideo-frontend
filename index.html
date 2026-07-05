@@ -498,6 +498,33 @@ button{font-family:inherit}
 .c-tag1.c-by{font-weight:800}
 .c-tag1.c-by::before{content:"@";opacity:.7}
 
+/* ━━━ TOP ARTISTS RAIL ━━━ */
+.artists-rail{margin:2px 0 20px}
+.rail-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px}
+.rail-title{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:900;letter-spacing:-.2px}
+.rail-title svg{width:17px;height:17px;fill:none;stroke:var(--accent);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.rail-scroll{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.rail-scroll::-webkit-scrollbar{display:none}
+.artist-tile{
+  flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:7px;
+  width:78px;text-decoration:none;cursor:pointer;
+}
+.artist-av{
+  width:64px;height:64px;border-radius:50%;
+  display:grid;place-items:center;
+  font-size:24px;font-weight:900;color:#2a1500;
+  background:var(--grad-accent,linear-gradient(135deg,#ffce54,var(--accent) 55%,#c07c08));
+  box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--accent-40,rgba(245,158,11,.4)),0 8px 18px -8px rgba(245,158,11,.5);
+  transition:transform .15s,box-shadow .15s;
+}
+.artist-tile:hover .artist-av{transform:translateY(-2px);box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--accent),0 12px 22px -8px rgba(245,158,11,.7)}
+.artist-name{
+  font-size:11px;font-weight:800;text-align:center;line-height:1.2;max-width:100%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  background:var(--grad-accent);-webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.artist-count{font-size:10px;font-weight:700;color:var(--sub,#8891a8)}
+
 /* ━━━ SKELETON ━━━ */
 .sk{border-radius:var(--r);background:var(--surface);border:1px solid var(--border);overflow:hidden}
 .sk-c{
@@ -665,6 +692,13 @@ button{font-family:inherit}
 
 <!-- ━━━ MAIN ━━━ -->
 <main class="main">
+  <!-- Top Artists (rule34video DNA, Aurora skin) — hidden until populated, and only on the default view -->
+  <section class="artists-rail" id="artistsRail" style="display:none">
+    <div class="rail-head">
+      <div class="rail-title"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg> Top Artists</div>
+    </div>
+    <div class="rail-scroll" id="artistsRow"></div>
+  </section>
   <div class="grid-header">
     <div class="grid-title" id="gridTitle">Browse Videos</div>
     <div class="grid-count" id="gridCount"></div>
@@ -814,6 +848,7 @@ async function load(){
     applyUrlParams();
     buildFilters();
     apply();
+    loadTopArtists();
   }catch{
     if(!all.length) grid.innerHTML=`<div class="state-box">
       <div class="state-ico">⚠️</div>
@@ -897,6 +932,7 @@ function apply(){
   if(activeTags.size) bits.push([...activeTags].map(t=>"#"+t).join(", "));
   if(q) bits.push(`"${q}"`);
   gridTitle.textContent=bits.length?bits.join(" · "):"Browse Videos";
+  updateRailVisibility();
   gridCount.textContent=filtered.length?`${filtered.length} videos`:"";
   updateFiltersUI();
   save();
@@ -1099,7 +1135,46 @@ function mkCard(v,favs){
     e.currentTarget.innerHTML=adding?"&#9733;":"&#9734;";
     if(favOnly) apply();
   });
+
+  // Hover-to-preview (rule34video DNA): scrub through the source's frame screenshots.
+  // Thumb is .../320x180/{N}.jpg — cycle N on hover, restore on leave. Desktop/hover only.
+  const base=frameBase(thumb);
+  if(base && window.matchMedia("(hover:hover)").matches){
+    const img=card.querySelector(".c-img");
+    let iv=null,i=1;
+    const stop=()=>{ if(iv){clearInterval(iv);iv=null;} img.src=thumb; };
+    card.addEventListener("mouseenter",()=>{
+      if(iv)return; i=1;
+      iv=setInterval(()=>{ i=i%9+1; const p=new Image(); p.onload=()=>{ if(iv) img.src=p.src; }; p.src=base+i+".jpg"; },650);
+    });
+    card.addEventListener("mouseleave",stop);
+  }
   return card;
+}
+// Derive the frame-screenshot base from a thumb URL (.../320x180/3.jpg -> .../320x180/)
+function frameBase(u){ const m=String(u||"").match(/^(.*\/)\d+\.jpg(\?.*)?$/i); return m?m[1]:null; }
+
+let _hasArtists=false;
+async function loadTopArtists(){
+  try{
+    const r=await fetch(`${API}/api/videos/artists`);
+    if(!r.ok) return;
+    const d=await r.json();
+    const list=(d.artists||[]).slice(0,20);
+    if(!list.length) return;
+    document.getElementById("artistsRow").innerHTML=list.map(a=>`<a class="artist-tile" href="index.html?artist=${encodeURIComponent(a.slug)}" title="${esc(a.name||a.slug)}">
+      <div class="artist-av">${esc(String(a.name||a.slug).charAt(0).toUpperCase())}</div>
+      <div class="artist-name">${esc(a.name||a.slug)}</div>
+      <div class="artist-count">${a.count} vid${a.count===1?"":"s"}</div>
+    </a>`).join("");
+    _hasArtists=true;
+    updateRailVisibility();
+  }catch{}
+}
+function updateRailVisibility(){
+  const rail=document.getElementById("artistsRail"); if(!rail) return;
+  const isDefault=!activeArtist && !activeTags.size && !favOnly && !srch.value.trim();
+  rail.style.display=(_hasArtists && isDefault)?"":"none";
 }
 
 function clearAll(){
