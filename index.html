@@ -548,6 +548,35 @@ button{font-family:inherit}
 }
 .artist-count{font-size:10px;font-weight:700;color:var(--sub,#8891a8)}
 
+/* ━━━ SORT TABS (rule34video-style) ━━━ */
+.sort-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.sort-tab{
+  height:32px;padding:0 15px;border-radius:999px;
+  background:rgba(255,255,255,.04);border:1px solid var(--border,#1e222e);
+  color:var(--sub,#8891a8);font-size:12.5px;font-weight:800;cursor:pointer;
+  transition:all .15s;
+}
+.sort-tab:hover{border-color:#3a4055;color:var(--text)}
+.sort-tab.on{
+  background:var(--grad-accent,linear-gradient(135deg,#ffce54,var(--accent) 55%,#c07c08));
+  border:none;color:#2a1500;
+  box-shadow:0 6px 16px -8px var(--accent-45,rgba(245,158,11,.6));
+}
+
+/* ━━━ CATEGORIES BAR ━━━ */
+.cats-bar{margin:0 0 16px}
+.cats-bar .rail-title{margin-bottom:9px}
+.cats-scroll{display:flex;gap:8px;overflow-x:auto;padding-bottom:5px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.cats-scroll::-webkit-scrollbar{display:none}
+.cat-chip{
+  flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;border-radius:999px;
+  background:var(--surface,#111318);border:1px solid var(--border2,#262b3a);
+  color:var(--text);font-size:12px;font-weight:800;text-decoration:none;white-space:nowrap;
+  transition:all .15s;
+}
+.cat-chip:hover{border-color:var(--accent);transform:translateY(-1px)}
+.cat-chip .cc-n{font-size:10px;font-weight:700;color:var(--sub,#8891a8)}
+
 /* ━━━ SKELETON ━━━ */
 .sk{border-radius:var(--r);background:var(--surface);border:1px solid var(--border);overflow:hidden}
 .sk-c{
@@ -654,6 +683,7 @@ button{font-family:inherit}
     <div class="brand" onclick="location.href='index.html'">34<span>Vault</span><span>Video</span></div>
 
     <div class="nav-pills">
+      <button class="nav-pill" onclick="location.href='artists.html'">Artists</button>
       <button class="nav-pill" onclick="location.href='https://34vault.com/'">Comics</button>
     </div>
 
@@ -677,6 +707,7 @@ button{font-family:inherit}
     <select class="sort-select" id="sortSel">
       <option value="new">Newest</option>
       <option value="views">Most Viewed</option>
+      <option value="longest">Longest</option>
     </select>
     <span class="sel-ico"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 9h8M8 13h8M8 17h4"/></svg><select class="sort-select" id="modeSel">
       <option value="pages">Pages</option>
@@ -722,10 +753,20 @@ button{font-family:inherit}
     </div>
     <div class="rail-scroll" id="artistsRow"></div>
   </section>
+  <!-- Categories bar (rule34video DNA) — top tags as quick chips; hidden until populated -->
+  <section class="cats-bar" id="catsBar" style="display:none">
+    <div class="rail-title"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg> Categories</div>
+    <div class="cats-scroll" id="catsRow"></div>
+  </section>
   <div class="grid-header">
-    <div class="grid-title" id="gridTitle">Browse Videos</div>
+    <div class="sort-tabs" id="sortTabs">
+      <button class="sort-tab on" data-sort="new" type="button" onclick="setSort('new')">Latest</button>
+      <button class="sort-tab" data-sort="views" type="button" onclick="setSort('views')">Most Viewed</button>
+      <button class="sort-tab" data-sort="longest" type="button" onclick="setSort('longest')">Longest</button>
+    </div>
     <div class="grid-count" id="gridCount"></div>
   </div>
+  <div class="grid-title" id="gridTitle" style="display:none"></div>
   <div class="grid" id="grid">
     <div class="sk"><div class="sk-c"></div><div class="sk-b"><div class="sk-l"></div><div class="sk-l s"></div></div></div>
     <div class="sk"><div class="sk-c"></div><div class="sk-b"><div class="sk-l"></div><div class="sk-l s"></div></div></div>
@@ -872,6 +913,7 @@ async function load(){
     buildFilters();
     apply();
     loadTopArtists();
+    loadCategories();
   }catch{
     if(!all.length) grid.innerHTML=`<div class="state-box">
       <div class="state-ico">⚠️</div>
@@ -954,7 +996,11 @@ function apply(){
   if(activeArtist) bits.push("@"+(activeArtistName||activeArtist));
   if(activeTags.size) bits.push([...activeTags].map(t=>"#"+t).join(", "));
   if(q) bits.push(`"${q}"`);
-  gridTitle.textContent=bits.length?bits.join(" · "):"Browse Videos";
+  // Filtering → show the context title, hide the sort tabs. Default → sort tabs.
+  const filtering=bits.length>0;
+  gridTitle.textContent=filtering?bits.join(" · "):"";
+  gridTitle.style.display=filtering?"":"none";
+  const st=document.getElementById("sortTabs"); if(st) st.style.display=filtering?"none":"";
   updateRailVisibility();
   gridCount.textContent=filtered.length?`${filtered.length} videos`:"";
   updateFiltersUI();
@@ -964,8 +1010,16 @@ function apply(){
 
 function sortFiltered(){
   if(sortMode==="views") filtered.sort((a,b)=>Number(b.views||0)-Number(a.views||0));
+  else if(sortMode==="longest") filtered.sort((a,b)=>Number(b.duration||0)-Number(a.duration||0));
   // "new" = insertion order: id is an autoincrement int, so id desc = newest added first
   else filtered.sort((a,b)=>Number(b.id||0)-Number(a.id||0));
+}
+// Sort tabs (rule34video-style) — set the mode, sync the dropdown, re-render.
+function setSort(mode){
+  sortMode=mode;
+  const sel=document.getElementById("sortSel"); if(sel) sel.value=mode;
+  document.querySelectorAll(".sort-tab").forEach(t=>t.classList.toggle("on",t.dataset.sort===mode));
+  page=1; loadedCount=PAGE; _scrollLoading=false; window.scrollTo(0,0); apply();
 }
 
 function updateFiltersUI(){
@@ -1196,10 +1250,22 @@ async function loadTopArtists(){
     updateRailVisibility();
   }catch{}
 }
+let _hasCats=false;
 function updateRailVisibility(){
-  const rail=document.getElementById("artistsRail"); if(!rail) return;
   const isDefault=!activeArtist && !activeTags.size && !favOnly && !srch.value.trim();
-  rail.style.display=(_hasArtists && isDefault)?"":"none";
+  const rail=document.getElementById("artistsRail"); if(rail) rail.style.display=(_hasArtists && isDefault)?"":"none";
+  const cb=document.getElementById("catsBar"); if(cb) cb.style.display=(_hasCats && isDefault)?"":"none";
+}
+// Categories bar = the most-common tags across the catalog, as quick chips.
+function loadCategories(){
+  const count=new Map();
+  for(const v of all){ for(const t of normTags(v.tags)){ count.set(t,(count.get(t)||0)+1); } }
+  const top=[...count.entries()].sort((a,b)=>b[1]-a[1]).slice(0,24);
+  if(!top.length) return;
+  document.getElementById("catsRow").innerHTML=top.map(([t,n])=>
+    `<a class="cat-chip" href="index.html?tag=${encodeURIComponent(t)}">${esc(t)}<span class="cc-n">${n}</span></a>`).join("");
+  _hasCats=true;
+  updateRailVisibility();
 }
 
 function clearAll(){

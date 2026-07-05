@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script src="/config.js?v=1"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#0a0b0e" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="preconnect" href="https://api.34vault.com" />
+<link rel="stylesheet" href="/shared.css" />
+<title>Artists | 34VaultVideo</title>
+<meta name="description" content="Browse all artists on 34VaultVideo — every creator's videos in one place." />
+<style>
+  *{box-sizing:border-box}
+  body{background:var(--bg,#0a0b0e);color:var(--text,#eef1f8);margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  .topbar{position:sticky;top:0;z-index:50;height:60px;display:flex;align-items:center;gap:14px;
+    padding:0 20px;background:var(--bg,#0a0b0e);border-bottom:1px solid var(--border,#1e222e)}
+  .brand{font-size:21px;font-weight:900;letter-spacing:-1px;cursor:pointer;line-height:1}
+  .brand i{font-style:normal;background:var(--grad-accent,linear-gradient(120deg,#ffcb45,#f59e0b));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .nav-pill{height:34px;padding:0 14px;border-radius:999px;background:rgba(255,255,255,.04);
+    border:1px solid var(--border2,#262b3a);color:var(--sub,#8891a8);font-size:12px;font-weight:800;cursor:pointer;transition:all .15s}
+  .nav-pill:hover{border-color:var(--accent);color:var(--text)}
+  .nav-pill.on{background:var(--grad-accent);border:none;color:#2a1500}
+  .spacer{flex:1}
+  .wrap{max-width:1280px;margin:0 auto;padding:22px 20px 60px}
+  .page-h{display:flex;align-items:center;gap:9px;font-size:22px;font-weight:900;letter-spacing:-.3px;margin:4px 0 4px}
+  .page-h svg{width:22px;height:22px;fill:none;stroke:var(--accent);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .page-sub{font-size:13px;color:var(--sub,#8891a8);font-weight:600;margin-bottom:20px}
+  .agrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:16px}
+  .acard{display:flex;flex-direction:column;align-items:center;gap:9px;text-decoration:none;padding:6px 4px;border-radius:14px;transition:background .15s}
+  .acard:hover{background:rgba(255,255,255,.03)}
+  .aav{width:80px;height:80px;border-radius:50%;display:grid;place-items:center;font-size:30px;font-weight:900;color:#2a1500;
+    background:var(--grad-accent,linear-gradient(135deg,#ffce54,#f59e0b));
+    box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--accent-40,rgba(245,158,11,.4)),0 10px 22px -8px rgba(245,158,11,.5);
+    transition:transform .15s,box-shadow .15s}
+  .acard:hover .aav{transform:translateY(-3px);box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--accent),0 14px 26px -8px rgba(245,158,11,.7)}
+  .aname{font-size:13px;font-weight:800;text-align:center;line-height:1.25;max-width:100%;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    background:var(--grad-accent);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .acount{font-size:11px;font-weight:700;color:var(--sub,#8891a8)}
+  .loading,.empty{text-align:center;padding:60px 20px;color:var(--sub,#8891a8)}
+  .spin{width:34px;height:34px;border-radius:50%;border:3px solid var(--border,#1e222e);border-top-color:var(--accent);margin:0 auto 14px;animation:sp 1s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand" onclick="location.href='index.html'">34<i>Vault</i><i>Video</i></div>
+  <button class="nav-pill" onclick="location.href='index.html'">Videos</button>
+  <button class="nav-pill on" onclick="location.href='artists.html'">Artists</button>
+  <button class="nav-pill" onclick="location.href='https://34vault.com/'">Comics</button>
+  <div class="spacer"></div>
+</header>
+
+<div class="wrap">
+  <div class="page-h"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg> Artists</div>
+  <div class="page-sub" id="sub">Every creator on 34VaultVideo</div>
+  <div id="out"><div class="loading"><div class="spin"></div>Loading artists…</div></div>
+</div>
+
+<script>
+const API=window.__API__||"https://api.34vault.com";
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+(async function(){
+  try{
+    const r=await fetch(`${API}/api/videos/artists`);
+    if(!r.ok) throw 0;
+    const d=await r.json();
+    const list=Array.isArray(d.artists)?d.artists:[];
+    const out=document.getElementById("out");
+    if(!list.length){ out.innerHTML=`<div class="empty">No artists yet — check back soon.</div>`; return; }
+    document.getElementById("sub").textContent=`${list.length} creators · ${list.reduce((s,a)=>s+(a.count||0),0)} videos`;
+    out.innerHTML=`<div class="agrid">`+list.map(a=>`
+      <a class="acard" href="index.html?artist=${encodeURIComponent(a.slug)}" title="${esc(a.name||a.slug)}">
+        <div class="aav">${esc(String(a.name||a.slug).charAt(0).toUpperCase())}</div>
+        <div class="aname">${esc(a.name||a.slug)}</div>
+        <div class="acount">${a.count} vid${a.count===1?"":"s"}</div>
+      </a>`).join("")+`</div>`;
+  }catch(e){
+    document.getElementById("out").innerHTML=`<div class="empty">Couldn't load artists. <a href="artists.html" style="color:var(--accent)">Retry</a></div>`;
+  }
+})();
+</script>
+</body>
+</html>
