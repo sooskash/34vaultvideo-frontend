@@ -495,6 +495,8 @@ button{font-family:inherit}
   background:var(--grad-accent);-webkit-background-clip:text;background-clip:text;color:transparent;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;
 }
+.c-tag1.c-by{font-weight:800}
+.c-tag1.c-by::before{content:"@";opacity:.7}
 
 /* ━━━ SKELETON ━━━ */
 .sk{border-radius:var(--r);background:var(--surface);border:1px solid var(--border);overflow:hidden}
@@ -699,6 +701,7 @@ let all=[], filtered=[], favOnly=false, page=1;
 let _adSeq=0;   // global unique-id counter for in-grid ad slots
 let pageMode="pages", loadedCount=PAGE;
 let activeTags=new Set(), sortMode="new";
+let activeArtist=null, activeArtistName="";
 
 // Elements
 const grid       = document.getElementById("grid");
@@ -871,11 +874,17 @@ function toggleTag(tag){ activeTags.has(tag)?activeTags.delete(tag):activeTags.a
 function apply(){
   const q=srch.value.trim().toLowerCase();
   const favs=getFavs();
+  // Resolve the artist's pretty display name from the loaded set (for the header label).
+  if(activeArtist&&!activeArtistName){
+    const hit=all.find(v=>Array.isArray(v.artistSlugs)&&v.artistSlugs.includes(activeArtist));
+    if(hit){ activeArtistName=hit.artists[hit.artistSlugs.indexOf(activeArtist)]||activeArtist; }
+  }
   filtered=all.filter(v=>{
     if(favOnly&&!favs.has(v.slug)) return false;
+    if(activeArtist){ const as=Array.isArray(v.artistSlugs)?v.artistSlugs:[]; if(!as.includes(activeArtist)) return false; }
     if(activeTags.size){ const vt=normTags(v.tags); if(![...activeTags].some(t=>vt.includes(t))) return false; }
     if(q){
-      const hay=[v.title,normTags(v.tags).join(" ")].map(x=>String(x||"").toLowerCase()).join(" ");
+      const hay=[v.title,normTags(v.tags).join(" "),(v.artists||[]).join(" ")].map(x=>String(x||"").toLowerCase()).join(" ");
       if(!hay.includes(q)) return false;
     }
     return true;
@@ -884,6 +893,7 @@ function apply(){
   page=1; loadedCount=PAGE;
   const bits=[];
   if(favOnly) bits.push("Saved");
+  if(activeArtist) bits.push("@"+(activeArtistName||activeArtist));
   if(activeTags.size) bits.push([...activeTags].map(t=>"#"+t).join(", "));
   if(q) bits.push(`"${q}"`);
   gridTitle.textContent=bits.length?bits.join(" · "):"Browse Videos";
@@ -1070,7 +1080,7 @@ function mkCard(v,favs){
     </a>
     <div class="c-bk${isFav?" on":""}" data-slug="${esc(slug)}">${isFav?"&#9733;":"&#9734;"}</div>
     <div class="c-foot">
-      <div class="c-tag1">${tags.length?esc(tags[0]):""}</div>
+      <div class="c-tag1${(Array.isArray(v.artists)&&v.artists.length)?" c-by":""}">${(Array.isArray(v.artists)&&v.artists.length)?esc(v.artists[0]):(tags.length?esc(tags[0]):"")}</div>
       <span class="c-views">
         <svg class="c-ico" viewBox="0 0 24 24">
           <path d="M2 12c2.5-5 6-7.5 10-7.5S19.5 7 22 12c-2.5 5-6 7.5-10 7.5S4.5 17 2 12Z"/>
@@ -1093,7 +1103,7 @@ function mkCard(v,favs){
 }
 
 function clearAll(){
-  srch.value=""; activeTags=new Set();
+  srch.value=""; activeTags=new Set(); activeArtist=null; activeArtistName="";
   favOnly=false; sortMode="new"; filterSearchInput.value="";
   srchX.classList.remove("vis"); chipFavs.classList.remove("on");
   sortSel.value=sortMode;
@@ -1124,7 +1134,12 @@ function restore(){
 function applyUrlParams(){
   try{
     const p=new URLSearchParams(location.search);
-    const t=p.get("tag"), uq=p.get("q");
+    const t=p.get("tag"), uq=p.get("q"), ar=p.get("artist");
+    if(ar){
+      activeArtist=ar.toLowerCase(); favOnly=false; activeTags=new Set();
+      chipFavs.classList.remove("on");
+      srch.value=""; srchX.classList.remove("vis");
+    }
     if(t){
       activeTags=new Set([t]); favOnly=false;
       chipFavs.classList.remove("on");
