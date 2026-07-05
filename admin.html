@@ -96,6 +96,10 @@
       <div class="pages"><label>Pages</label><input id="pages" type="number" min="1" max="20" value="1" /></div>
       <button class="btn" id="go" onclick="scrape()">Scrape</button>
     </div>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:12px;cursor:pointer;color:var(--text);font-weight:700">
+      <input type="checkbox" id="allPages" onchange="togglePages()" style="width:auto;height:auto" />
+      Full library — scrape every page of this artist / category (runs in the background)
+    </label>
     <div class="msg" id="msg"></div>
     <div class="hint">
       Works with:
@@ -142,17 +146,20 @@ async function loadStats(){
   }catch(e){ if(String(e.message).includes("Unauthorized")) gate(); }
 }
 
+function togglePages(){ $("pages").disabled=$("allPages").checked; }
 async function scrape(){
   const url=$("url").value.trim();
   if(!url){ show($("msg"),"err","Paste a URL first."); return; }
+  const all=$("allPages").checked;
   const pages=Math.max(1,Math.min(20,parseInt($("pages").value,10)||1));
   $("go").disabled=true;
-  show($("msg"),"busy","Scraping… (multiple pages can take a bit)");
+  show($("msg"),"busy",all?"Scraping the full library in the background…":"Scraping…");
   try{
-    const d=await api("/api/admin/scrape",{method:"POST",body:JSON.stringify({url,pages})});
-    show($("msg"),"ok",`Found ${d.found} · added ${d.added} new · ${d.existed} already had. They'll host in the background.`);
+    const d=await api("/api/admin/scrape",{method:"POST",body:JSON.stringify(all?{url,all:true}:{url,pages})});
+    if(d.started){ show($("msg"),"ok","Full-library scrape started in the background. Refresh stats to watch the catalog grow."); }
+    else{ show($("msg"),"ok",`Found ${d.found} · added ${d.added} new · ${d.existed} already had.`); }
     $("url").value="";
-    loadStats();
+    setTimeout(loadStats,1500);
   }catch(e){ show($("msg"),"err",e.message||"Failed"); }
   finally{ $("go").disabled=false; }
 }
