@@ -269,7 +269,7 @@ async function load(){
 
     document.getElementById("content").innerHTML=`
       <div class="player-shell" id="playerShell">
-        <iframe id="vid" src="https://rule34video.com/embed/${esc(v.sourceId)}/" allow="autoplay; fullscreen" allowfullscreen scrolling="no"></iframe>
+        <video id="vid" controls playsinline preload="metadata" poster="${esc(v.thumbUrl||"")}" src="${esc(v.videoUrl||"")}"></video>
       </div>
       <h1 class="v-title">${esc(v.title||"Untitled")}</h1>
       <div class="v-meta">
@@ -284,10 +284,12 @@ async function load(){
       </div>
     `;
 
-    // Playback is the source's own embed player (rule34video.com/embed/{id}) — zero
-    // bandwidth, native tokens/qualities, no IP-bound-token problem. The embed is
-    // cross-origin so there's no "play" event to hook; count OUR view once on load.
-    fetch(`${API}/api/videos/slug/${encodeURIComponent(v.slug)}/view`,{method:"POST"}).catch(()=>{});
+    // Playback is our OWN copy from R2 (our player, our ads). Count a view on
+    // first play (fire and forget).
+    const vid=document.getElementById("vid");
+    vid.addEventListener("play",function(){
+      fetch(`${API}/api/videos/slug/${encodeURIComponent(v.slug)}/view`,{method:"POST"}).catch(()=>{});
+    },{once:true});
 
     // Ad keywords for when zones go live
     var adKeywords=["hentai","rule34","video","porn","anime","adult","nsfw"];
