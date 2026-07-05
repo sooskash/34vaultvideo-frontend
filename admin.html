@@ -80,6 +80,12 @@
       <div class="stat"><div class="n" id="sCats">—</div><div class="l">Categories</div></div>
       <div class="stat"><div class="n" id="sArtists">—</div><div class="l">Artists</div></div>
     </div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn" id="hostBtn" onclick="host()">▶ Host queued videos</button>
+      <button class="btn ghost" onclick="loadStats()">↻ Refresh</button>
+    </div>
+    <div class="msg" id="hostMsg"></div>
+    <div class="hint">Hosting downloads the queued videos into R2 (your CDN) so they play in your player. Runs in the background — refresh stats after a couple minutes.</div>
   </div>
 
   <div class="card">
@@ -149,6 +155,16 @@ async function scrape(){
     loadStats();
   }catch(e){ show($("msg"),"err",e.message||"Failed"); }
   finally{ $("go").disabled=false; }
+}
+
+async function host(){
+  $("hostBtn").disabled=true;
+  show($("hostMsg"),"busy","Starting hosting run…");
+  try{
+    const d=await api("/api/admin/host",{method:"POST",body:JSON.stringify({limit:120})});
+    show($("hostMsg"),"ok","Hosting run started ("+(d.status||"queued")+"). Refresh stats in ~2 min.");
+  }catch(e){ show($("hostMsg"),"err",e.message||"Failed"); }
+  finally{ $("hostBtn").disabled=false; }
 }
 
 // boot
