@@ -85,6 +85,14 @@ body{padding-top:var(--topH);padding-bottom:32px}
 }
 .v-artist::before{content:"@";opacity:.7;margin-right:1px}
 .v-artist:hover{border-color:var(--accent)}
+.v-cats{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+.v-cat{
+  display:inline-flex;align-items:center;height:28px;padding:0 13px;border-radius:8px;
+  font-size:12px;font-weight:800;text-decoration:none;color:#2a1500;
+  background:var(--grad-accent,linear-gradient(135deg,#ffce54,var(--accent) 55%,#c07c08));
+  box-shadow:0 4px 12px -6px var(--accent-45,rgba(245,158,11,.5));
+  transition:transform .12s}
+.v-cat:hover{transform:translateY(-1px)}
 .v-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:10px}
 .v-tag{
   height:24px;padding:0 10px;border-radius:999px;
@@ -286,7 +294,8 @@ async function load(){
         <span><svg viewBox="0 0 24 24"><path d="M2 12c2.5-5 6-7.5 10-7.5S19.5 7 22 12c-2.5 5-6 7.5-10 7.5S4.5 17 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>${fmtNum(v.views)} views</span>
         ${v.duration?`<span><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${fmtDur(v.duration)}</span>`:""}
       </div>
-      ${tags.length?`<div class="v-tags">${tags.slice(0,16).map(t=>`<span class="v-tag" onclick="location.href='index.html?tag=${encodeURIComponent(t)}'">${esc(t)}</span>`).join("")}</div>`:""}
+      ${(Array.isArray(v.categories)&&v.categories.length)?`<div class="v-cats">${v.categories.map((c,i)=>`<a class="v-cat" href="index.html?category=${encodeURIComponent((v.categorySlugs&&v.categorySlugs[i])||c)}">${esc(c)}</a>`).join("")}</div>`:""}
+      ${tags.length?`<div class="v-tags">${tags.slice(0,24).map(t=>`<span class="v-tag" onclick="location.href='index.html?tag=${encodeURIComponent(t)}'">${esc(t)}</span>`).join("")}</div>`:""}
       <div class="ad-slot" id="watchAdSlot"></div>
       <div class="sec">
         <div class="sec-head"><div class="sec-title">More Videos</div></div>

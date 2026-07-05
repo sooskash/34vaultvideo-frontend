@@ -798,6 +798,7 @@ let _adSeq=0;   // global unique-id counter for in-grid ad slots
 let pageMode="pages", loadedCount=PAGE;
 let activeTags=new Set(), sortMode="new";
 let activeArtist=null, activeArtistName="";
+let activeCategory=null, activeCategoryName="";
 
 // Elements
 const grid       = document.getElementById("grid");
@@ -976,9 +977,14 @@ function apply(){
     const hit=all.find(v=>Array.isArray(v.artistSlugs)&&v.artistSlugs.includes(activeArtist));
     if(hit){ activeArtistName=hit.artists[hit.artistSlugs.indexOf(activeArtist)]||activeArtist; }
   }
+  if(activeCategory&&!activeCategoryName){
+    const hit=all.find(v=>Array.isArray(v.categorySlugs)&&v.categorySlugs.includes(activeCategory));
+    if(hit){ activeCategoryName=hit.categories[hit.categorySlugs.indexOf(activeCategory)]||activeCategory; }
+  }
   filtered=all.filter(v=>{
     if(favOnly&&!favs.has(v.slug)) return false;
     if(activeArtist){ const as=Array.isArray(v.artistSlugs)?v.artistSlugs:[]; if(!as.includes(activeArtist)) return false; }
+    if(activeCategory){ const cs=Array.isArray(v.categorySlugs)?v.categorySlugs:[]; if(!cs.includes(activeCategory)) return false; }
     if(activeTags.size){ const vt=normTags(v.tags); if(![...activeTags].some(t=>vt.includes(t))) return false; }
     if(q){
       const hay=[v.title,normTags(v.tags).join(" "),(v.artists||[]).join(" ")].map(x=>String(x||"").toLowerCase()).join(" ");
@@ -990,6 +996,7 @@ function apply(){
   page=1; loadedCount=PAGE;
   const bits=[];
   if(favOnly) bits.push("Saved");
+  if(activeCategory) bits.push(activeCategoryName||activeCategory);
   if(activeArtist) bits.push("@"+(activeArtistName||activeArtist));
   if(activeTags.size) bits.push([...activeTags].map(t=>"#"+t).join(", "));
   if(q) bits.push(`"${q}"`);
@@ -1248,24 +1255,31 @@ async function loadTopArtists(){
 }
 let _hasCats=false;
 function updateRailVisibility(){
-  const isDefault=!activeArtist && !activeTags.size && !favOnly && !srch.value.trim();
+  const isDefault=!activeArtist && !activeCategory && !activeTags.size && !favOnly && !srch.value.trim();
   const rail=document.getElementById("artistsRail"); if(rail) rail.style.display=(_hasArtists && isDefault)?"":"none";
   const cb=document.getElementById("catsBar"); if(cb) cb.style.display=(_hasCats && isDefault)?"":"none";
 }
-// Categories bar = the most-common tags across the catalog, as quick chips.
+// Categories bar = the top series/parody categories (Genshin Impact, 3D, …) as chips.
 function loadCategories(){
-  const count=new Map();
-  for(const v of all){ for(const t of normTags(v.tags)){ count.set(t,(count.get(t)||0)+1); } }
-  const top=[...count.entries()].sort((a,b)=>b[1]-a[1]).slice(0,24);
+  const map=new Map();
+  for(const v of all){
+    const cats=Array.isArray(v.categories)?v.categories:[];
+    const slugs=Array.isArray(v.categorySlugs)?v.categorySlugs:[];
+    cats.forEach((name,i)=>{
+      const slug=slugs[i]||String(name).toLowerCase().replace(/\s+/g,"-");
+      const cur=map.get(slug)||{slug,name,count:0}; cur.count++; map.set(slug,cur);
+    });
+  }
+  const top=[...map.values()].sort((a,b)=>b.count-a.count).slice(0,24);
   if(!top.length) return;
-  document.getElementById("catsRow").innerHTML=top.map(([t,n])=>
-    `<a class="cat-chip" href="index.html?tag=${encodeURIComponent(t)}">${esc(t)}<span class="cc-n">${n}</span></a>`).join("");
+  document.getElementById("catsRow").innerHTML=top.map(c=>
+    `<a class="cat-chip" href="index.html?category=${encodeURIComponent(c.slug)}">${esc(c.name)}<span class="cc-n">${c.count}</span></a>`).join("");
   _hasCats=true;
   updateRailVisibility();
 }
 
 function clearAll(){
-  srch.value=""; activeTags=new Set(); activeArtist=null; activeArtistName="";
+  srch.value=""; activeTags=new Set(); activeArtist=null; activeArtistName=""; activeCategory=null; activeCategoryName="";
   favOnly=false; sortMode="new"; filterSearchInput.value="";
   srchX.classList.remove("vis"); chipFavs.classList.remove("on");
   sortSel.value=sortMode;
@@ -1296,7 +1310,12 @@ function restore(){
 function applyUrlParams(){
   try{
     const p=new URLSearchParams(location.search);
-    const t=p.get("tag"), uq=p.get("q"), ar=p.get("artist");
+    const t=p.get("tag"), uq=p.get("q"), ar=p.get("artist"), cat=p.get("category");
+    if(cat){
+      activeCategory=cat.toLowerCase(); favOnly=false; activeTags=new Set(); activeArtist=null;
+      chipFavs.classList.remove("on");
+      srch.value=""; srchX.classList.remove("vis");
+    }
     if(ar){
       activeArtist=ar.toLowerCase(); favOnly=false; activeTags=new Set();
       chipFavs.classList.remove("on");
