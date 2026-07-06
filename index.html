@@ -1201,7 +1201,10 @@ function getBadge(v){
 
 function mkCard(v,favs){
   const slug=v.slug||"",title=v.title||"Untitled",
-        thumb=v.thumbUrl||"",isFav=favs.has(slug);
+        // Serve thumbs through our CDN proxy (source hotlinks are ddos-guard-blocked
+        // on many networks). Falls back to the raw url if there's no sourceId.
+        thumb=v.sourceId?`${API}/api/thumb/${v.sourceId}`:(v.thumbUrl||""),
+        isFav=favs.has(slug);
   const tags=normTags(v.tags);
   const badge=getBadge(v);
   const card=document.createElement("div");
