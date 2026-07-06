@@ -332,7 +332,7 @@ async function load(){
 
     document.getElementById("content").innerHTML=`
       <div class="player-shell" id="playerShell">
-        <video id="vid" controls playsinline preload="metadata" poster="${v.sourceId?API+'/api/thumb/'+v.sourceId:esc(v.thumbUrl||"")}" src="${esc(v.videoUrl||"")}"></video>
+        <video id="vid" controls playsinline preload="metadata" poster="${v.sourceId?API+'/api/thumb/'+v.sourceId:esc(v.thumbUrl||"")}" src="${API}/api/videos/slug/${encodeURIComponent(v.slug)}/stream"></video>
       </div>
       <h1 class="v-title">${esc(v.title||"Untitled")}</h1>
       ${(Array.isArray(v.artists)&&v.artists.length)?`<div class="v-by">${v.artists.map((n,i)=>`<a class="v-artist" href="index.html?artist=${encodeURIComponent((v.artistSlugs&&v.artistSlugs[i])||n)}">${esc(n)}</a>`).join("")}</div>`:""}
@@ -356,9 +356,9 @@ async function load(){
       fetch(`${API}/api/videos/slug/${encodeURIComponent(v.slug)}/view`,{method:"POST"}).catch(()=>{});
     },{once:true});
 
-    // Host-on-demand: if we haven't mirrored this one yet, fetch it into our CDN
-    // now (first viewer waits ~10-30s), then play. Instant for everyone after.
-    if(!v.videoUrl){ prepareOnDemand(v.slug,vid); }
+    // Playback goes through the /stream endpoint: hosted videos 302 to our R2 CDN
+    // (instant), un-hosted ones stream progressively via proxy (plays in ~1-2s) and
+    // cache to R2 in the background. No "preparing" wait needed.
 
     // Ad keywords for when zones go live
     var adKeywords=["hentai","rule34","video","porn","anime","adult","nsfw"];
