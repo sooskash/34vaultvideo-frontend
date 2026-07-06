@@ -71,6 +71,24 @@ body{padding-top:var(--topH);padding-bottom:32px}
 }
 .src-btn:hover{background:var(--accent2)}
 
+/* First-view hosting overlay (poster stays visible behind it) */
+.prep{
+  position:absolute;inset:0;z-index:6;
+  display:flex;align-items:center;justify-content:center;padding:20px;
+  background:rgba(10,11,14,.82);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+}
+.prep-box{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.prep-spin{
+  width:42px;height:42px;border-radius:50%;
+  border:3px solid rgba(255,255,255,.12);
+  border-top-color:var(--accent);
+  animation:prep-spin .8s linear infinite;
+}
+@keyframes prep-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.prep-spin{animation-duration:2s}}
+.prep-msg{font-size:15px;font-weight:900}
+.prep-sub{font-size:12px;color:var(--muted);max-width:340px;line-height:1.5}
+
 /* ── META ── */
 .v-title{font-size:18px;font-weight:900;line-height:1.25;margin-top:10px;letter-spacing:-.2px}
 .v-meta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);font-weight:700;margin-top:7px}
@@ -257,6 +275,34 @@ function showResolveError(v){
   if(row) row.innerHTML="";
 }
 
+// First-view hosting: ask the server to mirror this video into our CDN, then poll
+// until it's playable and start it. Shows a lightweight "preparing" overlay.
+async function prepareOnDemand(slug,vid){
+  const shell=document.getElementById("playerShell");
+  if(!shell) return;
+  const ov=document.createElement("div");
+  ov.className="prep";
+  ov.innerHTML=`<div class="prep-box"><div class="prep-spin"></div><div class="prep-msg">Preparing this video…</div><div class="prep-sub">First play loads it into our player — just a few seconds.</div></div>`;
+  shell.appendChild(ov);
+  const setMsg=(m,s)=>{ const a=ov.querySelector(".prep-msg"),b=ov.querySelector(".prep-sub"); if(a)a.textContent=m; if(b)b.innerHTML=s||""; };
+  const go=(url)=>{ ov.remove(); vid.src=url; vid.load(); vid.play().catch(()=>{}); };
+  try{
+    const r=await fetch(`${API}/api/videos/slug/${encodeURIComponent(slug)}/host-now`,{method:"POST"});
+    const d=await r.json().catch(()=>({}));
+    if(d&&d.ready&&d.videoUrl){ go(d.videoUrl); return; }
+    if(r.status===503){ setMsg("High demand right now…","<button class=\"src-btn\" onclick=\"location.reload()\">Try again</button>"); return; }
+  }catch(e){}
+  const started=Date.now();
+  const timer=setInterval(async()=>{
+    if(Date.now()-started>120000){ clearInterval(timer); setMsg("This one’s taking a while.","<button class=\"src-btn\" onclick=\"location.reload()\">Retry</button>"); return; }
+    try{
+      const r=await fetch(`${API}/api/videos/slug/${encodeURIComponent(slug)}?_=${Date.now()}`);
+      const d=await r.json(); const vv=(d&&d.video)||d;
+      if(vv&&vv.videoUrl){ clearInterval(timer); go(vv.videoUrl); }
+    }catch(e){}
+  },2500);
+}
+
 async function load(){
   if(!slug){location.href="index.html";return}
   try{
@@ -309,6 +355,10 @@ async function load(){
     vid.addEventListener("play",function(){
       fetch(`${API}/api/videos/slug/${encodeURIComponent(v.slug)}/view`,{method:"POST"}).catch(()=>{});
     },{once:true});
+
+    // Host-on-demand: if we haven't mirrored this one yet, fetch it into our CDN
+    // now (first viewer waits ~10-30s), then play. Instant for everyone after.
+    if(!v.videoUrl){ prepareOnDemand(v.slug,vid); }
 
     // Ad keywords for when zones go live
     var adKeywords=["hentai","rule34","video","porn","anime","adult","nsfw"];
