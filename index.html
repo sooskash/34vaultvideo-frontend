@@ -910,7 +910,8 @@ async function runQuery(reset){
   const token=++_qToken;
   if(reset){
     all=[]; offset=0; done=false;
-    if(pageMode==="pages") page=1;
+    // NOTE: do NOT reset `page` here — pagination sets it before calling. apply()
+    // (filter/sort/search) resets page to 1 itself.
     grid.innerHTML='<div style="text-align:center;padding:40px;color:var(--sub)"><div class="spinner" style="margin:0 auto 12px"></div>Loading videos…</div>';
     pagArea.innerHTML=""; scrollSentinel.style.display="none";
   }
@@ -933,7 +934,7 @@ async function runQuery(reset){
 // Fetch one page from the server. mode "replace" swaps `all` (reset / pages-mode);
 // "append" adds to it (scroll-mode load-more).
 async function fetchInto(off, mode, token){
-  if(loading) return;
+  if(mode==="append" && loading) return; // only scroll-appends need dedup; replace/paginate always fire
   loading=true;
   try{
     const r=await fetch(buildVideosUrl(off));
@@ -1024,8 +1025,9 @@ function renderSelectedChips(){
 
 function toggleTag(tag){ activeTags.has(tag)?activeTags.delete(tag):activeTags.add(tag); renderFilterChips(); renderSelectedChips(); apply(); }
 
-// Any filter/sort/search change → update the header + run a fresh server query.
+// Any filter/sort/search change → back to page 1, update the header, run a fresh query.
 function apply(){
+  page=1;
   updateHeaderLabels();
   updateFiltersUI();
   updateRailVisibility();
