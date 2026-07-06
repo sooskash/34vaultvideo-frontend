@@ -887,6 +887,7 @@ async function load(){
   renderFilterChips();
   renderSelectedChips();
   loadCategories();       // server endpoint (full nav bar)
+  loadTags();             // server endpoint (full catalog tag list for the filter sheet)
   runQuery(true);         // first page from the server
 }
 
@@ -979,16 +980,21 @@ function sortClient(vids){
 }
 
 let allTagsSorted=[], popularTags=[];
-function buildFilters(){
-  const tagCount=new Map();
-  for(const v of all){
-    for(const t of normTags(v.tags)) tagCount.set(t,(tagCount.get(t)||0)+1);
-  }
-  allTagsSorted=[...tagCount.keys()].sort();
-  popularTags=[...tagCount.entries()].sort((a,b)=>b[1]-a[1]).slice(0,24).map(e=>e[0]);
-  renderFilterChips();
-  renderSelectedChips();
+// The filter sheet's tag list comes from the SERVER (whole catalog), not the loaded
+// page — with server paging the grid only holds ~24 videos. Fetched once on load.
+async function loadTags(){
+  try{
+    const d=await fetch(`${API}/api/videos/tags`).then(r=>r.json());
+    const tags=Array.isArray(d.tags)?d.tags:[];
+    if(tags.length){
+      allTagsSorted=tags.map(t=>t.tag).sort();
+      popularTags=tags.slice(0,24).map(t=>t.tag);
+      renderFilterChips();
+    }
+  }catch{}
 }
+// Called after each page load — just re-render chips (tag list already loaded above).
+function buildFilters(){ renderFilterChips(); renderSelectedChips(); }
 
 function renderFilterChips(){
   const term=filterSearchInput.value.trim().toLowerCase();
