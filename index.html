@@ -793,12 +793,15 @@ const K_PMODE = "videoIndexPageMode_v1";
 const PAGE  = 24;
 const AD_N  = 6;
 
-let all=[], filtered=[], favOnly=false, page=1;
+let all=[], favOnly=false, page=1;
 let _adSeq=0;   // global unique-id counter for in-grid ad slots
 let pageMode="pages", loadedCount=PAGE;
 let activeTags=new Set(), sortMode="new";
 let activeArtist=null, activeArtistName="";
 let activeCategory=null, activeCategoryName="";
+// Server-side paging: the catalog is 150k+, so we NEVER load it all client-side.
+// `all` holds only the loaded window; the server does filtering/sorting/paging.
+let total=0, offset=0, loading=false, done=false, _qToken=0;
 
 // Elements
 const grid       = document.getElementById("grid");
@@ -873,53 +876,105 @@ const updFavCt=()=>{ favCt.textContent=String(getFavs().size); };
 })();
 
 async function load(){
-  try{
-    try{ const m=localStorage.getItem(K_PMODE); if(m==="pages"||m==="scroll") pageMode=m; }catch{}
-    modeSel.value=pageMode;
+  try{ const m=localStorage.getItem(K_PMODE); if(m==="pages"||m==="scroll") pageMode=m; }catch{}
+  modeSel.value=pageMode;
+  restore();
+  applyUrlParams();
+  syncSortTabs();
+  updateHeaderLabels();
+  updateFiltersUI();
+  updateRailVisibility();
+  renderFilterChips();
+  renderSelectedChips();
+  loadCategories();       // server endpoint (full nav bar)
+  runQuery(true);         // first page from the server
+}
 
-    // Show cached data instantly while fetching fresh data
-    var cached=null;
-    try{ cached=JSON.parse(sessionStorage.getItem("_videos")); }catch{}
-    if(cached&&Array.isArray(cached)&&cached.length>50){
-      all=cached;
-      calcAvgViewsPerDay(); restore(); applyUrlParams(); buildFilters(); apply();
-    } else {
-      // Cold start: fetch one small page first so the grid paints almost instantly,
-      // then the full catalog fetch below replaces it.
-      grid.innerHTML='<div style="text-align:center;padding:40px;color:var(--sub)"><div class="spinner" style="margin:0 auto 12px"></div>Loading videos...</div>';
-      try{
-        const fr=await fetch(`${API}/api/videos?limit=60&offset=0`);
-        if(fr.ok){
-          const fd=await fr.json();
-          const firstPage=Array.isArray(fd.videos)?fd.videos:[];
-          if(firstPage.length){
-            all=firstPage;
-            calcAvgViewsPerDay(); restore(); applyUrlParams(); buildFilters(); apply();
-          }
-        }
-      }catch{}
-    }
+// Build the /api/videos query for the current filter+sort state.
+function buildVideosUrl(off){
+  const p=new URLSearchParams();
+  p.set("all","1"); p.set("limit",String(PAGE)); p.set("offset",String(off)); p.set("sort",sortMode);
+  const q=srch.value.trim(); if(q) p.set("q",q);
+  if(activeCategory) p.set("category",activeCategory);
+  if(activeArtist) p.set("artist",activeArtist);
+  if(activeTags.size) p.set("tags",[...activeTags].join(","));
+  return `${API}/api/videos?${p.toString()}`;
+}
 
-    // Fetch the full catalog (limit capped at 30000 server-side)
-    const r=await fetch(`${API}/api/videos?limit=30000`);
-    if(!r.ok) throw 0;
-    const data=await r.json();
-    all=Array.isArray(data.videos)?data.videos:(Array.isArray(data)?data:[]);
-    try{ sessionStorage.setItem("_videos",JSON.stringify(all)); }catch{}
-    calcAvgViewsPerDay();
-    restore();
-    applyUrlParams();
-    buildFilters();
-    apply();
-    loadCategories();
-  }catch{
-    if(!all.length) grid.innerHTML=`<div class="state-box">
-      <div class="state-ico">⚠️</div>
-      <div class="state-t">Couldn't load</div>
-      <div class="state-s">Check connection and try again.</div>
-      <button class="state-btn" onclick="location.reload()">Retry</button>
-    </div>`;
+function showLoadError(){
+  grid.innerHTML=`<div class="state-box"><div class="state-ico">⚠️</div><div class="state-t">Couldn't load</div><div class="state-s">Check connection and try again.</div><button class="state-btn" onclick="location.reload()">Retry</button></div>`;
+}
+
+// Reset paging and load the first page (or the current page, in pages-mode).
+async function runQuery(reset){
+  const token=++_qToken;
+  if(reset){
+    all=[]; offset=0; done=false;
+    if(pageMode==="pages") page=1;
+    grid.innerHTML='<div style="text-align:center;padding:40px;color:var(--sub)"><div class="spinner" style="margin:0 auto 12px"></div>Loading videos…</div>';
+    pagArea.innerHTML=""; scrollSentinel.style.display="none";
   }
+  // "Saved" = client-side favorites → fetch by slug, sort + show client-side.
+  if(favOnly){
+    const favs=[...getFavs()];
+    if(!favs.length){ all=[]; total=0; done=true; if(token===_qToken){ render(); gridCount.textContent="0 videos"; } return; }
+    try{
+      const r=await fetch(`${API}/api/videos/by-slugs?slugs=${encodeURIComponent(favs.join(","))}`);
+      const d=await r.json(); let vids=Array.isArray(d.videos)?d.videos:[];
+      if(token!==_qToken) return;
+      all=sortClient(vids); total=all.length; done=true;
+      calcAvgViewsPerDay(); buildFilters(); render(); gridCount.textContent=`${total} videos`;
+    }catch{ if(token===_qToken && !all.length) showLoadError(); }
+    return;
+  }
+  fetchInto(pageMode==="pages" ? (page-1)*PAGE : 0, "replace", token);
+}
+
+// Fetch one page from the server. mode "replace" swaps `all` (reset / pages-mode);
+// "append" adds to it (scroll-mode load-more).
+async function fetchInto(off, mode, token){
+  if(loading) return;
+  loading=true;
+  try{
+    const r=await fetch(buildVideosUrl(off));
+    if(!r.ok) throw 0;
+    const d=await r.json();
+    if(token!==_qToken) return; // superseded by a newer query
+    const vids=Array.isArray(d.videos)?d.videos:[];
+    total=Number(d.total||0);
+    offset=off+vids.length;
+    done = offset>=total || !vids.length;
+    if(mode==="append"){
+      all=all.concat(vids);
+      calcAvgViewsPerDay(); buildFilters();
+      appendCards(vids,getFavs());
+      scrollSentinel.style.display=done?"none":"block";
+    } else {
+      all=vids;
+      resolveNames(); calcAvgViewsPerDay(); buildFilters();
+      render();
+    }
+    gridCount.textContent = total?`${total.toLocaleString()} videos`:"";
+  }catch{ if(!all.length) showLoadError(); }
+  finally{ loading=false; }
+}
+
+function loadMore(){
+  if(loading||done||favOnly||pageMode!=="scroll") return;
+  fetchInto(offset,"append",_qToken);
+}
+
+// Pull the pretty artist/category display name off the first loaded row.
+function resolveNames(){
+  if(activeArtist&&!activeArtistName){ const h=all.find(v=>Array.isArray(v.artistSlugs)&&v.artistSlugs.includes(activeArtist)); if(h){ activeArtistName=h.artists[h.artistSlugs.indexOf(activeArtist)]||activeArtist; } }
+  if(activeCategory&&!activeCategoryName){ const h=all.find(v=>Array.isArray(v.categorySlugs)&&v.categorySlugs.includes(activeCategory)); if(h){ activeCategoryName=h.categories[h.categorySlugs.indexOf(activeCategory)]||activeCategory; } }
+  if(activeArtistName||activeCategoryName) updateHeaderLabels();
+}
+
+function sortClient(vids){
+  if(sortMode==="views") return vids.sort((a,b)=>Number(b.views||0)-Number(a.views||0));
+  if(sortMode==="longest") return vids.sort((a,b)=>Number(b.duration||0)-Number(a.duration||0));
+  return vids.sort((a,b)=>Number(b.id||0)-Number(a.id||0));
 }
 
 let allTagsSorted=[], popularTags=[];
@@ -969,53 +1024,27 @@ function renderSelectedChips(){
 
 function toggleTag(tag){ activeTags.has(tag)?activeTags.delete(tag):activeTags.add(tag); renderFilterChips(); renderSelectedChips(); apply(); }
 
+// Any filter/sort/search change → update the header + run a fresh server query.
 function apply(){
-  const q=srch.value.trim().toLowerCase();
-  const favs=getFavs();
-  // Resolve the artist's pretty display name from the loaded set (for the header label).
-  if(activeArtist&&!activeArtistName){
-    const hit=all.find(v=>Array.isArray(v.artistSlugs)&&v.artistSlugs.includes(activeArtist));
-    if(hit){ activeArtistName=hit.artists[hit.artistSlugs.indexOf(activeArtist)]||activeArtist; }
-  }
-  if(activeCategory&&!activeCategoryName){
-    const hit=all.find(v=>Array.isArray(v.categorySlugs)&&v.categorySlugs.includes(activeCategory));
-    if(hit){ activeCategoryName=hit.categories[hit.categorySlugs.indexOf(activeCategory)]||activeCategory; }
-  }
-  filtered=all.filter(v=>{
-    if(favOnly&&!favs.has(v.slug)) return false;
-    if(activeArtist){ const as=Array.isArray(v.artistSlugs)?v.artistSlugs:[]; if(!as.includes(activeArtist)) return false; }
-    if(activeCategory){ const cs=Array.isArray(v.categorySlugs)?v.categorySlugs:[]; if(!cs.includes(activeCategory)) return false; }
-    if(activeTags.size){ const vt=normTags(v.tags); if(![...activeTags].some(t=>vt.includes(t))) return false; }
-    if(q){
-      const hay=[v.title,normTags(v.tags).join(" "),(v.artists||[]).join(" ")].map(x=>String(x||"").toLowerCase()).join(" ");
-      if(!hay.includes(q)) return false;
-    }
-    return true;
-  });
-  sortFiltered();
-  page=1; loadedCount=PAGE;
+  updateHeaderLabels();
+  updateFiltersUI();
+  updateRailVisibility();
+  save();
+  runQuery(true);
+}
+
+// Sort tabs stay visible always; when filtering, show the context line above them.
+function updateHeaderLabels(){
+  const q=srch.value.trim();
   const bits=[];
   if(favOnly) bits.push("Saved");
   if(activeCategory) bits.push(activeCategoryName||activeCategory);
   if(activeArtist) bits.push("@"+(activeArtistName||activeArtist));
   if(activeTags.size) bits.push([...activeTags].map(t=>"#"+t).join(", "));
   if(q) bits.push(`"${q}"`);
-  // Sort tabs stay visible always; when filtering, show the context line above them.
   const filtering=bits.length>0;
   gridTitle.textContent=filtering?bits.join(" · "):"";
   gridTitle.style.display=filtering?"":"none";
-  updateRailVisibility();
-  gridCount.textContent=filtered.length?`${filtered.length} videos`:"";
-  updateFiltersUI();
-  save();
-  render();
-}
-
-function sortFiltered(){
-  if(sortMode==="views") filtered.sort((a,b)=>Number(b.views||0)-Number(a.views||0));
-  else if(sortMode==="longest") filtered.sort((a,b)=>Number(b.duration||0)-Number(a.duration||0));
-  // "new" = insertion order: id is an autoincrement int, so id desc = newest added first
-  else filtered.sort((a,b)=>Number(b.id||0)-Number(a.id||0));
 }
 // Sort tabs (rule34video-style) — set the mode, sync the dropdown, re-render.
 function setSort(mode){
@@ -1034,7 +1063,7 @@ function updateFiltersUI(){
 
 function render(){
   grid.innerHTML="";
-  if(!filtered.length){
+  if(!all.length){
     grid.innerHTML=`<div class="state-box">
       <div class="state-ico">🔍</div>
       <div class="state-t">Nothing found</div>
@@ -1044,32 +1073,31 @@ function render(){
     pagArea.innerHTML=""; scrollSentinel.style.display="none"; return;
   }
   const favs=getFavs();
-  if(pageMode==="pages"){
+  if(pageMode==="pages" && !favOnly){
     scrollSentinel.style.display="none";
-    const total=Math.ceil(filtered.length/PAGE);
-    page=Math.min(Math.max(1,page),total);
-    const start=(page-1)*PAGE;
-    appendCards(filtered.slice(start,start+PAGE),favs);
-    pagArea.innerHTML=total>1?buildPag(page,total):"";
-    if(total>1){
+    appendCards(all,favs);   // `all` already holds exactly this page (server-sliced)
+    const totalPages=Math.max(1,Math.ceil(total/PAGE));
+    page=Math.min(Math.max(1,page),totalPages);
+    pagArea.innerHTML=totalPages>1?buildPag(page,totalPages):"";
+    if(totalPages>1){
       pagArea.querySelectorAll(".pg[data-p]").forEach(b=>{
-        b.addEventListener("click",()=>{ page=Number(b.dataset.p); render(); window.scrollTo({top:0,behavior:"smooth"}); });
+        b.addEventListener("click",()=>{ const np=Number(b.dataset.p); if(np>=1&&np<=totalPages){ page=np; runQuery(true); window.scrollTo({top:0,behavior:"smooth"}); } });
       });
       const goWrap=document.createElement("div");
       goWrap.className="pag-goto";
-      goWrap.innerHTML=`<input type="number" min="1" max="${total}" id="gotoPageInput" placeholder="Page #" inputmode="numeric" /><button type="button" id="gotoPageBtn">Go</button>`;
+      goWrap.innerHTML=`<input type="number" min="1" max="${totalPages}" id="gotoPageInput" placeholder="Page #" inputmode="numeric" /><button type="button" id="gotoPageBtn">Go</button>`;
       pagArea.appendChild(goWrap);
       const gotoInput=goWrap.querySelector("#gotoPageInput");
       const gotoBtn=goWrap.querySelector("#gotoPageBtn");
-      const goToPage=()=>{ const v=Math.min(Math.max(1,parseInt(gotoInput.value,10)||1),total); page=v; render(); window.scrollTo({top:0,behavior:"smooth"}); };
+      const goToPage=()=>{ const v=Math.min(Math.max(1,parseInt(gotoInput.value,10)||1),totalPages); page=v; runQuery(true); window.scrollTo({top:0,behavior:"smooth"}); };
       gotoBtn.addEventListener("click",goToPage);
       gotoInput.addEventListener("keydown",e=>{ if(e.key==="Enter") goToPage(); });
     }
   } else {
+    // scroll mode (and the Saved view): draw the loaded window; the sentinel loads more
     pagArea.innerHTML="";
-    loadedCount=Math.min(Math.max(loadedCount,PAGE),Math.max(filtered.length,PAGE));
-    appendCards(filtered.slice(0,Math.min(loadedCount,filtered.length)),favs);
-    scrollSentinel.style.display=loadedCount<filtered.length?"block":"none";
+    appendCards(all,favs);
+    scrollSentinel.style.display=(!favOnly && !done)?"block":"none";
   }
 }
 
@@ -1125,16 +1153,8 @@ modeSel.addEventListener("change",()=>setPageMode(modeSel.value));
 
 let _scrollLoading=false;
 new IntersectionObserver(entries=>{
-  if(!entries[0].isIntersecting) return;
-  if(pageMode!=="scroll"||_scrollLoading||loadedCount>=filtered.length) return;
-  _scrollLoading=true;
-  const prevCount=loadedCount;
-  loadedCount=Math.min(loadedCount+PAGE,filtered.length);
-  const favs=getFavs();
-  appendCards(filtered.slice(prevCount,loadedCount),favs);
-  scrollSentinel.style.display=loadedCount<filtered.length?"block":"none";
-  setTimeout(()=>{ _scrollLoading=false; },150);
-},{rootMargin:"300px"}).observe(scrollSentinel);
+  if(entries[0].isIntersecting) loadMore();   // guards live inside loadMore()
+},{rootMargin:"600px"}).observe(scrollSentinel);
 
 function buildPag(cur,tot){
   let h=`<button class="pg" data-p="${cur-1}" ${cur===1?"disabled":""}>‹</button>`;
@@ -1261,21 +1281,14 @@ function updateRailVisibility(){
 }
 // Categories bar = the top series/parody categories (Genshin Impact, 3D, …) as chips.
 function loadCategories(){
-  const map=new Map();
-  for(const v of all){
-    const cats=Array.isArray(v.categories)?v.categories:[];
-    const slugs=Array.isArray(v.categorySlugs)?v.categorySlugs:[];
-    cats.forEach((name,i)=>{
-      const slug=slugs[i]||String(name).toLowerCase().replace(/\s+/g,"-");
-      const cur=map.get(slug)||{slug,name,count:0}; cur.count++; map.set(slug,cur);
-    });
-  }
-  const top=[...map.values()].sort((a,b)=>b.count-a.count).slice(0,24);
-  if(!top.length) return;
-  document.getElementById("catsRow").innerHTML=top.map(c=>
-    `<a class="cat-chip" href="index.html?category=${encodeURIComponent(c.slug)}">${esc(c.name)}<span class="cc-n">${c.count}</span></a>`).join("");
-  _hasCats=true;
-  updateRailVisibility();
+  fetch(`${API}/api/videos/categories`).then(r=>r.json()).then(d=>{
+    const top=(d.categories||[]).slice(0,24);
+    if(!top.length) return;
+    document.getElementById("catsRow").innerHTML=top.map(c=>
+      `<a class="cat-chip" href="index.html?category=${encodeURIComponent(c.slug)}">${esc(c.name)}<span class="cc-n">${c.count}</span></a>`).join("");
+    _hasCats=true;
+    updateRailVisibility();
+  }).catch(()=>{});
 }
 
 function clearAll(){
@@ -1300,11 +1313,13 @@ function restore(){
     if(s.q){ srch.value=s.q; srchX.classList.add("vis"); }
     if(Array.isArray(s.tags)) activeTags=new Set(s.tags);
     if(s.fav) favOnly=true;
-    if(s.sort==="new"||s.sort==="views") sortMode=s.sort;
+    if(s.sort==="new"||s.sort==="views"||s.sort==="longest") sortMode=s.sort;
     chipFavs.classList.toggle("on",favOnly);
     sortSel.value=sortMode;
   }catch{}
 }
+// Keep the visible sort tabs (Latest / Most Viewed / Longest) in sync with sortMode.
+function syncSortTabs(){ document.querySelectorAll(".sort-tab").forEach(t=>t.classList.toggle("on",t.dataset.sort===sortMode)); }
 // URL params (?tag=… from watch-page tag chips, ?q=… from the SearchAction schema)
 // override whatever was restored from localStorage.
 function applyUrlParams(){
