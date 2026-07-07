@@ -12,13 +12,13 @@
     st.id = "acctCss";
     st.textContent =
       ".acct{position:relative}" +
-      ".avatar-btn{width:38px;height:38px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:900;color:#221200;background:var(--grad-accent,linear-gradient(135deg,#ffce54,#f59e0b));border:none;cursor:pointer;font-size:15px;transition:transform .15s,box-shadow .15s;padding:0;overflow:hidden}" +
-      ".avatar-btn img{width:100%;height:100%;object-fit:cover;border-radius:50%}" +
+      ".avatar-btn{width:38px;height:38px;border-radius:11px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:900;color:#221200;background:var(--grad-accent,linear-gradient(135deg,#ffce54,#f59e0b));border:none;cursor:pointer;font-size:15px;transition:transform .15s,box-shadow .15s;padding:0;overflow:hidden}" +
+      ".avatar-btn img{width:100%;height:100%;object-fit:cover;border-radius:11px}" +
       ".avatar-btn:hover{transform:scale(1.06);box-shadow:0 4px 16px rgba(245,158,11,.5)}" +
       ".acct-menu{position:absolute;top:calc(100% + 10px);right:0;min-width:212px;background:var(--panel,#12141a);border:1px solid var(--border,#242835);border-radius:14px;padding:6px;box-shadow:0 16px 40px rgba(0,0,0,.55);display:none;z-index:1000}" +
       ".acct-menu.open{display:block}" +
       ".acct-head{display:flex;align-items:center;gap:10px;padding:9px 10px 11px;border-bottom:1px solid var(--border,#242835);margin-bottom:6px}" +
-      ".acct-head .av{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;color:#221200;overflow:hidden;background:var(--grad-accent,linear-gradient(135deg,#ffce54,#f59e0b))}" +
+      ".acct-head .av{width:34px;height:34px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;color:#221200;overflow:hidden;background:var(--grad-accent,linear-gradient(135deg,#ffce54,#f59e0b))}" +
       ".acct-head .av img{width:100%;height:100%;object-fit:cover}" +
       ".acct-name{font-weight:800;font-size:13px;line-height:1.2}" +
       ".acct-sub{font-size:11px;color:var(--muted,#8891a8);margin-top:1px}" +
