@@ -115,8 +115,8 @@
         <div id="networks"></div>
       </div>
       <div class="panel">
-        <h2>Rotation split</h2>
-        <p class="hint">How the engine currently weights slots — auto-tuned by 7-day eCPM (confidence-shrunk).</p>
+        <h2>Traffic split</h2>
+        <p class="hint">Actual share of impressions per network — how the rotation allocated traffic in this range.</p>
         <div class="weights" id="weightsBar"></div>
         <div class="wlegend" id="weightsLegend"></div>
       </div>
@@ -230,16 +230,15 @@ function render(){
     '<div class="netsub num"><span>eCPM '+money3(n.ecpm)+'</span><span>'+intf(n.impressions)+' impr</span><span>'+intf(n.clicks)+' clicks</span></div></div>'
   ).join("") : '<div class="empty">No revenue in this range for the selected networks.</div>';
 
-  // rotation weights (all networks, from /api/ads/weights)
-  const wt = (lastWeights&&lastWeights.networks)||{};
-  const wk = Object.keys(wt).sort((a,b)=>wt[b]-wt[a]);
-  if(wk.length){
-    const sum = wk.reduce((s,k)=>s+Math.max(0,wt[k]),0)||1;
-    $("weightsBar").innerHTML = wk.map(k=>'<i style="width:'+(Math.max(0,wt[k])/sum*100)+'%;background:'+color(k)+'" title="'+k+'"></i>').join("");
-    $("weightsLegend").innerHTML = wk.map(k=>'<div class="wl"><span><span class="dot" style="background:'+color(k)+'"></span>'+k+'</span><b class="num">'+(Math.max(0,wt[k])/sum*100).toFixed(1)+'%</b></div>').join("");
+  // traffic split — actual impression share per network (the real rotation outcome)
+  const totImp = networks.reduce((s,n)=>s+n.impressions,0);
+  const tsplit = networks.slice().sort((a,b)=>b.impressions-a.impressions);
+  if(totImp>0){
+    $("weightsBar").innerHTML = tsplit.map(n=>'<i style="width:'+(n.impressions/totImp*100)+'%;background:'+color(n.network)+'" title="'+n.network+' '+(n.impressions/totImp*100).toFixed(1)+'%"></i>').join("");
+    $("weightsLegend").innerHTML = tsplit.map(n=>'<div class="wl"><span><span class="dot" style="background:'+color(n.network)+'"></span>'+n.network+'</span><b class="num">'+(n.impressions/totImp*100).toFixed(1)+'%</b></div>').join("");
   } else {
     $("weightsBar").innerHTML='<i style="width:100%;background:var(--panel2)"></i>';
-    $("weightsLegend").innerHTML='<div class="wl" style="color:var(--dim)">No weights yet.</div>';
+    $("weightsLegend").innerHTML='<div class="wl" style="color:var(--dim)">No impressions in range.</div>';
   }
 
   drawChart(dailyArr);
