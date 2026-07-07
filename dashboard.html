@@ -161,16 +161,20 @@ function showGate(msg){ $("app").style.display="none"; $("gate").style.display="
 function showApp(){ $("gate").style.display="none"; $("app").style.display="block"; }
 
 async function load(){
-  if(!KEY()) return showGate();
   $("meta").innerHTML = '<span style="color:var(--muted)">Loading…</span>';
   let stats, weights;
   try{
-    const r = await fetch(API+"/api/admin/ads/stats?range="+range, { headers:{ "x-admin-key":KEY() } });
-    if(r.status===401){ sessionStorage.removeItem("adkey"); return showGate("That key was rejected."); }
+    // Owner session (cross-domain cookie) works with no key; a pasted admin key also works.
+    const headers = KEY() ? { "x-admin-key":KEY() } : {};
+    const r = await fetch(API+"/api/admin/ads/stats?range="+range, { credentials:"include", headers });
+    if(r.status===401 || r.status===403){
+      if(KEY()){ sessionStorage.removeItem("adkey"); return showGate("That key was rejected."); }
+      return showGate();  // not a logged-in owner and no key entered
+    }
     if(!r.ok) throw new Error("HTTP "+r.status);
     stats = await r.json();
-  }catch(e){ $("meta").innerHTML='<span style="color:#fca5a5">Failed to load: '+e.message+'</span>'; return; }
-  try{ weights = await (await fetch(API+"/api/ads/weights")).json(); }catch(e){ weights={weights:{}}; }
+  }catch(e){ showApp(); $("meta").innerHTML='<span style="color:#fca5a5">Failed to load: '+e.message+'</span>'; return; }
+  try{ weights = await (await fetch(API+"/api/ads/weights",{credentials:"include"})).json(); }catch(e){ weights={networks:{}}; }
   lastData = stats; showApp(); render(stats, weights);
 }
 
