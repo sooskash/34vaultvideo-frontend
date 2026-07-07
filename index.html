@@ -689,6 +689,40 @@ button{font-family:inherit}
   font-size:11px;color:var(--sub);font-weight:600;
 }
 .foot-links a:hover{color:var(--text)}
+/* ══════════ CLEAN REDESIGN — match the UI concept ══════════ */
+/* wider, centered search */
+.search-wrap{flex:1;max-width:560px;margin:0 auto}
+@media(max-width:760px){.search-wrap{max-width:none;margin:0}}
+/* ONE clean control row (replaces the old 3 stacked bars) */
+.ctl{display:flex;align-items:center;gap:11px;margin:2px 0 4px;flex-wrap:wrap}
+/* sort tabs → segmented control */
+.sort-tabs{display:inline-flex;gap:3px;background:var(--surface,#12141a);border:1px solid var(--border,#242835);border-radius:12px;padding:4px}
+.sort-tab{height:auto;padding:8px 15px;border-radius:9px;border:none;background:none;font-size:13px;font-weight:700;color:var(--sub,#8b93a7);cursor:pointer;transition:color .12s,background .12s}
+.sort-tab:hover{color:var(--text);background:transparent}
+.sort-tab.on{background:var(--surface2,#1e222c);color:var(--text);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+.sort-tab.on::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:7px;vertical-align:middle}
+/* filters button */
+.fbtn{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 15px;border-radius:11px;background:var(--surface,#12141a);border:1px solid var(--border,#242835);font-size:13px;font-weight:700;color:var(--sub,#8b93a7);cursor:pointer;transition:all .12s}
+.fbtn:hover{border-color:var(--accent);color:var(--text)}
+.fbtn.on{border-color:var(--accent);color:var(--accent)}
+.fbtn .filters-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--accent);color:#221200;font-size:11px;font-weight:900}
+/* grid-size toggle */
+.gv-btn2{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:11px;background:var(--surface,#12141a);border:1px solid var(--border,#242835);color:var(--sub,#8b93a7);cursor:pointer;flex-shrink:0}
+.gv-btn2 svg{width:18px;height:18px}
+.gv-btn2:hover{color:var(--text);border-color:var(--accent)}
+/* video count, right-aligned */
+.count{margin-left:auto;font-size:13px;color:var(--sub,#8b93a7);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.count b{color:var(--text);font-weight:800}
+/* category chips — clean pills, no label */
+.cats{display:flex;gap:8px;overflow-x:auto;margin:14px 0 20px;padding-bottom:2px;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 93%,transparent);mask-image:linear-gradient(90deg,#000 93%,transparent)}
+.cats::-webkit-scrollbar{display:none}
+.cat-chip{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;background:var(--surface,#12141a);border:1px solid var(--border,#242835);font-size:12.5px;font-weight:700;color:var(--sub,#8b93a7);white-space:nowrap;text-decoration:none;transition:border-color .12s,color .12s}
+.cat-chip:hover{border-color:var(--accent);color:var(--text);transform:none}
+.cat-chip .cc-n{font-size:11px;font-weight:700;color:var(--dim,#5b6373);font-variant-numeric:tabular-nums}
+.cat-chip.on{background:rgba(245,166,35,.12);border-color:rgba(245,166,35,.42);color:var(--accent)}
+.cat-chip.on .cc-n{color:var(--accent);opacity:.85}
+/* a touch more room between cards */
+.grid{gap:16px 14px}
 </style>
 </head>
 <body><noscript><div style="padding:40px 20px;text-align:center;font-family:sans-serif;color:#f0f0f0;background:#0a0b0e;min-height:100vh"><h1>34VaultVideo</h1><p style="margin-top:16px;color:#8b8fa8">This site requires JavaScript to function. Please enable JavaScript in your browser settings.</p></div></noscript>
@@ -716,25 +750,13 @@ button{font-family:inherit}
   </div>
 </header>
 
-<!-- ━━━ FILTER STRIP ━━━ -->
-<div class="filter-strip">
-  <div class="filter-inner" id="filterInner">
-    <button class="filters-btn" id="filtersBtn" type="button">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg> Filters
-      <span class="filters-badge" id="filtersBadge" style="display:none">0</span>
-    </button>
-    <select class="sort-select" id="sortSel">
-      <option value="new">Newest</option>
-      <option value="views">Most Viewed</option>
-      <option value="longest">Longest</option>
-    </select>
-    <span class="sel-ico"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 9h8M8 13h8M8 17h4"/></svg><select class="sort-select" id="modeSel">
-      <option value="pages">Pages</option>
-      <option value="scroll">Scroll</option>
-    </select></span>
-    <button class="sort-select gv-btn" id="gridViewBtn" type="button" title="Video size (grid / large)" aria-label="Toggle video size"></button>
-    <div class="chip" id="chipFavs"><span class="fav-star">&#9733;</span> Saved <span class="cn" id="favCt">0</span></div>
-  </div>
+<!-- Legacy controls kept hidden — the JS still references these ids. The visible
+     controls now live in the clean control row inside <main>. Saved moved to the
+     account menu; page-mode + sort-dropdown are hidden (sort tabs drive sorting). -->
+<div style="display:none" aria-hidden="true">
+  <select id="sortSel"><option value="new">Newest</option><option value="views">Most Viewed</option><option value="longest">Longest</option></select>
+  <select id="modeSel"><option value="pages">Pages</option><option value="scroll">Scroll</option></select>
+  <div id="chipFavs"><span id="favCt">0</span></div>
 </div>
 
 <!-- ━━━ FILTERS SHEET (simplified: tag search + tag chips only) ━━━ -->
@@ -768,19 +790,23 @@ button{font-family:inherit}
   <!-- Categories bar — top tags as quick chips; hidden until populated
        (Top Artists rail removed from the homepage: low signal + no rating data;
         artist credits still appear on cards/watch, and the /artists page remains) -->
-  <section class="cats-bar" id="catsBar" style="display:none">
-    <div class="rail-title"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg> Categories</div>
-    <div class="cats-scroll" id="catsRow"></div>
-  </section>
-  <div class="grid-title" id="gridTitle" style="display:none"></div>
-  <div class="grid-header">
+  <div class="ctl">
     <div class="sort-tabs" id="sortTabs">
       <button class="sort-tab on" data-sort="new" type="button" onclick="setSort('new')">Latest</button>
       <button class="sort-tab" data-sort="views" type="button" onclick="setSort('views')">Most Viewed</button>
       <button class="sort-tab" data-sort="longest" type="button" onclick="setSort('longest')">Longest</button>
     </div>
-    <div class="grid-count" id="gridCount"></div>
+    <button class="fbtn" id="filtersBtn" type="button">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg> Filters
+      <span class="filters-badge" id="filtersBadge" style="display:none">0</span>
+    </button>
+    <button class="gv-btn2" id="gridViewBtn" type="button" title="Video size" aria-label="Toggle video size"></button>
+    <span class="count" id="gridCount"></span>
   </div>
+  <div class="cats" id="catsBar" style="display:none">
+    <div class="cats-scroll" id="catsRow"></div>
+  </div>
+  <div class="grid-title" id="gridTitle" style="display:none"></div>
   <div class="grid" id="grid">
     <div class="sk"><div class="sk-c"></div><div class="sk-b"><div class="sk-l"></div><div class="sk-l s"></div></div></div>
     <div class="sk"><div class="sk-c"></div><div class="sk-b"><div class="sk-l"></div><div class="sk-l s"></div></div></div>
@@ -997,7 +1023,7 @@ async function fetchInto(off, mode, token){
       resolveNames(); calcAvgViewsPerDay(); buildFilters();
       render();
     }
-    gridCount.textContent = total?`${total.toLocaleString()} videos`:"";
+    gridCount.innerHTML = total?`<b>${total.toLocaleString()}</b> videos`:"";
   }catch{ if(!all.length) showLoadError(); }
   finally{ loading=false; }
 }
