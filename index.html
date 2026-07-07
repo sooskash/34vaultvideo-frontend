@@ -181,6 +181,19 @@ button{font-family:inherit}
 }
 .avatar-btn img{width:34px;height:34px;object-fit:cover;border-radius:9px}
 .avatar-btn:hover{transform:scale(1.06);box-shadow:0 4px 16px var(--accent-45,rgba(245,158,11,.5))}
+/* Account dropdown */
+.acct{position:relative}
+.acct-menu{position:absolute;top:calc(100% + 10px);right:0;min-width:210px;background:var(--panel,#111318);border:1px solid var(--border,#1e222e);border-radius:14px;padding:6px;box-shadow:0 16px 40px rgba(0,0,0,.55);display:none;z-index:1000}
+.acct-menu.open{display:block}
+.acct-head{display:flex;align-items:center;gap:10px;padding:9px 10px 11px;border-bottom:1px solid var(--border,#1e222e);margin-bottom:6px}
+.acct-head .av{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;color:#2a1500;overflow:hidden;background:linear-gradient(135deg,var(--accent,#ffce54),var(--accent2,#f59e0b))}
+.acct-head .av img{width:100%;height:100%;object-fit:cover}
+.acct-name{font-weight:800;font-size:13px;line-height:1.2}
+.acct-sub{font-size:11px;color:var(--muted,#8891a8);margin-top:1px}
+.acct-item{display:flex;align-items:center;gap:10px;padding:10px 10px;border-radius:9px;font-size:13px;font-weight:700;color:var(--text,#eef1f8);cursor:pointer;text-decoration:none;transition:background .12s}
+.acct-item:hover{background:var(--panel2,#181b22)}
+.acct-item .mi{width:16px;text-align:center;opacity:.85}
+.acct-item.danger{color:#fca5a5}
 
 /* ━━━ FILTER STRIP ━━━ */
 .filter-strip{
@@ -696,7 +709,10 @@ button{font-family:inherit}
       <button class="search-x" id="searchX" type="button">✕</button>
     </div>
 
-    <button class="avatar-btn" onclick="location.href='https://34vault.com/profile.html'" title="Profile" type="button">V</button>
+    <div class="acct" id="acct">
+      <button class="avatar-btn" id="avatarBtn" title="Account" type="button" aria-haspopup="true">V</button>
+      <div class="acct-menu" id="acctMenu" role="menu"></div>
+    </div>
   </div>
 </header>
 
@@ -863,16 +879,41 @@ const getFavs=()=>{ try{ return new Set(JSON.parse(localStorage.getItem(K_FAV)||
 const setFavs=s=>{ try{ localStorage.setItem(K_FAV,JSON.stringify([...s])); }catch{} updFavCt(); };
 const updFavCt=()=>{ favCt.textContent=String(getFavs().size); };
 
-// Avatar: show the logged-in user's avatar/initial from the shared 34vault account
-// (cookie lives on api.34vault.com). Button itself links to the main site's profile.
+// Account menu — reads the shared 34vault account (cookie on api.34vault.com).
+// Profile/Settings/Login live on the main site (same account); Saved is local here.
 (function(){
-  fetch(`${API}/api/me`,{credentials:"include"}).then(r=>r.ok?r.json():null).then(me=>{
-    if(!me) return;
-    const av=document.querySelector(".avatar-btn");
-    if(!av) return;
-    if(me.avatarUrl) av.innerHTML=`<img src="${esc(me.avatarUrl)}" alt="">`;
-    else av.textContent=(me.displayName||"V").charAt(0).toUpperCase();
-  }).catch(()=>{});
+  var btn=document.getElementById("avatarBtn"), menu=document.getElementById("acctMenu");
+  if(!btn||!menu) return;
+  var MAIN="https://34vault.com";
+  function toggle(v){ menu.classList.toggle("open", v===undefined ? !menu.classList.contains("open") : v); }
+  btn.addEventListener("click",function(e){ e.stopPropagation(); toggle(); });
+  document.addEventListener("click",function(){ toggle(false); });
+  menu.addEventListener("click",function(e){ e.stopPropagation(); });
+  fetch(`${API}/api/me`,{credentials:"include"}).then(function(r){ return r.ok?r.json():null; }).then(function(me){
+    if(me){
+      var initial=(me.displayName||"V").charAt(0).toUpperCase();
+      var avHtml = me.avatarUrl ? `<img src="${esc(me.avatarUrl)}" alt="">` : initial;
+      btn.innerHTML = avHtml;
+      menu.innerHTML =
+        `<div class="acct-head"><div class="av">${avHtml}</div><div><div class="acct-name">${esc(me.displayName||"You")}</div><div class="acct-sub">34Vault account</div></div></div>`+
+        `<div class="acct-item" id="acctSaved"><span class="mi">&#9733;</span> Saved</div>`+
+        `<a class="acct-item" href="${MAIN}/profile.html"><span class="mi">&#128100;</span> Profile</a>`+
+        `<a class="acct-item" href="${MAIN}/settings.html"><span class="mi">&#9881;</span> Settings</a>`+
+        `<div class="acct-item danger" id="acctLogout"><span class="mi">&#9099;</span> Log out</div>`;
+      var s=document.getElementById("acctSaved");
+      if(s) s.onclick=function(){ toggle(false); var c=document.getElementById("chipFavs"); if(c) c.click(); };
+      var lo=document.getElementById("acctLogout");
+      if(lo) lo.onclick=function(){ fetch(`${API}/api/auth/logout`,{method:"POST",credentials:"include"}).catch(function(){}).then(function(){ location.reload(); }); };
+    } else {
+      btn.textContent="V";
+      menu.innerHTML =
+        `<a class="acct-item" href="${MAIN}/auth.html"><span class="mi">&#8594;</span> Log in</a>`+
+        `<a class="acct-item" href="${MAIN}/auth.html"><span class="mi">&#43;</span> Sign up</a>`;
+    }
+  }).catch(function(){
+    btn.textContent="V";
+    menu.innerHTML = `<a class="acct-item" href="${MAIN}/auth.html"><span class="mi">&#8594;</span> Log in</a>`;
+  });
 })();
 
 async function load(){
