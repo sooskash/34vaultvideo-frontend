@@ -395,16 +395,11 @@ async function load(){
 load();
 </script>
 
-<!-- ═══ ADS (disabled for launch) ═══
-  ads.js is NOT in this repo yet. It will be added once the NEW ExoClick account
-  zones for 34vaultvideo.com are created. When they are:
-    1. Copy ads.js from the main 34vault frontend and swap in the new zone IDs.
-    2. Uncomment the script tag below.
-    3. Flip window.ADS_ENABLED to true at the top of the page script above.
-    4. Re-check the <meta name="referrer" content="no-referrer"> in <head> against the
-       ad network's domain-verification requirements.
-  <script src="/ads.js?v=1" defer></script>
--->
+<!-- ═══ ADS ═══ Multi-network engine (see ads.js). To go live: paste zone/spot IDs
+     into AD_CONFIG in ads.js, then set window.ADS_ENABLED=true at the top of this page.
+     Units stay silent until their id is filled in. If a network requires a referrer,
+     re-check <meta name="referrer"> in <head> against its domain-verification rules. -->
+<script src="/ads.js?v=1" defer></script>
 <script>
 window.onAdsReady = window.onAdsReady || function(fn){
   var t=0; var p=setInterval(function(){t++;if(window.__adsReady){clearInterval(p);fn();}else if(t>40)clearInterval(p);},100);

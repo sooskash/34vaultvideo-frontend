@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script src="/config.js?v=1"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#0a0b0e" />
+<meta name="robots" content="noindex,nofollow" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="preconnect" href="https://api.34vault.com" />
+<title>Ad Revenue · 34Vault</title>
+<style>
+  *{box-sizing:border-box}
+  :root{--bg:#0a0b0e;--panel:#13151c;--panel2:#1a1d27;--border:#252736;--text:#f0f0f0;--muted:#8b8fa8;--dim:#5b6373;--accent:#f59e0b;--ok:#22c55e}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif;
+    background-image:radial-gradient(110% 80% at 50% -10%,rgba(245,158,11,.07),transparent 55%);min-height:100vh}
+  .num{font-variant-numeric:tabular-nums}
+  a{color:inherit}
+  /* header */
+  .top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+    padding:14px 22px;background:rgba(10,11,14,.82);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+  .brand{font-size:17px;font-weight:900;letter-spacing:-.02em}
+  .brand b{background:linear-gradient(120deg,#ffd36b,#f59e0b);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .brand span{color:var(--muted);font-weight:700;font-size:13px;margin-left:8px}
+  .spacer{flex:1}
+  .seg{display:flex;background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:3px}
+  .seg button{border:none;background:none;color:var(--muted);font-weight:800;font-size:12.5px;padding:7px 14px;border-radius:8px;cursor:pointer}
+  .seg button.on{background:linear-gradient(135deg,#ffce54,#f59e0b);color:#221200}
+  .ghost{border:1px solid var(--border);background:var(--panel);color:var(--text);font-weight:800;font-size:12.5px;padding:8px 13px;border-radius:10px;cursor:pointer}
+  .ghost:hover{border-color:var(--accent)}
+  .wrap{max-width:1180px;margin:0 auto;padding:22px}
+  .meta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;color:var(--dim);font-size:12px;margin-bottom:16px}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
+  .badge{display:inline-flex;align-items:center;gap:0;padding:4px 9px;border:1px solid var(--border);border-radius:20px;font-size:11.5px;font-weight:700;color:var(--muted)}
+  .badge.live{color:var(--ok);border-color:rgba(34,197,94,.35)}
+  /* stat cards */
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-bottom:20px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:16px 17px}
+  .card .k{font-size:11px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+  .card .v{font-size:28px;font-weight:900;letter-spacing:-.02em;margin-top:7px}
+  .card .v small{font-size:15px;font-weight:800;color:var(--muted)}
+  .card .sub{font-size:12px;color:var(--dim);margin-top:4px}
+  /* panels */
+  .grid2{display:grid;grid-template-columns:1.35fr 1fr;gap:16px;margin-bottom:20px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:17px 18px}
+  .panel h2{font-size:13px;font-weight:900;letter-spacing:.02em;margin:0 0 3px}
+  .panel .hint{font-size:11.5px;color:var(--dim);margin:0 0 14px}
+  /* network rows */
+  .netrow{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:center;padding:11px 0;border-top:1px solid var(--border)}
+  .netrow:first-of-type{border-top:none}
+  .netname{font-weight:800;font-size:13.5px;display:flex;align-items:center}
+  .netmoney{font-weight:900;font-size:14.5px}
+  .bar{grid-column:1/-1;height:6px;border-radius:4px;background:var(--panel2);overflow:hidden;margin-top:2px}
+  .bar i{display:block;height:100%;border-radius:4px}
+  .netsub{grid-column:1/-1;font-size:11.5px;color:var(--muted);display:flex;gap:14px}
+  /* rotation weights */
+  .weights{display:flex;height:26px;border-radius:8px;overflow:hidden;border:1px solid var(--border);margin:2px 0 12px}
+  .weights i{height:100%}
+  .wlegend{display:flex;flex-direction:column;gap:7px}
+  .wlegend .wl{display:flex;align-items:center;justify-content:space-between;font-size:12.5px}
+  .wlegend .wl b{font-weight:900}
+  /* chart */
+  .chart{width:100%;height:150px;display:block}
+  .chart .lbl{fill:var(--dim);font-size:9px}
+  /* table */
+  .tblwrap{overflow-x:auto;border:1px solid var(--border);border-radius:14px}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:640px}
+  th,td{padding:11px 14px;text-align:right;white-space:nowrap}
+  th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}
+  thead th{background:var(--panel2);color:var(--muted);font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer;user-select:none}
+  tbody tr{border-top:1px solid var(--border)}
+  tbody tr:hover{background:var(--panel2)}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-weight:800;font-size:12.5px}
+  .empty{padding:60px 20px;text-align:center;color:var(--dim)}
+  /* gate */
+  .gate{max-width:380px;margin:14vh auto;background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:26px 24px;text-align:center}
+  .gate h1{font-size:19px;margin:0 0 6px}
+  .gate p{color:var(--muted);font-size:13px;margin:0 0 18px}
+  .gate input{width:100%;height:46px;background:var(--bg);border:1px solid var(--border);border-radius:11px;color:var(--text);font-size:14px;padding:0 14px;margin-bottom:12px;outline:none}
+  .gate input:focus{border-color:var(--accent)}
+  .gate button{width:100%;height:46px;border:none;border-radius:11px;background:linear-gradient(135deg,#ffce54,#f59e0b);color:#221200;font-weight:900;font-size:14.5px;cursor:pointer}
+  .err{color:#fca5a5;font-size:12.5px;margin-top:10px;min-height:16px}
+  @media(max-width:820px){.cards{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="app" style="display:none">
+  <div class="top">
+    <div class="brand">34<b>Vault</b> <span>Ad Revenue</span></div>
+    <div class="spacer"></div>
+    <div class="seg" id="rangeSeg">
+      <button data-r="1d">Today</button>
+      <button data-r="7d" class="on">7 days</button>
+      <button data-r="30d">30 days</button>
+    </div>
+    <button class="ghost" id="refreshBtn">↻ Refresh</button>
+    <button class="ghost" id="logoutBtn">Sign out</button>
+  </div>
+
+  <div class="wrap">
+    <div class="meta" id="meta"></div>
+    <div class="cards" id="cards"></div>
+    <div class="grid2">
+      <div class="panel">
+        <h2>By network</h2>
+        <p class="hint">Revenue and eCPM per network, across both sites (reports are account-wide).</p>
+        <div id="networks"></div>
+      </div>
+      <div class="panel">
+        <h2>Rotation split</h2>
+        <p class="hint">How the engine is currently weighting slots — auto-tuned by 7-day eCPM, 10% exploration floor.</p>
+        <div class="weights" id="weightsBar"></div>
+        <div class="wlegend" id="weightsLegend"></div>
+      </div>
+    </div>
+    <div class="panel" style="margin-bottom:20px">
+      <h2>Daily revenue</h2>
+      <p class="hint" id="trendHint"></p>
+      <svg class="chart" id="chart" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="panel" style="padding:17px 18px 6px">
+      <h2>Zones</h2>
+      <p class="hint">Top ad zones by revenue. Click a header to sort.</p>
+    </div>
+    <div class="tblwrap">
+      <table id="zoneTbl">
+        <thead><tr>
+          <th data-s="network">Network</th><th data-s="label">Zone</th>
+          <th data-s="impressions">Impr.</th><th data-s="clicks">Clicks</th>
+          <th data-s="ecpm">eCPM</th><th data-s="revenue">Revenue</th>
+        </tr></thead>
+        <tbody id="zoneBody"></tbody>
+      </table>
+    </div>
+    <p class="empty" id="emptyNote" style="display:none"></p>
+  </div>
+</div>
+
+<div id="gate" class="gate" style="display:none">
+  <h1>Ad dashboard</h1>
+  <p>Enter your admin key to view combined ad revenue.</p>
+  <input id="keyInput" type="password" placeholder="ADMIN_KEY" autocomplete="off" />
+  <button id="keyBtn">Unlock</button>
+  <div class="err" id="gateErr"></div>
+</div>
+
+<script>
+const API = window.__API__ || "https://api.34vault.com";
+const $ = id => document.getElementById(id);
+const KEY = () => sessionStorage.getItem("adkey") || "";
+const NET_COLOR = { ExoClick:"#f59e0b", TrafficStars:"#3b82f6", JuicyAds:"#a855f7", Adsterra:"#ef4444", HilltopAds:"#14b8a6", Clickadu:"#eab308", EroAdvertising:"#ec4899", House:"#64748b" };
+const color = n => NET_COLOR[n] || "#64748b";
+const money = n => "$" + (Number(n)||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const money3 = n => "$" + (Number(n)||0).toLocaleString(undefined,{minimumFractionDigits:3,maximumFractionDigits:3});
+const intf = n => (Number(n)||0).toLocaleString();
+let range = "7d", lastData = null, sortKey = "revenue", sortDir = -1;
+
+function showGate(msg){ $("app").style.display="none"; $("gate").style.display="block"; $("gateErr").textContent=msg||""; $("keyInput").focus(); }
+function showApp(){ $("gate").style.display="none"; $("app").style.display="block"; }
+
+async function load(){
+  if(!KEY()) return showGate();
+  $("meta").innerHTML = '<span style="color:var(--muted)">Loading…</span>';
+  let stats, weights;
+  try{
+    const r = await fetch(API+"/api/admin/ads/stats?range="+range, { headers:{ "x-admin-key":KEY() } });
+    if(r.status===401){ sessionStorage.removeItem("adkey"); return showGate("That key was rejected."); }
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    stats = await r.json();
+  }catch(e){ $("meta").innerHTML='<span style="color:#fca5a5">Failed to load: '+e.message+'</span>'; return; }
+  try{ weights = await (await fetch(API+"/api/ads/weights")).json(); }catch(e){ weights={weights:{}}; }
+  lastData = stats; showApp(); render(stats, weights);
+}
+
+function render(d, w){
+  // meta: configured networks
+  const cfg = d.configured||{};
+  const badges = Object.keys(cfg).map(n=>{
+    const on = cfg[n];
+    return '<span class="badge '+(on?'live':'')+'"><span class="dot" style="background:'+(on?color(n):'#3a3f4d')+'"></span>'+n+(on?'':' · no key')+'</span>';
+  }).join(" ");
+  const pulled = d.pulledAt ? new Date(d.pulledAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : "—";
+  $("meta").innerHTML = badges + '<span class="spacer" style="flex:1"></span><span>'+d.from+' → '+d.to+' · pulled '+pulled+'</span>';
+
+  // stat cards
+  const t = d.totals||{};
+  $("cards").innerHTML = [
+    ["Revenue", money(t.revenue), rangeLabel()],
+    ["eCPM", money3(t.ecpm), "per 1,000 impressions"],
+    ["Impressions", intf(t.impressions), ""],
+    ["Clicks", intf(t.clicks), (t.impressions? ((t.clicks/t.impressions*100).toFixed(2)+"% CTR"):"")]
+  ].map(([k,v,s])=>'<div class="card"><div class="k">'+k+'</div><div class="v num">'+v+'</div><div class="sub num">'+s+'</div></div>').join("");
+
+  // networks
+  const nets = d.networks||[];
+  const maxRev = Math.max(1, ...nets.map(n=>n.revenue));
+  $("networks").innerHTML = nets.length ? nets.map(n=>
+    '<div class="netrow"><div class="netname"><span class="dot" style="background:'+color(n.network)+'"></span>'+n.network+'</div>'+
+    '<div class="netmoney num">'+money(n.revenue)+'</div>'+
+    '<div class="bar"><i style="width:'+(n.revenue/maxRev*100)+'%;background:'+color(n.network)+'"></i></div>'+
+    '<div class="netsub num"><span>eCPM '+money3(n.ecpm)+'</span><span>'+intf(n.impressions)+' impr</span><span>'+intf(n.clicks)+' clicks</span></div></div>'
+  ).join("") : '<div class="empty">No revenue rows yet.</div>';
+
+  // rotation weights
+  const wt = (w&&w.networks)||{};
+  const wk = Object.keys(wt).sort((a,b)=>wt[b]-wt[a]);
+  if(wk.length){
+    const sum = wk.reduce((s,k)=>s+wt[k],0)||1;
+    $("weightsBar").innerHTML = wk.map(k=>'<i style="width:'+(wt[k]/sum*100)+'%;background:'+color(k)+'" title="'+k+' '+(wt[k]/sum*100).toFixed(1)+'%"></i>').join("");
+    $("weightsLegend").innerHTML = wk.map(k=>'<div class="wl"><span><span class="dot" style="background:'+color(k)+'"></span>'+k+'</span><b class="num">'+(wt[k]/sum*100).toFixed(1)+'%</b></div>').join("");
+  } else {
+    $("weightsBar").innerHTML='<i style="width:100%;background:var(--panel2)"></i>';
+    $("weightsLegend").innerHTML='<div class="wl" style="color:var(--dim)">No weights yet — add reporting API keys, then rotation self-tunes.</div>';
+  }
+
+  drawChart(d.daily||[]);
+  renderZones();
+
+  const anyRows = (d.zones||[]).length || nets.length;
+  $("emptyNote").style.display = anyRows ? "none" : "block";
+  $("emptyNote").innerHTML = anyRows ? "" : "No data returned. Add each network's reporting API key on the backend (see the ad-ops comment in server.js), then refresh.";
+}
+
+function rangeLabel(){ return range==="1d"?"today":range==="30d"?"last 30 days":"last 7 days"; }
+
+function drawChart(daily){
+  const svg=$("chart"), W=1000, H=150, pad=18;
+  svg.setAttribute("viewBox","0 0 "+W+" "+H);
+  $("trendHint").textContent = daily.length? ("Revenue per day · "+rangeLabel()) : "No daily rows yet.";
+  if(!daily.length){ svg.innerHTML=""; return; }
+  const max=Math.max(1,...daily.map(d=>d.revenue));
+  const bw=(W-pad*2)/daily.length, gap=Math.min(8,bw*0.25);
+  let out="";
+  // baseline
+  out+='<line x1="'+pad+'" y1="'+(H-pad)+'" x2="'+(W-pad)+'" y2="'+(H-pad)+'" stroke="#252736"/>';
+  daily.forEach((d,i)=>{
+    const h=(d.revenue/max)*(H-pad*2);
+    const x=pad+i*bw+gap/2, y=H-pad-h;
+    out+='<rect x="'+x+'" y="'+y+'" width="'+(bw-gap)+'" height="'+Math.max(1,h)+'" rx="3" fill="url(#g)"><title>'+d.date+" · "+money(d.revenue)+'</title></rect>';
+    if(daily.length<=14 || i%Math.ceil(daily.length/10)===0) out+='<text class="lbl" x="'+(x+(bw-gap)/2)+'" y="'+(H-6)+'" text-anchor="middle">'+d.date.slice(5)+'</text>';
+  });
+  out+='<text class="lbl" x="'+pad+'" y="12">'+money(max)+'</text>';
+  svg.innerHTML='<defs><linearGradient id="g" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#ffce54"/><stop offset="1" stop-color="#f59e0b"/></linearGradient></defs>'+out;
+}
+
+function renderZones(){
+  const zones=(lastData.zones||[]).slice().sort((a,b)=>{
+    const av=a[sortKey], bv=b[sortKey];
+    if(typeof av==="string") return sortDir*av.localeCompare(bv);
+    return sortDir*((av||0)-(bv||0));
+  });
+  $("zoneBody").innerHTML = zones.length ? zones.map(z=>
+    '<tr><td><span class="pill"><span class="dot" style="background:'+color(z.network)+'"></span>'+z.network+'</span></td>'+
+    '<td>'+(z.label||z.zone||"—")+'</td>'+
+    '<td class="num">'+intf(z.impressions)+'</td>'+
+    '<td class="num">'+intf(z.clicks)+'</td>'+
+    '<td class="num">'+money3(z.ecpm)+'</td>'+
+    '<td class="num" style="font-weight:800">'+money(z.revenue)+'</td></tr>'
+  ).join("") : '<tr><td colspan="6" class="empty">No zones yet.</td></tr>';
+}
+
+// events
+$("rangeSeg").addEventListener("click", e=>{ const b=e.target.closest("button"); if(!b)return;
+  [...$("rangeSeg").children].forEach(x=>x.classList.remove("on")); b.classList.add("on"); range=b.dataset.r; load(); });
+$("refreshBtn").onclick = load;
+$("logoutBtn").onclick = ()=>{ sessionStorage.removeItem("adkey"); showGate(); };
+$("zoneTbl").querySelector("thead").addEventListener("click", e=>{ const th=e.target.closest("th"); if(!th)return;
+  const k=th.dataset.s; if(k===sortKey) sortDir*=-1; else { sortKey=k; sortDir=-1; } renderZones(); });
+$("keyBtn").onclick = ()=>{ const v=$("keyInput").value.trim(); if(!v)return; sessionStorage.setItem("adkey",v); load(); };
+$("keyInput").addEventListener("keydown", e=>{ if(e.key==="Enter") $("keyBtn").click(); });
+
+load();
+</script>
+</body>
+</html>
