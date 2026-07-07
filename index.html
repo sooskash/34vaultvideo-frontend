@@ -1378,6 +1378,7 @@ function applyUrlParams(){
   try{
     const p=new URLSearchParams(location.search);
     const t=p.get("tag"), uq=p.get("q"), ar=p.get("artist"), cat=p.get("category");
+    if(p.get("saved")==="1"){ favOnly=true; chipFavs.classList.add("on"); }  // Saved link from other pages
     if(cat){
       activeCategory=cat.toLowerCase(); favOnly=false; activeTags=new Set(); activeArtist=null;
       chipFavs.classList.remove("on");
