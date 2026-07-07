@@ -56,11 +56,11 @@
     } else {
       btn.textContent = "V";
       menu.innerHTML =
-        '<a class="acct-item" href="' + MAIN + '/auth.html"><span class="mi">&#8594;</span> Log in</a>' +
-        '<a class="acct-item" href="' + MAIN + '/auth.html"><span class="mi">&#43;</span> Sign up</a>';
+        '<a class="acct-item" href="auth.html"><span class="mi">&#8594;</span> Log in</a>' +
+        '<a class="acct-item" href="auth.html"><span class="mi">&#43;</span> Sign up</a>';
     }
   }).catch(function () {
     btn.textContent = "V";
-    menu.innerHTML = '<a class="acct-item" href="' + MAIN + '/auth.html"><span class="mi">&#8594;</span> Log in</a>';
+    menu.innerHTML = '<a class="acct-item" href="auth.html"><span class="mi">&#8594;</span> Log in</a>';
   });
 })();

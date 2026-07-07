@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script src="/config.js?v=1"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#0a0b0e" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="preconnect" href="https://api.34vault.com" />
+<link rel="stylesheet" href="/shared.css" />
+<title>Log in | 34VaultVideo</title>
+<meta name="robots" content="noindex" />
+<style>
+  *{box-sizing:border-box}
+  body{background:var(--bg,#0a0b0e);color:var(--text,#eef1f8);margin:0;min-height:100vh;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif;
+    display:flex;flex-direction:column;align-items:center;
+    background-image:radial-gradient(120% 90% at 50% -10%,rgba(245,166,35,.10),transparent 55%)}
+  .top{width:100%;height:60px;display:flex;align-items:center;padding:0 22px}
+  .logo{font-size:20px;font-weight:900;letter-spacing:-.03em;cursor:pointer}
+  .logo b{background:var(--grad-accent,linear-gradient(120deg,#ffd36b,#f59e0b));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .card{width:100%;max-width:400px;margin:6vh auto auto;padding:26px 24px 28px;
+    background:var(--surface,#12141a);border:1px solid var(--border,#242835);border-radius:18px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+  h1{font-size:21px;font-weight:900;letter-spacing:-.02em;margin:0 0 4px}
+  .sub{font-size:13px;color:var(--sub,#8b93a7);margin-bottom:20px}
+  .tabs{display:flex;gap:3px;background:var(--bg,#0a0b0e);border:1px solid var(--border,#242835);border-radius:12px;padding:4px;margin-bottom:20px}
+  .tabs button{flex:1;padding:9px;border:none;background:none;border-radius:9px;font-size:13.5px;font-weight:800;color:var(--sub,#8b93a7);cursor:pointer;transition:.12s}
+  .tabs button.on{background:var(--grad-accent,linear-gradient(135deg,#ffce54,#f59e0b));color:#221200}
+  label{display:block;font-size:12px;font-weight:700;color:var(--sub,#8b93a7);margin:0 0 6px}
+  input{width:100%;height:46px;background:var(--bg,#0a0b0e);border:1px solid var(--border,#242835);border-radius:11px;
+    color:var(--text);font-size:14.5px;padding:0 14px;outline:none;transition:.15s;margin-bottom:14px}
+  input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(245,166,35,.15)}
+  .btn{width:100%;height:48px;border:none;border-radius:12px;cursor:pointer;font-size:15px;font-weight:900;
+    background:var(--grad-accent,linear-gradient(135deg,#ffce54,#f59e0b));color:#221200;transition:transform .12s,opacity .15s;margin-top:2px}
+  .btn:hover{transform:translateY(-1px)}
+  .btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+  .or{display:flex;align-items:center;gap:12px;margin:18px 0;color:var(--dim,#5b6373);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+  .or::before,.or::after{content:"";flex:1;height:1px;background:var(--border,#242835)}
+  .google{width:100%;height:46px;border-radius:12px;border:1px solid var(--border,#242835);background:var(--bg,#0a0b0e);
+    color:var(--text);font-size:14px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:.15s}
+  .google:hover{border-color:var(--accent)}
+  .google svg{width:18px;height:18px}
+  .msg{display:none;margin-bottom:14px;font-size:13px;font-weight:700;padding:10px 13px;border-radius:10px}
+  .msg.err{display:block;background:rgba(225,29,72,.12);border:1px solid rgba(225,29,72,.3);color:#fca5a5}
+  .msg.ok{display:block;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac}
+  .foot{font-size:11.5px;color:var(--dim,#5b6373);text-align:center;margin-top:18px;line-height:1.6}
+  .foot a{color:var(--sub,#8b93a7);text-decoration:none}
+  .hint{font-size:11.5px;color:var(--sub,#8b93a7);text-align:center;margin-top:16px}
+  .hint a{color:var(--accent);font-weight:700;text-decoration:none;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="top"><div class="logo" onclick="location.href='index.html'">34<b>VaultVideo</b></div></div>
+
+<div class="card">
+  <h1 id="h">Welcome back</h1>
+  <div class="sub" id="sub">Log in to save videos and sync across 34Vault.</div>
+
+  <div class="tabs">
+    <button id="tabLogin" class="on" type="button" onclick="setMode('login')">Log in</button>
+    <button id="tabSignup" type="button" onclick="setMode('signup')">Sign up</button>
+  </div>
+
+  <div class="msg" id="msg"></div>
+
+  <form id="form" autocomplete="on">
+    <div id="nameWrap" style="display:none">
+      <label for="dn">Display name</label>
+      <input id="dn" type="text" autocomplete="nickname" placeholder="Your name" />
+    </div>
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="email" placeholder="you@example.com" required />
+    <label for="pw">Password</label>
+    <input id="pw" type="password" autocomplete="current-password" placeholder="••••••••" required />
+    <button class="btn" id="submit" type="submit">Log in</button>
+  </form>
+
+  <div class="or">or</div>
+  <button class="google" type="button" id="googleBtn">
+    <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38Z"/></svg>
+    Continue with Google
+  </button>
+
+  <div class="hint" id="forgot">Forgot your password? <a onclick="location.href='https://34vault.com/forgot-password.html'">Reset it</a></div>
+  <div class="foot">One account works across <a href="index.html">34VaultVideo</a> and <a href="https://34vault.com/">34Vault Comics</a>.</div>
+</div>
+
+<script>
+const API=window.__API__||"https://api.34vault.com";
+const $=id=>document.getElementById(id);
+const next=new URLSearchParams(location.search).get("next")||"index.html";
+let mode="login";
+if(new URLSearchParams(location.search).get("mode")==="signup") mode="signup";
+
+function setMode(m){
+  mode=m;
+  $("tabLogin").classList.toggle("on",m==="login");
+  $("tabSignup").classList.toggle("on",m==="signup");
+  $("nameWrap").style.display = m==="signup" ? "" : "none";
+  $("h").textContent = m==="signup" ? "Create your account" : "Welcome back";
+  $("sub").textContent = m==="signup" ? "Sign up to save videos and sync across 34Vault." : "Log in to save videos and sync across 34Vault.";
+  $("submit").textContent = m==="signup" ? "Create account" : "Log in";
+  $("pw").autocomplete = m==="signup" ? "new-password" : "current-password";
+  $("forgot").style.display = m==="signup" ? "none" : "";
+  $("msg").className="msg";
+}
+setMode(mode);
+
+function show(cls,txt){ const m=$("msg"); m.className="msg "+cls; m.textContent=txt; }
+
+async function api(path,body){
+  const r=await fetch(API+path,{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(d.error||d.message||("HTTP "+r.status));
+  return d;
+}
+
+$("form").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const email=$("email").value.trim(), pw=$("pw").value, dn=$("dn").value.trim();
+  if(!email||!pw){ show("err","Enter your email and password."); return; }
+  if(mode==="signup" && pw.length<6){ show("err","Password must be at least 6 characters."); return; }
+  $("submit").disabled=true; const orig=$("submit").textContent; $("submit").textContent="Please wait…"; $("msg").className="msg";
+  try{
+    if(mode==="signup") await api("/api/auth/register",{email,password:pw,displayName:dn||email.split("@")[0]});
+    else await api("/api/auth/login",{email,password:pw});
+    show("ok","Success! Redirecting…");
+    setTimeout(()=>location.href=next,500);
+  }catch(err){
+    show("err",err.message||"Something went wrong.");
+    $("submit").disabled=false; $("submit").textContent=orig;
+  }
+});
+
+// Google OAuth (shared backend). Pass where to return so the callback can send you back here.
+$("googleBtn").addEventListener("click",()=>{
+  location.href=API+"/api/auth/google?return="+encodeURIComponent(location.origin+"/"+next);
+});
+
+// Already logged in? skip straight through.
+fetch(API+"/api/me",{credentials:"include"}).then(r=>r.ok?r.json():null).then(me=>{ if(me) location.href=next; }).catch(()=>{});
+</script>
+</body>
+</html>
