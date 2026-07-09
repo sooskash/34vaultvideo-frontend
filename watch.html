@@ -121,6 +121,9 @@ body{padding-top:var(--topH);padding-bottom:32px}
 .v-edit-msg{font-size:12px;font-weight:700}
 .v-edit-msg.err{color:#fca5a5}
 .v-edit-msg.ok{color:#86efac}
+.v-edit-thumb-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.v-edit-thumb-row img{width:140px;aspect-ratio:16/9;border-radius:9px;object-fit:cover;background:#0d1018;border:1px solid var(--border);flex-shrink:0}
+.v-edit-thumb-actions{display:flex;gap:8px;flex-wrap:wrap}
 .v-meta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);font-weight:700;margin-top:7px}
 .v-meta span{display:inline-flex;align-items:center;gap:5px}
 .v-meta svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.8}
@@ -298,7 +301,9 @@ window.__thumbFall=function(img,sid){
   if(stage==="1"&&sid){ img.dataset.p="2"; img.src=API+"/api/thumb/"+sid; return; }
   img.onerror=null; img.src=NO_THUMB;
 };
-function thumbSrc(x){ return x&&x.sourceId?CDN_THUMBS+"/"+x.sourceId+".jpg":((x&&x.thumbUrl)||NO_THUMB); }
+// Cache-buster off updatedAt — see index.html's thumbSrc for why (thumbnails are
+// stored with a one-year immutable Cache-Control, so an edit needs this to show).
+function thumbSrc(x){ if(!x||!x.sourceId) return (x&&x.thumbUrl)||NO_THUMB; var ver=x.updatedAt?new Date(x.updatedAt).getTime():""; return CDN_THUMBS+"/"+x.sourceId+".jpg"+(ver?"?v="+ver:""); }
 
 function vcard(x){
   return `<div class="vcard" onclick="location.href='watch.html?slug=${encodeURIComponent(x.slug)}'">
@@ -494,6 +499,17 @@ async function load(){
           <div><label>Artist <span style="text-transform:none;font-weight:600">(replaces all credits — leave as-is for multi-artist videos)</span></label><input type="text" id="veArtist" maxlength="80" /></div>
         </div>
         <div><label>Tags <span style="text-transform:none;font-weight:600">(comma-separated)</span></label><input type="text" id="veTags" /></div>
+        <div>
+          <label>Thumbnail</label>
+          <div class="v-edit-thumb-row">
+            <img id="veThumbPreview" alt="" />
+            <div class="v-edit-thumb-actions">
+              <button class="v-edit-cancel" id="veCaptureFrame" type="button">📷 Use current frame</button>
+              <button class="v-edit-cancel" id="veUploadThumb" type="button">⬆ Upload image</button>
+              <input type="file" id="veThumbFile" accept="image/jpeg,image/png" style="display:none" />
+            </div>
+          </div>
+        </div>
         <div class="v-edit-msg" id="veMsg"></div>
         <div class="v-edit-actions">
           <button class="v-edit-cancel" id="veCancel" type="button">Cancel</button>
@@ -535,20 +551,50 @@ async function load(){
     document.getElementById("pcNext").addEventListener("click",()=>{ if(_nextVideo) location.href=upNextUrl(_nextVideo); });
     document.getElementById("pcDl").href=`${API}/api/videos/slug/${encodeURIComponent(v.slug)}/stream`;
 
-    // ── Owner/admin edit (title, tags, single-artist correction) ──
+    // ── Owner/admin edit (title, tags, single-artist correction, thumbnail) ──
     fetch(`${API}/api/me`,{credentials:"include"}).then(r=>r.ok?r.json():null).then(me=>{
       if(!me||(me.role!=="OWNER"&&me.role!=="ADMIN")) return;
       const btn=document.getElementById("vEditBtn"), form=document.getElementById("vEditForm");
+      const thumbImg=document.getElementById("veThumbPreview");
+      let pendingThumbB64=null; // set when a new frame/file is picked; sent on Save, cleared after
       btn.style.display="flex";
       btn.addEventListener("click",()=>{
         document.getElementById("veTitle").value=v.title||"";
         document.getElementById("veArtist").value=(Array.isArray(v.artists)&&v.artists.length===1)?v.artists[0]:"";
         document.getElementById("veTags").value=normTags(v.tags).join(", ");
         document.getElementById("veMsg").textContent="";
+        thumbImg.src=thumbSrc(v); pendingThumbB64=null;
         form.classList.add("on");
         btn.style.display="none";
       });
-      document.getElementById("veCancel").addEventListener("click",()=>{ form.classList.remove("on"); btn.style.display="flex"; });
+      document.getElementById("veCancel").addEventListener("click",()=>{ form.classList.remove("on"); btn.style.display="flex"; pendingThumbB64=null; });
+
+      // "Use current frame" — grabs whatever the LIVE <video> is showing right now.
+      // Scrub the actual player to the moment you want first, then click this.
+      document.getElementById("veCaptureFrame").addEventListener("click",()=>{
+        const msg=document.getElementById("veMsg");
+        try{
+          const c=document.createElement("canvas");
+          c.width=640; c.height=Math.round(640*(vid.videoHeight/vid.videoWidth))||360;
+          c.getContext("2d").drawImage(vid,0,0,c.width,c.height);
+          const b64=c.toDataURL("image/jpeg",0.85);
+          pendingThumbB64=b64; thumbImg.src=b64;
+          msg.className="v-edit-msg ok"; msg.textContent="Frame captured — Save to apply.";
+        }catch(e){ msg.className="v-edit-msg err"; msg.textContent="Couldn't capture — the source may not allow this."; }
+      });
+
+      // "Upload image" — pick a local file instead of a video frame.
+      document.getElementById("veUploadThumb").addEventListener("click",()=>document.getElementById("veThumbFile").click());
+      document.getElementById("veThumbFile").addEventListener("change",()=>{
+        const f=document.getElementById("veThumbFile").files[0];
+        document.getElementById("veThumbFile").value="";
+        if(!f) return;
+        if(!/^image\/(jpeg|png)$/.test(f.type)){ document.getElementById("veMsg").className="v-edit-msg err"; document.getElementById("veMsg").textContent="JPEG or PNG only."; return; }
+        const fr=new FileReader();
+        fr.onload=()=>{ pendingThumbB64=fr.result; thumbImg.src=fr.result; };
+        fr.readAsDataURL(f);
+      });
+
       document.getElementById("veSave").addEventListener("click",async()=>{
         const saveBtn=document.getElementById("veSave"), msg=document.getElementById("veMsg");
         const title=document.getElementById("veTitle").value.trim();
@@ -558,6 +604,7 @@ async function load(){
           const body={title,tags:document.getElementById("veTags").value};
           const artistVal=document.getElementById("veArtist").value.trim();
           if(artistVal) body.artist=artistVal;
+          if(pendingThumbB64) body.thumbBase64=pendingThumbB64;
           const r=await fetch(`${API}/api/admin/videos/${v.id}`,{method:"PATCH",credentials:"include",
             headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
           const d=await r.json();
@@ -567,7 +614,8 @@ async function load(){
           if(Array.isArray(d.video.artists)&&d.video.artists.length){
             document.getElementById("vBy").innerHTML=`<div class="v-by">${d.video.artists.map((n,i)=>`<a class="v-artist" href="index.html?artist=${encodeURIComponent((d.video.artistSlugs&&d.video.artistSlugs[i])||n)}">${esc(n)}</a>`).join("")}</div>`;
           }
-          v.title=d.video.title; v.tags=d.video.tags; v.artists=d.video.artists; v.artistSlugs=d.video.artistSlugs;
+          Object.assign(v,d.video);
+          pendingThumbB64=null;
           msg.className="v-edit-msg ok"; msg.textContent="Saved.";
           setTimeout(()=>{ form.classList.remove("on"); btn.style.display="flex"; },700);
         }catch(e){ msg.className="v-edit-msg err"; msg.textContent=e.message||"Failed"; }

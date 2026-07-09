@@ -972,7 +972,11 @@ window.__thumbFall=function(img,sid){
   if(stage==="1"&&sid){ img.dataset.p="2"; img.src=(window.__API__||"")+"/api/thumb/"+sid; return; }
   img.onerror=null; img.src=window.__NOTHUMB;
 };
-function thumbSrc(v){ return v&&v.sourceId?CDN_THUMBS+"/"+v.sourceId+".jpg":((v&&v.thumbUrl)||window.__NOTHUMB); }
+// Thumbnails are stored with a one-year immutable Cache-Control, so an edited
+// thumbnail needs a cache-buster to actually show up instead of sitting behind
+// the old cached bytes — updatedAt changes whenever the video row (incl. its
+// thumbnail) is edited, so it doubles as a free per-video cache key.
+function thumbSrc(v){ if(!v||!v.sourceId) return (v&&v.thumbUrl)||window.__NOTHUMB; var ver=v.updatedAt?new Date(v.updatedAt).getTime():""; return CDN_THUMBS+"/"+v.sourceId+".jpg"+(ver?"?v="+ver:""); }
 
 // Elements
 const grid       = document.getElementById("grid");
