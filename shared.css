@@ -4,6 +4,8 @@
    <link rel="stylesheet" href="/shared.css" />
 ═══════════════════════════════════════ */
 
+@import url('https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&display=swap');
+
 :root {
   --bg:      #0a0b0e;
   --panel:   #13151c;
@@ -19,6 +21,7 @@
   --maxW:    1100px;
   --radius:  12px;
   --shadow:  0 8px 32px rgba(0,0,0,.5);
+  --font-display: "Clash Display", -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
