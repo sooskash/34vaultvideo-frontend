@@ -273,7 +273,12 @@ const NO_THUMB="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22
 // hit), then the placeholder.
 const CDN_THUMBS="https://cdn.34vault.com/thumbs";
 window.__thumbFall=function(img,sid){
-  if(sid&&!img.dataset.p){ img.dataset.p="1"; img.src=API+"/api/thumb/"+sid; return; }
+  var stage=img.dataset.p||"0";
+  // Stage 0: bypass a cached error at the edge for THIS exact URL before assuming
+  // the object is actually missing (verified live: same URL 503s bare, 200s with
+  // a cache-busting query string).
+  if(stage==="0"){ img.dataset.p="1"; img.src=img.src.split("?")[0]+"?cb="+Date.now(); return; }
+  if(stage==="1"&&sid){ img.dataset.p="2"; img.src=API+"/api/thumb/"+sid; return; }
   img.onerror=null; img.src=NO_THUMB;
 };
 function thumbSrc(x){ return x&&x.sourceId?CDN_THUMBS+"/"+x.sourceId+".jpg":((x&&x.thumbUrl)||NO_THUMB); }

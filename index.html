@@ -963,7 +963,13 @@ let total=0, offset=0, loading=false, done=false, _qToken=0;
 const CDN_THUMBS="https://cdn.34vault.com/thumbs";
 window.__NOTHUMB="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22320%22 height=%22180%22%3E%3Crect fill=%22%230d1018%22 width=%22320%22 height=%22180%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%231a1e2a%22 font-size=%2214%22 font-family=%22sans-serif%22%3ENo Thumb%3C/text%3E%3C/svg%3E";
 window.__thumbFall=function(img,sid){
-  if(sid&&!img.dataset.p){ img.dataset.p="1"; img.src=(window.__API__||"")+"/api/thumb/"+sid; return; }
+  var stage=img.dataset.p||"0";
+  // Stage 0: most "failures" are Cloudflare serving a cached error for THIS exact
+  // URL (verified live — the same URL 503s bare but 200s with a cache-busting
+  // query string), not a missing object. Bypass the cache before assuming the
+  // worse and paying for a slower API-proxy round-trip.
+  if(stage==="0"){ img.dataset.p="1"; img.src=img.src.split("?")[0]+"?cb="+Date.now(); return; }
+  if(stage==="1"&&sid){ img.dataset.p="2"; img.src=(window.__API__||"")+"/api/thumb/"+sid; return; }
   img.onerror=null; img.src=window.__NOTHUMB;
 };
 function thumbSrc(v){ return v&&v.sourceId?CDN_THUMBS+"/"+v.sourceId+".jpg":((v&&v.thumbUrl)||window.__NOTHUMB); }
