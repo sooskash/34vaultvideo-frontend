@@ -32,6 +32,9 @@ input[type=text]:focus{border-color:var(--accent)}
 .pv-thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .pv-meta{flex:1;min-width:0;font-size:12.5px;color:var(--muted);line-height:1.7}
 .pv-meta b{color:var(--text)}
+#thumbScrub{-webkit-appearance:none;height:6px;border-radius:999px;background:var(--panel2);outline:none;cursor:pointer}
+#thumbScrub::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--grad-accent);cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+#thumbScrub::-moz-range-thumb{width:16px;height:16px;border:none;border-radius:50%;background:var(--grad-accent);cursor:pointer}
 .bar{height:10px;border-radius:999px;background:var(--panel2);border:1px solid var(--border);overflow:hidden;margin:14px 0 6px;display:none}
 .bar.on{display:block}
 .bar i{display:block;height:100%;width:0%;background:var(--grad-accent);transition:width .2s}
@@ -90,7 +93,11 @@ input[type=text]:focus{border-color:var(--accent)}
 
       <div class="pv" id="pv" style="margin-top:16px">
         <div class="pv-thumb"><img id="pvImg" alt="" /></div>
-        <div class="pv-meta" id="pvMeta"></div>
+        <div class="pv-meta" id="pvMeta">
+          <div id="pvInfo"></div>
+          <label style="margin:10px 0 4px">Thumbnail frame</label>
+          <input type="range" id="thumbScrub" min="0" max="1000" value="250" style="width:100%" />
+        </div>
       </div>
 
       <div style="margin-top:16px">
@@ -123,7 +130,7 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function show(el,cls,txt){ el.className="msg "+cls; el.textContent=txt; }
 
-let file=null, thumbBlob=null, duration=0;
+let file=null, thumbBlob=null, duration=0, _pickVideo=null, _pickUrl=null;
 
 // ── auth gate (shared account cookie) ──
 fetch(`${API}/api/me`,{credentials:"include"}).then(r=>{
@@ -149,53 +156,80 @@ $("file").addEventListener("change",()=>{
   $("file").value="";   // so re-choosing the SAME file fires change again
 });
 
+// Grabs the frame at the video's CURRENT position into thumbBlob + the preview
+// img. Shared by the initial auto-capture and the scrubber (re-seeks + redraws).
+function captureCurrentFrame(v,cb){
+  try{
+    const c=document.createElement("canvas");
+    c.width=640; c.height=Math.round(640*(v.videoHeight/v.videoWidth))||360;
+    c.getContext("2d").drawImage(v,0,0,c.width,c.height);
+    c.toBlob(b=>{
+      if(b){ thumbBlob=b; $("pvImg").src=URL.createObjectURL(b); }
+      if(cb) cb();
+    },"image/jpeg",0.82);
+  }catch(e){ if(cb) cb(); }
+}
+
 function pick(f){
   if(!/^video\/(mp4|webm)$/.test(f.type)){ show($("msg"),"err","MP4 or WebM only."); return; }
   if(f.size>500*1024*1024){ show($("msg"),"err","Max 500MB."); return; }
+  if(_pickUrl) URL.revokeObjectURL(_pickUrl);   // replacing a previously-picked file
   file=f; thumbBlob=null; duration=0;
   $("msg").className="msg";
   if(!$("title").value) $("title").value=f.name.replace(/\.[^.]+$/,"").replace(/[_-]+/g," ").trim();
-  // Read duration + capture a thumbnail frame at ~25% (all client-side).
+  // Read duration + capture a thumbnail frame at ~25% (all client-side). The video
+  // element + its object URL stay alive (not revoked) so the scrubber below can
+  // keep re-seeking it to pick a different frame.
   // NOTE: MediaRecorder-produced WebM reports duration=Infinity at loadedmetadata
   // (Chromium bug 642012) — guard with isFinite, and a fallback timer makes sure
   // the Upload button never stays stuck if preview/seek fails entirely.
   const url=URL.createObjectURL(f);
   const v=document.createElement("video");
+  _pickVideo=v; _pickUrl=url;
   const fallback=setTimeout(()=>{
     if($("go").disabled){
-      $("pv").classList.add("on");
-      $("pvMeta").innerHTML=`<b>${esc(f.name)}</b><br>${(f.size/1048576).toFixed(1)} MB (couldn't preview — will upload without a thumbnail)`;
+      $("pv").classList.add("on"); $("thumbScrub").style.display="none";
+      $("pvInfo").innerHTML=`<b>${esc(f.name)}</b><br>${(f.size/1048576).toFixed(1)} MB (couldn't preview — will upload without a thumbnail)`;
       $("go").disabled=false;
     }
   },5000);
   v.muted=true; v.playsInline=true; v.preload="metadata"; v.src=url;
   v.addEventListener("loadedmetadata",()=>{
     duration=Number.isFinite(v.duration)&&v.duration>0?Math.floor(v.duration):0;
+    $("thumbScrub").style.display=duration>1?"":"none";
     try{ v.currentTime=duration?Math.max(0.1,duration*0.25):0.1; }catch(e){}
   });
-  v.addEventListener("seeked",()=>{
-    try{
-      const c=document.createElement("canvas");
-      c.width=640; c.height=Math.round(640*(v.videoHeight/v.videoWidth))||360;
-      c.getContext("2d").drawImage(v,0,0,c.width,c.height);
-      c.toBlob(b=>{
-        thumbBlob=b;
-        if(b) $("pvImg").src=URL.createObjectURL(b);
-      },"image/jpeg",0.82);
-    }catch(e){}
-    clearTimeout(fallback);
-    $("pv").classList.add("on");
-    $("pvMeta").innerHTML=`<b>${esc(file.name)}</b><br>${(file.size/1048576).toFixed(1)} MB · ${duration?Math.floor(duration/60)+":"+String(duration%60).padStart(2,"0"):"?"} · ${esc(file.type)}`;
-    $("go").disabled=false;
-    URL.revokeObjectURL(url);
-  },{once:true});
+  v.addEventListener("seeked",function onFirstSeek(){
+    v.removeEventListener("seeked",onFirstSeek);
+    captureCurrentFrame(v,()=>{
+      clearTimeout(fallback);
+      $("pv").classList.add("on");
+      $("pvInfo").innerHTML=`<b>${esc(file.name)}</b><br>${(file.size/1048576).toFixed(1)} MB · ${duration?Math.floor(duration/60)+":"+String(duration%60).padStart(2,"0"):"?"} · ${esc(file.type)}`;
+      $("go").disabled=false;
+    });
+  });
   v.addEventListener("error",()=>{
     clearTimeout(fallback);
-    $("pv").classList.add("on");
-    $("pvMeta").innerHTML=`<b>${esc(file.name)}</b><br>${(file.size/1048576).toFixed(1)} MB (couldn't preview — will upload without a thumbnail)`;
+    $("pv").classList.add("on"); $("thumbScrub").style.display="none";
+    $("pvInfo").innerHTML=`<b>${esc(file.name)}</b><br>${(file.size/1048576).toFixed(1)} MB (couldn't preview — will upload without a thumbnail)`;
     $("go").disabled=false;
   });
 }
+
+// Scrubber: 0-1000 maps to 0-duration seconds. Debounced so dragging doesn't
+// fire a seek+capture on every pixel of mouse movement.
+let _scrubT=null;
+$("thumbScrub").addEventListener("input",()=>{
+  if(!_pickVideo||!duration) return;
+  clearTimeout(_scrubT);
+  const pct=Number($("thumbScrub").value)/1000;
+  _scrubT=setTimeout(()=>{
+    const v=_pickVideo;
+    const onSeek=()=>{ v.removeEventListener("seeked",onSeek); captureCurrentFrame(v); };
+    v.addEventListener("seeked",onSeek);
+    try{ v.currentTime=Math.max(0,Math.min(duration-0.05,duration*pct)); }catch(e){}
+  },120);
+});
 
 // ── upload with progress. `withCreds` sends the session cookie — needed for the
 // same-origin streaming endpoint (requireAuth); the R2 presigned PUT doesn't want
@@ -233,19 +267,31 @@ $("go").addEventListener("click",async()=>{
       $("barI").style.width=pct+"%";
       $("barT").textContent="Uploading video… "+pct+"%";
     });
+    // Thumbnail travels as base64 inside the complete() call below — NOT a direct
+    // PUT to R2 (that path silently failed: same R2-CORS issue the video hit,
+    // caught-and-ignored, which is why uploads had no thumbnail). It's a small
+    // JPEG, so this rides along on the already-working same-origin API call.
+    let thumbBase64=null;
     if(thumbBlob){
-      $("barT").textContent="Uploading thumbnail…";
-      await putWithProgress(d.thumbPut,thumbBlob,"image/jpeg",false,null).catch(()=>{});
+      $("barT").textContent="Preparing thumbnail…";
+      thumbBase64=await new Promise(res=>{
+        const fr=new FileReader();
+        fr.onload=()=>res(fr.result);
+        fr.onerror=()=>res(null);
+        fr.readAsDataURL(thumbBlob);
+      });
     }
     $("barT").textContent="Finishing…";
     const cr=await fetch(`${API}/api/videos/uploads/complete`,{method:"POST",credentials:"include",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({id:d.id,ext:d.ext,title,artist:$("artist").value,tags:$("tags").value,duration})});
+      body:JSON.stringify({id:d.id,ext:d.ext,title,artist:$("artist").value,tags:$("tags").value,duration,thumbBase64})});
     const cd=await cr.json();
     if(!cr.ok) throw new Error(cd.error||"Couldn't finish the upload");
     show($("msg"),"ok",cd.pending?"Uploaded! It's pending review — it goes public once approved.":"Uploaded and live!");
     $("barI").style.width="100%"; $("barT").textContent="Done";
-    file=null; thumbBlob=null; $("title").value=""; $("artist").value=""; $("tags").value=""; $("pv").classList.remove("on");
+    if(_pickUrl) URL.revokeObjectURL(_pickUrl);
+    file=null; thumbBlob=null; _pickVideo=null; _pickUrl=null;
+    $("title").value=""; $("artist").value=""; $("tags").value=""; $("pv").classList.remove("on");
     loadMine();
   }catch(e){
     show($("msg"),"err",e.message||"Upload failed");
