@@ -56,6 +56,8 @@ html{background:var(--bg)}
 body{
   font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   background:var(--bg);color:var(--text);min-height:100dvh;
+  background-image:radial-gradient(1100px 560px at 82% -8%, var(--accent-08,rgba(245,158,11,.08)), transparent 62%);
+  background-attachment:fixed;background-repeat:no-repeat;
   padding-top:calc(var(--topH) + var(--filterH));
   overscroll-behavior-y:none;
 }
@@ -68,7 +70,8 @@ button{font-family:inherit}
 .topbar{
   position:fixed;top:0;left:0;right:0;z-index:900;
   height:var(--topH);
-  background:var(--bg);
+  background:rgba(10,11,14,.72);
+  backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4);
   border-bottom:1px solid var(--border);
   transform:translateZ(0);
   will-change:transform;
@@ -397,11 +400,11 @@ button{font-family:inherit}
 
 /* ━━━ GRID ━━━ */
 .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-@media(min-width:480px){.grid{grid-template-columns:repeat(2,1fr);gap:11px}}
-@media(min-width:600px){.grid{grid-template-columns:repeat(3,1fr);gap:12px}}
-@media(min-width:860px){.grid{grid-template-columns:repeat(4,1fr);gap:14px}}
-@media(min-width:1100px){.grid{grid-template-columns:repeat(5,1fr);gap:16px}}
-@media(min-width:1300px){.grid{grid-template-columns:repeat(6,1fr)}}
+@media(min-width:480px){.grid{grid-template-columns:repeat(2,1fr);gap:12px}}
+@media(min-width:600px){.grid{grid-template-columns:repeat(3,1fr);gap:16px}}
+@media(min-width:860px){.grid{grid-template-columns:repeat(4,1fr);gap:20px}}
+@media(min-width:1100px){.grid{grid-template-columns:repeat(4,1fr);gap:22px}}
+@media(min-width:1300px){.grid{grid-template-columns:repeat(4,1fr)}}
 /* "videos per row" toggle. Default = dense responsive grid. .g1 = big,
    fewer-per-row layout: 1 on mobile → 3 on desktop. */
 .grid.g1{grid-template-columns:1fr}
@@ -415,22 +418,24 @@ button{font-family:inherit}
 
 /* ━━━ CARD ━━━ */
 .card{
-  border-radius:14px;background:var(--surface);
-  border:1px solid var(--border);overflow:hidden;
   position:relative;display:flex;flex-direction:column;
-  transition:transform .2s,border-color .2s,box-shadow .2s;
+  background:transparent;border:0;border-radius:0;overflow:visible;
+  transition:transform .22s cubic-bezier(.4,0,.2,1);
   cursor:pointer;min-width:0;max-width:100%;
 }
-.card:hover{
-  transform:translateY(-5px);
-  border-color:var(--accent-45,rgba(245,158,11,.5));
-  box-shadow:0 16px 40px rgba(0,0,0,.55),0 0 0 1px var(--accent-10,rgba(245,158,11,.12));
-}
+.card:hover{transform:translateY(-6px)}
 .card:active{transform:translateY(-2px)}
 
 .c-cover{
   position:relative;overflow:hidden;
   aspect-ratio:16/9;background:#0d1018;flex-shrink:0;
+  border-radius:14px;border:1px solid var(--border);
+  box-shadow:0 18px 40px -20px rgba(0,0,0,.8);
+  transition:border-color .2s,box-shadow .2s;
+}
+.card:hover .c-cover{
+  border-color:var(--accent-45,rgba(245,158,11,.5));
+  box-shadow:0 26px 52px -20px rgba(0,0,0,.92),0 0 0 1px var(--accent-10,rgba(245,158,11,.14));
 }
 .c-cover::after{
   content:"";position:absolute;left:0;right:0;bottom:0;height:38%;
@@ -445,12 +450,12 @@ button{font-family:inherit}
 
 /* Title — fixed 2-line height so every card's footer aligns */
 .c-title{
-  padding:9px 9px 0;
-  font-size:11px;font-weight:800;color:var(--text);line-height:1.3;
+  padding:11px 3px 0;
+  font-size:13px;font-weight:700;color:var(--text);line-height:1.32;
   letter-spacing:.1px;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
   overflow:hidden;
-  height:calc(9px + 2*11px*1.3);
+  height:calc(11px + 2*13px*1.32);
 }
 
 /* Bookmark btn */
@@ -512,13 +517,13 @@ button{font-family:inherit}
 
 /* Card footer */
 .c-foot{
-  padding:6px 9px 9px;
-  display:flex;align-items:center;justify-content:space-between;gap:6px;
-  min-height:30px;
+  padding:8px 3px 2px;
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  min-height:24px;
 }
 .c-views{
-  display:inline-flex;align-items:center;gap:4px;flex-shrink:0;
-  font-size:10px;font-weight:800;color:var(--text);
+  display:inline-flex;align-items:center;gap:5px;flex-shrink:0;
+  font-size:11px;font-weight:700;color:var(--sub);
 }
 .c-views .c-ico{opacity:.6}
 .c-ico{
@@ -536,29 +541,12 @@ button{font-family:inherit}
 .c-tag1.c-by{font-weight:800}
 .c-tag1.c-by::before{content:"@";opacity:.7}
 
-/* ━━━ FEATURED HERO (desktop only) ━━━ */
-.hero{
-  display:none;position:relative;margin:2px 0 24px;
-  border-radius:20px;overflow:hidden;aspect-ratio:24/9;
-  background:#0d1018;border:1px solid var(--border2);
-  box-shadow:0 24px 60px -22px rgba(0,0,0,.75);cursor:pointer;
-}
-@media(min-width:860px){ .hero:not(.hidden){display:block} }
-.hero-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:transform .6s cubic-bezier(.4,0,.2,1)}
-.hero:hover .hero-img{transform:scale(1.045)}
-.hero-scrim{position:absolute;inset:0;background:
-  linear-gradient(90deg,rgba(6,7,11,.94) 0%,rgba(6,7,11,.72) 40%,rgba(6,7,11,.12) 72%,transparent 100%),
-  linear-gradient(0deg,rgba(6,7,11,.82),transparent 55%)}
-.hero-body{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;justify-content:center;gap:13px;max-width:620px;padding:0 52px}
-.hero-eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent)}
-.hero-eyebrow::before{content:"";width:24px;height:2px;background:var(--accent);border-radius:2px}
-.hero-title{font-family:var(--font-display);font-size:38px;font-weight:700;line-height:1.06;letter-spacing:-.4px;color:#fff;text-shadow:0 2px 24px rgba(0,0,0,.55);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.hero-meta{display:flex;align-items:center;gap:18px;font-size:13px;font-weight:700;color:#cbd1e0}
-.hero-meta span{display:inline-flex;align-items:center;gap:7px}
-.hero-meta svg{width:15px;height:15px;opacity:.85}
-.hero-cta{margin-top:5px;display:inline-flex;align-items:center;gap:9px;height:46px;padding:0 26px;width:max-content;border-radius:12px;background:var(--grad-accent);color:#2a1500;font-size:14px;font-weight:900;box-shadow:0 12px 30px -8px var(--accent-45,rgba(245,158,11,.55));transition:transform .15s}
-.hero:hover .hero-cta{transform:translateY(-2px)}
-.hero-cta svg{width:16px;height:16px;fill:#2a1500}
+/* ━━━ PREMIUM SECTION HEADER ━━━ */
+.disc-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin:4px 0 20px}
+.disc-eyebrow{display:flex;align-items:center;gap:9px;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.disc-eyebrow::before{content:"";width:24px;height:2px;border-radius:2px;background:var(--grad-accent)}
+.disc-title{font-family:var(--font-display);font-size:32px;font-weight:600;letter-spacing:-.5px;line-height:1.02;margin:0}
+@media(max-width:600px){.disc-title{font-size:24px}.disc-head{margin-bottom:14px}}
 
 /* ━━━ TOP ARTISTS RAIL ━━━ */
 .artists-rail{margin:2px 0 20px}
@@ -745,8 +733,8 @@ button{font-family:inherit}
 .cat-chip{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;background:var(--surface,#12141a);border:1px solid var(--border,#242835);font-size:12.5px;font-weight:700;color:var(--sub,#8b93a7);white-space:nowrap;text-decoration:none;transition:border-color .12s,color .12s}
 .cat-chip:hover{border-color:var(--accent);color:var(--text);transform:none}
 .cat-chip .cc-n{font-size:11px;font-weight:700;color:var(--dim,#5b6373);font-variant-numeric:tabular-nums}
-.cat-chip.on{background:rgba(245,166,35,.12);border-color:rgba(245,166,35,.42);color:var(--accent)}
-.cat-chip.on .cc-n{color:var(--accent);opacity:.85}
+.cat-chip.on{background:var(--grad-accent);border-color:transparent;color:#241a08}
+.cat-chip.on .cc-n{color:#241a08;opacity:.6}
 /* a touch more room between cards */
 .grid{gap:16px 14px}
 /* ── mobile: clean two-line control row ── */
@@ -825,11 +813,15 @@ button{font-family:inherit}
 
 <!-- ━━━ MAIN ━━━ -->
 <main class="main">
-  <!-- Featured hero — desktop only, hidden while searching/filtering -->
-  <div class="hero hidden" id="hero"></div>
   <!-- Categories bar — top tags as quick chips; hidden until populated
        (Top Artists rail removed from the homepage: low signal + no rating data;
         artist credits still appear on cards/watch, and the /artists page remains) -->
+  <div class="disc-head">
+    <div class="disc-titles">
+      <div class="disc-eyebrow">Fresh this week</div>
+      <h1 class="disc-title">Trending</h1>
+    </div>
+  </div>
   <div class="ctl">
     <div class="sort-tabs" id="sortTabs">
       <button class="sort-tab on" data-sort="new" type="button" onclick="setSort('new')">Latest</button>
@@ -996,48 +988,6 @@ async function load(){
   loadCategories();       // server endpoint (full nav bar)
   loadTags();             // server endpoint (full catalog tag list for the filter sheet)
   runQuery(true);         // first page from the server
-  buildHero();            // desktop featured banner (default view only)
-}
-
-// ── FEATURED HERO (desktop) ──────────────────────────────────────────────────
-// Cinematic banner above the grid: picks one of the top-viewed videos (rotates
-// for variety) and links straight to its watch page. Shown only on the default
-// browse view (no search/filter) and only on desktop (CSS gates it to ≥860px).
-function heroEligible(){
-  return !srch.value.trim() && !activeCategory && !activeArtist && !activeTags.size && ((typeof page==="undefined")||page<=1);
-}
-function updateHeroVisibility(){
-  const h=document.getElementById("hero"); if(!h) return;
-  h.classList.toggle("hidden", !(h.dataset.loaded==="1" && heroEligible()));
-}
-async function buildHero(){
-  const h=document.getElementById("hero"); if(!h) return;
-  try{
-    const r=await fetch(`${API}/api/videos?all=1&limit=10&sort=views`);
-    const d=await r.json();
-    const pool=(Array.isArray(d.videos)?d.videos:[]).filter(v=>v&&v.slug);
-    if(!pool.length) return;
-    const v=pool[Math.floor(Math.random()*Math.min(pool.length,8))];
-    const thumb=v.sourceId?`${API}/api/thumb/${v.sourceId}`:(v.thumbUrl||"");
-    const cats=Array.isArray(v.categories)?v.categories.slice(0,2):[];
-    const href="watch.html?slug="+encodeURIComponent(v.slug);
-    h.innerHTML=`
-      <img class="hero-img" src="${esc(thumb)}" alt="" onerror="this.style.display='none'"/>
-      <div class="hero-scrim"></div>
-      <div class="hero-body">
-        <div class="hero-eyebrow">Featured</div>
-        <div class="hero-title">${esc(v.title||"Untitled")}</div>
-        <div class="hero-meta">
-          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12c2.5-5 6-7.5 10-7.5S19.5 7 22 12c-2.5 5-6 7.5-10 7.5S4.5 17 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>${fmtNum(v.views)} views</span>
-          ${v.duration?`<span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${fmtDur(v.duration)}</span>`:""}
-          ${cats.length?`<span>${cats.map(esc).join(" · ")}</span>`:""}
-        </div>
-        <a class="hero-cta" href="${href}"><svg viewBox="0 0 24 24"><polygon points="7 4 20 12 7 20 7 4"/></svg>Watch now</a>
-      </div>`;
-    h.onclick=(e)=>{ if(!e.target.closest("a")) location.href=href; };
-    h.dataset.loaded="1";
-    updateHeroVisibility();
-  }catch(e){}
 }
 
 // Build the /api/videos query for the current filter+sort state.
@@ -1219,7 +1169,6 @@ function updateFiltersUI(){
 }
 
 function render(){
-  updateHeroVisibility();
   grid.innerHTML="";
   if(!all.length){
     grid.innerHTML=`<div class="state-box">
