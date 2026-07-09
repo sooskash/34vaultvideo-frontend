@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script src="/config.js?v=1"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="preconnect" href="https://api.34vault.com" />
+<link rel="stylesheet" href="/shared.css" />
+<title>Request a video | 34VaultVideo</title>
+<meta name="robots" content="noindex" />
+<meta name="rating" content="adult" />
+<style>
+body{padding-top:var(--topH);padding-bottom:60px}
+.page{max-width:620px;margin:0 auto;padding:26px 16px}
+.brand span{background:var(--grad-accent,linear-gradient(135deg,#f7d489,var(--accent) 55%,#b8913d));-webkit-background-clip:text;background-clip:text;color:transparent}
+h1{font-family:var(--font-display,inherit);font-size:26px;font-weight:700;letter-spacing:-.4px;margin:0 0 4px}
+.sub{font-size:13px;color:var(--muted);margin-bottom:22px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:18px}
+.card h2{font-size:14px;font-weight:800;margin:0 0 14px}
+label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin:0 0 6px}
+input,textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:11px;color:var(--text);font-size:14px;padding:12px 13px;outline:none;margin-bottom:14px;font-family:inherit}
+input{height:44px;padding:0 13px}
+textarea{min-height:90px;resize:vertical}
+input:focus,textarea:focus{border-color:var(--accent)}
+.btn{height:46px;padding:0 26px;border:none;border-radius:12px;background:var(--grad-accent);color:#241a08;font-size:14px;font-weight:800;cursor:pointer;transition:transform .12s;font-family:inherit}
+.btn:hover{transform:translateY(-1px)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.msg{display:none;margin-top:14px;font-size:13px;font-weight:700;padding:11px 14px;border-radius:10px}
+.msg.err{display:block;background:rgba(225,29,72,.12);border:1px solid rgba(225,29,72,.3);color:#fca5a5}
+.msg.ok{display:block;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac}
+.gate{text-align:center;padding:60px 20px}
+.gate .btn{margin-top:16px}
+.rq{display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px}
+.rq:last-child{border-bottom:none}
+.rq-t{flex:1;min-width:0;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rq-s{flex-shrink:0;height:22px;padding:0 10px;border-radius:999px;font-size:10px;font-weight:800;display:inline-flex;align-items:center;background:var(--panel2);border:1px solid var(--border);color:var(--muted)}
+.rq-s.DONE{background:rgba(34,197,94,.12);color:#86efac;border-color:rgba(34,197,94,.3)}
+.rq-s.REJECTED{background:rgba(225,29,72,.1);color:#fca5a5;border-color:rgba(225,29,72,.3)}
+.hint{font-size:11.5px;color:var(--muted);line-height:1.6;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="ico-btn" onclick="location.href='index.html'">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </div>
+    <div class="brand" onclick="location.href='index.html'">34<span>Vault</span><span>Video</span></div>
+    <div class="spacer"></div>
+    <div class="desktop-nav"><a href="index.html">Videos</a><a href="artists.html">Artists</a><a href="upload.html">Upload</a></div>
+    <div id="acctMount"></div>
+  </div>
+</div>
+
+<div class="page">
+  <div class="gate" id="gate" style="display:none">
+    <h1>Log in to request</h1>
+    <div class="sub">Requests are tied to your account so you can track their status.</div>
+    <button class="btn" onclick="location.href='auth.html?next=request.html'">Log in / Sign up</button>
+  </div>
+
+  <div id="main" style="display:none">
+    <h1>Request a video</h1>
+    <div class="sub">Can't find something? Tell us what to add — a link works best.</div>
+
+    <div class="card">
+      <label>What are you looking for?</label>
+      <input id="title" maxlength="200" placeholder="e.g. more ViciNeko Genshin animations" autocomplete="off" />
+      <label>Link <span style="font-weight:600;text-transform:none">(optional — rule34video, iwara, anywhere)</span></label>
+      <input id="url" maxlength="500" placeholder="https://…" autocomplete="off" />
+      <label>Notes <span style="font-weight:600;text-transform:none">(optional)</span></label>
+      <textarea id="notes" maxlength="1000" placeholder="Anything else that helps us find it"></textarea>
+      <button class="btn" id="go">Send request</button>
+      <div class="msg" id="msg"></div>
+      <div class="hint">You can have up to 20 open requests at a time.</div>
+    </div>
+
+    <div class="card">
+      <h2>Your requests</h2>
+      <div id="mine"><div class="hint">No requests yet.</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API=window.__API__||"https://api.34vault.com";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function show(el,cls,txt){ el.className="msg "+cls; el.textContent=txt; }
+
+fetch(`${API}/api/me`,{credentials:"include"}).then(r=>{
+  if(r.ok){ $("main").style.display=""; loadMine(); }
+  else $("gate").style.display="";
+}).catch(()=>{ $("gate").style.display=""; });
+
+$("go").addEventListener("click",async()=>{
+  const title=$("title").value.trim(), url=$("url").value.trim(), notes=$("notes").value.trim();
+  if(!title&&!url){ show($("msg"),"err","Give a title or a link."); return; }
+  $("go").disabled=true;
+  try{
+    const r=await fetch(`${API}/api/video-requests`,{method:"POST",credentials:"include",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify({title,url,notes})});
+    const d=await r.json();
+    if(!r.ok) throw new Error(d.error||"Failed");
+    show($("msg"),"ok","Request sent — we'll take a look.");
+    $("title").value=""; $("url").value=""; $("notes").value="";
+    loadMine();
+  }catch(e){ show($("msg"),"err",e.message||"Failed"); }
+  finally{ $("go").disabled=false; }
+});
+
+async function loadMine(){
+  try{
+    const r=await fetch(`${API}/api/me/video-requests`,{credentials:"include"});
+    if(!r.ok) return;
+    const d=await r.json();
+    const list=Array.isArray(d.requests)?d.requests:[];
+    if(!list.length) return;
+    $("mine").innerHTML=list.map(q=>`
+      <div class="rq">
+        <div class="rq-t" title="${esc(q.title)}">${esc(q.title)}</div>
+        <span class="rq-s ${esc(q.status)}">${esc(q.status.replace("_"," "))}</span>
+      </div>`).join("");
+  }catch(e){}
+}
+</script>
+<script src="/account-menu.js?v=3"></script>
+</body>
+</html>

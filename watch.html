@@ -43,6 +43,18 @@ body{padding-top:var(--topH);padding-bottom:32px}
 .player-shell video{width:100%;height:100%;display:block;background:#000;outline:none}
 .player-shell iframe{width:100%;height:100%;display:block;background:#000;border:0}
 
+/* Player controls row (speed / autoplay / next / download) */
+.p-ctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}
+.pc-btn{height:32px;padding:0 14px;border-radius:9px;background:var(--panel2);border:1px solid var(--border);color:var(--text);font-size:12px;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-decoration:none;transition:border-color .15s}
+.pc-btn:hover{border-color:var(--accent)}
+.pc-speed{display:inline-flex;gap:3px;background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:3px}
+.pc-speed button{height:24px;padding:0 9px;border:none;border-radius:6px;background:none;color:var(--muted);font-size:11px;font-weight:800;cursor:pointer}
+.pc-speed button.on{background:var(--accent);color:#241a08}
+.pc-auto{display:inline-flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;user-select:none;margin-left:auto}
+.pc-auto input{accent-color:var(--accent);width:15px;height:15px}
+.pc-keys{font-size:10.5px;color:var(--muted);opacity:.7;font-weight:600;width:100%;margin-top:2px}
+@media(max-width:600px){.pc-keys{display:none}}
+
 /* Quality pills */
 .q-row{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 2px;align-items:center}
 .q-label{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-right:2px}
@@ -227,7 +239,7 @@ body{padding-top:var(--topH);padding-bottom:32px}
     </div>
     <div class="brand" onclick="location.href='index.html'">34<span>Vault</span><span>Video</span></div>
     <div class="spacer"></div>
-    <div class="desktop-nav"><a href="index.html">Videos</a><a href="artists.html">Artists</a><a href="https://34vault.com/" rel="noopener">Comics</a></div>
+    <div class="desktop-nav"><a href="index.html">Videos</a><a href="artists.html">Artists</a><a href="upload.html">Upload</a><a href="https://34vault.com/" rel="noopener">Comics</a></div>
     <div id="acctMount"></div>
   </div>
 </div>
@@ -242,7 +254,7 @@ window.ADS_ENABLED = false; // TODO: enable after the new ExoClick account zones
 const API=window.__API__||"";
 const slug=new URLSearchParams(location.search).get("slug");
 
-let quals=[], curQ=-1;
+let quals=[], curQ=-1, _nextVideo=null;
 
 function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
 function fmtNum(n){n=Number(n||0);if(n>=1e6)return(n/1e6).toFixed(1).replace(/\.0$/,"")+"M";if(n>=1e3)return(n/1e3).toFixed(1).replace(/\.0$/,"")+"k";return String(n)}
@@ -288,12 +300,16 @@ let _upNextTimer=null;
 function upNextUrl(next){ return "watch.html?slug="+encodeURIComponent(next.slug)+"&autoplay=1"; }
 function setupUpNext(vid,next){
   if(!vid||!next||!next.slug) return;
-  vid.addEventListener("ended",function(){ showUpNext(next); });
+  vid.addEventListener("ended",function(){
+    if(localStorage.getItem("vv_autonext")!=="0") showUpNext(next);
+  });
 }
 function showUpNext(next){
   const shell=document.getElementById("playerShell");
   if(!shell||document.getElementById("upNext")) return;
-  const thumb=thumbSrc(next);
+  // API-proxy URL on purpose: it always resolves (mirrors to R2 on first hit) and
+  // was PRELOADED when the related list arrived, so it renders instantly here.
+  const thumb=next.sourceId?API+"/api/thumb/"+next.sourceId:(next.thumbUrl||NO_THUMB);
   const ov=document.createElement("div");
   ov.className="upnext"; ov.id="upNext";
   ov.innerHTML=`
@@ -436,6 +452,15 @@ async function load(){
       <div class="player-shell" id="playerShell">
         <video id="vid" controls playsinline preload="metadata" poster="${v.sourceId?API+'/api/thumb/'+v.sourceId:esc(v.thumbUrl||"")}" src="${API}/api/videos/slug/${encodeURIComponent(v.slug)}/stream"></video>
       </div>
+      <div class="p-ctl">
+        <button class="pc-btn" id="pcNext" type="button" title="Next video (n)">Next ▸</button>
+        <div class="pc-speed" id="pcSpeed">
+          <button type="button" data-s="1" class="on">1×</button><button type="button" data-s="1.25">1.25×</button><button type="button" data-s="1.5">1.5×</button><button type="button" data-s="2">2×</button>
+        </div>
+        <a class="pc-btn" id="pcDl" href="#" download target="_blank" rel="noopener">Download</a>
+        <label class="pc-auto"><input type="checkbox" id="pcAuto"/> Autoplay next</label>
+        <div class="pc-keys">Shortcuts: space play · ←/→ seek 5s · f fullscreen · m mute · n next</div>
+      </div>
       <h1 class="v-title">${esc(v.title||"Untitled")}</h1>
       ${(Array.isArray(v.artists)&&v.artists.length)?`<div class="v-by">${v.artists.map((n,i)=>`<a class="v-artist" href="index.html?artist=${encodeURIComponent((v.artistSlugs&&v.artistSlugs[i])||n)}">${esc(n)}</a>`).join("")}</div>`:""}
       <div class="v-meta">
@@ -462,6 +487,32 @@ async function load(){
     // autoplay-with-sound may be blocked, in which case the poster + play button stay).
     if(new URLSearchParams(location.search).get("autoplay")==="1"){ vid.play().catch(()=>{}); }
 
+    // ── Player controls: speed, autoplay-next toggle, next, download ──
+    document.querySelectorAll("#pcSpeed button").forEach(b=>b.addEventListener("click",()=>{
+      vid.playbackRate=Number(b.dataset.s)||1;
+      document.querySelectorAll("#pcSpeed button").forEach(x=>x.classList.toggle("on",x===b));
+    }));
+    const autoT=document.getElementById("pcAuto");
+    autoT.checked=localStorage.getItem("vv_autonext")!=="0";
+    autoT.addEventListener("change",()=>{ try{localStorage.setItem("vv_autonext",autoT.checked?"1":"0");}catch(e){} });
+    document.getElementById("pcNext").addEventListener("click",()=>{ if(_nextVideo) location.href=upNextUrl(_nextVideo); });
+    document.getElementById("pcDl").href=`${API}/api/videos/slug/${encodeURIComponent(v.slug)}/stream`;
+
+    // ── Keyboard shortcuts (skip while typing) ──
+    document.addEventListener("keydown",function(e){
+      if(/^(INPUT|TEXTAREA|SELECT)$/.test((e.target&&e.target.tagName)||"")) return;
+      // When the <video> itself has focus, native controls already handle these
+      // keys — running ours too would double-seek / double-toggle.
+      if(e.target&&e.target.tagName==="VIDEO") return;
+      const vd=document.getElementById("vid"); if(!vd) return;
+      if(e.key===" "||e.key==="k"){ e.preventDefault(); if(vd.paused)vd.play().catch(()=>{}); else vd.pause(); }
+      else if(e.key==="ArrowRight"){ vd.currentTime=Math.min(vd.duration||1e9,vd.currentTime+5); }
+      else if(e.key==="ArrowLeft"){ vd.currentTime=Math.max(0,vd.currentTime-5); }
+      else if(e.key==="f"){ const sh=document.getElementById("playerShell"); try{ document.fullscreenElement?document.exitFullscreen():sh.requestFullscreen(); }catch(err){} }
+      else if(e.key==="m"){ vd.muted=!vd.muted; }
+      else if(e.key==="n"){ if(_nextVideo) location.href=upNextUrl(_nextVideo); }
+    });
+
     // Playback goes through the /stream endpoint: hosted videos 302 to our R2 CDN
     // (instant), un-hosted ones stream progressively via proxy (plays in ~1-2s) and
     // cache to R2 in the background. No "preparing" wait needed.
@@ -487,7 +538,11 @@ async function load(){
       const g=document.getElementById("moreGrid");
       if(!list.length){ g.parentElement.style.display="none"; return; }
       g.innerHTML=list.map(vcard).join("");
+      _nextVideo=list[0];
       setupUpNext(vid,list[0]);
+      // Preload the up-next thumbnail through the API proxy NOW — by the time the
+      // video ends it's mirrored + browser-cached, so the overlay never shows blank.
+      if(list[0]&&list[0].sourceId){ const pre=new Image(); pre.src=API+"/api/thumb/"+list[0].sourceId; }
     }).catch(()=>{});
 
   }catch{

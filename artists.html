@@ -58,27 +58,37 @@
 <div class="wrap">
   <div class="page-h"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg> Artists</div>
   <div class="page-sub" id="sub">Every creator on 34VaultVideo</div>
+  <input id="artistSearch" placeholder="Search artists…" autocomplete="off"
+    style="width:100%;max-width:380px;height:42px;border-radius:12px;background:rgba(255,255,255,.035);border:1px solid var(--border2,#262b3a);color:var(--text,#eef1f8);font-size:13.5px;padding:0 14px;outline:none;margin:0 0 20px;font-family:inherit" />
   <div id="out"><div class="loading"><div class="spin"></div>Loading artists…</div></div>
 </div>
 
 <script>
 const API=window.__API__||"https://api.34vault.com";
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let _all=[];
+function renderArtists(term){
+  const out=document.getElementById("out");
+  term=String(term||"").trim().toLowerCase();
+  const list=term?_all.filter(a=>String(a.name||a.slug).toLowerCase().includes(term)):_all;
+  if(!list.length){ out.innerHTML=`<div class="empty">${term?"No artists match “"+esc(term)+"”.":"No artists yet — check back soon."}</div>`; return; }
+  out.innerHTML=`<div class="agrid">`+list.map(a=>`
+    <a class="acard" href="index.html?artist=${encodeURIComponent(a.slug)}" title="${esc(a.name||a.slug)}">
+      <div class="aav">${esc(String(a.name||a.slug).charAt(0).toUpperCase())}</div>
+      <div class="aname">${esc(a.name||a.slug)}</div>
+      <div class="acount">${a.count} vid${a.count===1?"":"s"}</div>
+    </a>`).join("")+`</div>`;
+}
 (async function(){
   try{
     const r=await fetch(`${API}/api/videos/artists`);
     if(!r.ok) throw 0;
     const d=await r.json();
-    const list=Array.isArray(d.artists)?d.artists:[];
-    const out=document.getElementById("out");
-    if(!list.length){ out.innerHTML=`<div class="empty">No artists yet — check back soon.</div>`; return; }
-    document.getElementById("sub").textContent=`${list.length} creators · ${list.reduce((s,a)=>s+(a.count||0),0)} videos`;
-    out.innerHTML=`<div class="agrid">`+list.map(a=>`
-      <a class="acard" href="index.html?artist=${encodeURIComponent(a.slug)}" title="${esc(a.name||a.slug)}">
-        <div class="aav">${esc(String(a.name||a.slug).charAt(0).toUpperCase())}</div>
-        <div class="aname">${esc(a.name||a.slug)}</div>
-        <div class="acount">${a.count} vid${a.count===1?"":"s"}</div>
-      </a>`).join("")+`</div>`;
+    _all=Array.isArray(d.artists)?d.artists:[];
+    document.getElementById("sub").textContent=`${_all.length} creators · ${_all.reduce((s,a)=>s+(a.count||0),0)} videos`;
+    renderArtists("");
+    const inp=document.getElementById("artistSearch");
+    inp.addEventListener("input",()=>renderArtists(inp.value));
   }catch(e){
     document.getElementById("out").innerHTML=`<div class="empty">Couldn't load artists. <a href="artists.html" style="color:var(--accent)">Retry</a></div>`;
   }

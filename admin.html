@@ -126,6 +126,18 @@
     <div class="msg" id="bulkMsg"></div>
     <div class="hint">Each line is queued one at a time (with a polite delay between requests). Single-video URLs add that exact video with full tags; listing URLs pull their first page.</div>
   </div>
+
+  <div class="card">
+    <h2>Pending uploads <span class="tag" id="upCount" style="margin-left:6px">0</span></h2>
+    <div id="uploads"><div class="hint">Nothing waiting for review.</div></div>
+    <div class="msg" id="upMsg"></div>
+  </div>
+
+  <div class="card">
+    <h2>Video requests <span class="tag" id="rqCount" style="margin-left:6px">0</span></h2>
+    <div id="requests"><div class="hint">No open requests.</div></div>
+    <div class="msg" id="rqMsg"></div>
+  </div>
 </div>
 
 <script>
@@ -205,6 +217,86 @@ async function host(){
   }catch(e){ show($("hostMsg"),"err",e.message||"Failed"); }
   finally{ $("hostBtn").disabled=false; }
 }
+
+// ── moderation queues: pending uploads + video requests ──
+// SECURITY: request titles/notes/URLs are USER INPUT. They are only ever rendered
+// through escq into text/attribute positions, never interpolated into inline
+// onclick JS-strings (that pattern is XSS: the browser HTML-decodes &#39; back to a
+// quote BEFORE the JS engine parses the handler). Buttons carry data-* attributes
+// and get addEventListener bindings after render. Links are gated to http(s).
+const escq=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const safeUrl=u=>/^https?:\/\//i.test(String(u||""))?String(u):"";
+let _reqUrls={};   // id -> sourceUrl (looked up JS-side, never through the DOM)
+async function loadQueues(){
+  try{
+    const d=await api("/api/admin/video-uploads");
+    const list=Array.isArray(d.videos)?d.videos:[];
+    document.getElementById("upCount").textContent=String(list.length);
+    const upEl=document.getElementById("uploads");
+    upEl.innerHTML=list.length?list.map(v=>`
+      <div style="display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border,#1e222e)">
+        <a href="https://34vaultvideo.com/watch.html?slug=${encodeURIComponent(v.slug)}" target="_blank" rel="noopener"
+           style="width:96px;flex-shrink:0;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#0d1018;display:block">
+          <img src="https://cdn.34vault.com/thumbs/${encodeURIComponent(String(v.sourceId||""))}.jpg" onerror="this.style.display='none'" style="width:100%;height:100%;object-fit:cover" alt=""/>
+        </a>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escq(v.title)}</div>
+          <div style="font-size:11px;color:var(--sub,#8891a8)">by ${escq((v.artists&&v.artists[0])||"?")} · ${Number(v.duration)||0}s · <a href="https://34vaultvideo.com/watch.html?slug=${encodeURIComponent(v.slug)}" target="_blank" rel="noopener" style="color:var(--accent)">preview</a></div>
+        </div>
+        <button class="btn up-act" data-id="${Number(v.id)||0}" data-act="approve" style="height:32px;padding:0 14px;font-size:12px">Approve</button>
+        <button class="btn ghost up-act" data-id="${Number(v.id)||0}" data-act="reject" style="height:32px;padding:0 12px;font-size:12px">Reject</button>
+      </div>`).join(""):`<div class="hint">Nothing waiting for review.</div>`;
+    upEl.querySelectorAll(".up-act").forEach(b=>b.addEventListener("click",()=>modUpload(Number(b.dataset.id),b.dataset.act)));
+  }catch(e){}
+  try{
+    const d=await api("/api/admin/video-requests");
+    const list=(Array.isArray(d.requests)?d.requests:[]).filter(q=>q.status==="OPEN"||q.status==="IN_REVIEW");
+    document.getElementById("rqCount").textContent=String(list.length);
+    _reqUrls={};
+    list.forEach(q=>{ _reqUrls[q.id]=safeUrl(q.sourceUrl); });
+    const rqEl=document.getElementById("requests");
+    rqEl.innerHTML=list.length?list.map(q=>{
+      const url=safeUrl(q.sourceUrl);
+      const scrapable=/^https:\/\/(www\.)?rule34video\.com\//i.test(url);
+      return `
+      <div style="display:flex;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border,#1e222e)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escq(q.title)}</div>
+          <div style="font-size:11px;color:var(--sub,#8891a8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            ${url?`<a href="${escq(url)}" target="_blank" rel="noopener" style="color:var(--accent)">${escq(url)}</a> · `:""}${escq(q.notes||"")}
+          </div>
+        </div>
+        ${scrapable?`<button class="btn rq-scrape" data-id="${escq(q.id)}" style="height:30px;padding:0 12px;font-size:11px">Scrape it</button>`:""}
+        <button class="btn ghost rq-act" data-id="${escq(q.id)}" data-st="DONE" style="height:30px;padding:0 12px;font-size:11px">Done</button>
+        <button class="btn ghost rq-act" data-id="${escq(q.id)}" data-st="REJECTED" style="height:30px;padding:0 12px;font-size:11px">Reject</button>
+      </div>`;
+    }).join(""):`<div class="hint">No open requests.</div>`;
+    rqEl.querySelectorAll(".rq-act").forEach(b=>b.addEventListener("click",()=>modReq(b.dataset.id,b.dataset.st)));
+    rqEl.querySelectorAll(".rq-scrape").forEach(b=>b.addEventListener("click",()=>fulfillReq(b.dataset.id,_reqUrls[b.dataset.id])));
+  }catch(e){}
+}
+async function modUpload(id,action){
+  try{ await api("/api/admin/video-uploads/"+id,{method:"POST",body:JSON.stringify({action})}); show(document.getElementById("upMsg"),"ok",action==="approve"?"Approved — it's live.":"Rejected and removed."); }
+  catch(e){ show(document.getElementById("upMsg"),"err",e.message||"Failed"); }
+  loadQueues();
+}
+async function modReq(id,status){
+  try{ await api("/api/admin/video-requests/"+id,{method:"POST",body:JSON.stringify({status})}); }
+  catch(e){ show(document.getElementById("rqMsg"),"err",e.message||"Failed"); }
+  loadQueues();
+}
+async function fulfillReq(id,url){
+  if(!url){ show(document.getElementById("rqMsg"),"err","No usable link on this request."); return; }
+  try{
+    show(document.getElementById("rqMsg"),"busy","Scraping the requested link…");
+    await api("/api/admin/scrape",{method:"POST",body:JSON.stringify({url,pages:1})});
+    await api("/api/admin/video-requests/"+id,{method:"POST",body:JSON.stringify({status:"DONE"})});
+    show(document.getElementById("rqMsg"),"ok","Scraped and marked done.");
+  }catch(e){ show(document.getElementById("rqMsg"),"err",e.message||"Failed"); }
+  loadQueues();
+}
+const _mainOrig=main;
+main=function(){ _mainOrig(); loadQueues(); };
 
 // boot
 if(KEY){ api("/api/admin/stats").then(main).catch(gate); } else { gate(); }

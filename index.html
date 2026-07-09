@@ -163,6 +163,34 @@ button{font-family:inherit}
 .search-x:hover{color:var(--text)}
 .search-x.vis{display:block}
 
+/* ── NOTIFICATION BELL ── */
+.bell{position:relative;width:38px;height:38px;border-radius:11px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--sub);background:rgba(255,255,255,.035);border:1px solid var(--border2);transition:color .15s,border-color .15s}
+.bell:hover{color:var(--text);border-color:var(--border2)}
+.bell-n{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:var(--grad-accent);color:#241a08;font-size:9.5px;font-weight:900;display:flex;align-items:center;justify-content:center}
+.bell-panel{position:absolute;top:calc(100% + 10px);right:0;width:330px;max-width:88vw;max-height:420px;overflow-y:auto;display:none;z-index:960;
+  background:rgba(17,19,24,.97);border:1px solid var(--border2);border-radius:14px;
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 24px 60px -18px rgba(0,0,0,.85);cursor:default;text-align:left}
+.bell-panel.open{display:block}
+.bn{display:block;padding:11px 14px;border-bottom:1px solid var(--border);text-decoration:none}
+.bn:last-child{border-bottom:none}
+.bn:hover{background:rgba(255,255,255,.04)}
+.bn.un{background:var(--accent-06,rgba(236,186,88,.06))}
+.bn-t{font-size:12.5px;font-weight:800;color:var(--text)}
+.bn-m{font-size:11.5px;color:var(--sub);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bn-empty{padding:22px 16px;font-size:12.5px;color:var(--sub);text-align:center}
+
+/* ── ARTIST CHANNEL HEADER ── */
+.ah{display:none;align-items:center;gap:16px;padding:18px;margin:0 0 20px;background:var(--surface);border:1px solid var(--border);border-radius:16px}
+.ah.on{display:flex}
+.ah-av{width:64px;height:64px;border-radius:50%;flex-shrink:0;display:grid;place-items:center;font-size:26px;font-weight:700;color:#241a08;background:var(--grad-accent);font-family:var(--font-display)}
+.ah-info{flex:1;min-width:0}
+.ah-name{font-family:var(--font-display);font-size:22px;font-weight:700;letter-spacing:-.3px;text-transform:capitalize;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ah-sub{font-size:12.5px;color:var(--sub);font-weight:600;margin-top:2px}
+.ah-follow{height:38px;padding:0 22px;border-radius:999px;border:none;background:var(--grad-accent);color:#241a08;font-size:13px;font-weight:800;cursor:pointer;flex-shrink:0;transition:transform .15s}
+.ah-follow:hover{transform:translateY(-1px)}
+.ah-follow.on{background:var(--surface2);color:var(--text);box-shadow:inset 0 0 0 1px var(--border2)}
+@media(max-width:600px){.ah{padding:14px;gap:12px}.ah-av{width:50px;height:50px;font-size:21px}.ah-name{font-size:18px}.ah-follow{height:34px;padding:0 16px;font-size:12px}}
+
 /* ── SEARCH SUGGESTIONS (tags / artists / categories as you type) ── */
 .sugg{position:absolute;top:calc(100% + 8px);left:0;right:0;z-index:950;display:none;
   background:rgba(17,19,24,.97);border:1px solid var(--border2);border-radius:14px;overflow:hidden;
@@ -774,6 +802,7 @@ button{font-family:inherit}
     <div class="nav-pills">
       <button class="nav-pill on" onclick="location.href='index.html'">Videos</button>
       <button class="nav-pill" onclick="location.href='artists.html'">Artists</button>
+      <button class="nav-pill" onclick="location.href='upload.html'">Upload</button>
       <button class="nav-pill" onclick="location.href='https://34vault.com/'">Comics</button>
     </div>
 
@@ -784,6 +813,11 @@ button{font-family:inherit}
       <div class="sugg" id="sugg"></div>
     </div>
 
+    <div class="bell" id="bellBtn" style="display:none" role="button" aria-label="Notifications">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      <span class="bell-n" id="bellN" style="display:none">0</span>
+      <div class="bell-panel" id="bellPanel"></div>
+    </div>
     <div class="acct" id="acct">
       <button class="avatar-btn" id="avatarBtn" title="Account" type="button" aria-haspopup="true">V</button>
       <div class="acct-menu" id="acctMenu" role="menu"></div>
@@ -855,6 +889,8 @@ button{font-family:inherit}
 
 <!-- ━━━ MAIN ━━━ -->
 <main class="main">
+  <!-- Artist channel header (shown on ?artist= views, YouTube-style) -->
+  <div class="ah" id="artistHead"></div>
   <!-- Categories bar — top tags as quick chips; hidden until populated
        (Top Artists rail removed from the homepage: low signal + no rating data;
         artist credits still appear on cards/watch, and the /artists page remains) -->
@@ -895,6 +931,8 @@ button{font-family:inherit}
 <div class="foot-links">
   <a href="policy.html">Terms &amp; Privacy</a>
   <a href="contact.html">Contact</a>
+  <a href="upload.html">Upload</a>
+  <a href="request.html">Request a video</a>
   <a href="https://34vault.com/" rel="noopener">34Vault Comics</a>
 </div>
 
@@ -1040,6 +1078,7 @@ async function load(){
   loadCategories();       // server endpoint (full nav bar) — localStorage-cached
   loadTags();             // full catalog tag list (filter sheet + suggestions) — cached
   loadArtists();          // artists list for search suggestions — cached
+  if(activeArtist) loadFollows();   // follow state for the artist channel header
   runQuery(true);         // first page from the server
 }
 
@@ -1114,6 +1153,7 @@ async function fetchInto(off, mode, token){
       render();
     }
     gridCount.innerHTML = total?`<b>${total.toLocaleString()}</b> videos`:"";
+    if(activeArtist) renderArtistHead();   // header shows the now-known video count
     // Premium touch: the catalog size lives in the search placeholder (default view only)
     if(total>1000 && !srch.value.trim() && !activeCategory && !activeArtist && !activeTags.size){
       srch.placeholder=`Search ${Math.floor(total/1000)},000+ videos`;
@@ -1236,6 +1276,7 @@ function updateHeaderLabels(){
   const filtering=bits.length>0;
   gridTitle.textContent=filtering?bits.join(" · "):"";
   gridTitle.style.display=filtering?"":"none";
+  renderArtistHead();
 }
 // Sort tabs (rule34video-style) — set the mode, sync the dropdown, re-render.
 function setSort(mode){
@@ -1624,6 +1665,75 @@ function addBlockedTag(){
 document.getElementById("blockAdd").addEventListener("click",addBlockedTag);
 document.getElementById("blockInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); addBlockedTag(); } });
 renderBlockedChips();
+
+// ── ARTIST CHANNEL HEADER + FOLLOW (YouTube-style; accounts shared with the comic site) ──
+let _followSet=null;   // Set = logged in; false = logged out; null = not checked yet
+async function loadFollows(){
+  try{
+    const r=await fetch(`${API}/api/video-follows`,{credentials:"include"});
+    if(!r.ok){ _followSet=false; renderArtistHead(); return; }
+    const d=await r.json();
+    _followSet=new Set((d.follows||[]).map(f=>f.artistSlug));
+  }catch{ _followSet=false; }
+  renderArtistHead();
+}
+function renderArtistHead(){
+  const el=document.getElementById("artistHead"); if(!el) return;
+  if(!activeArtist){ el.className="ah"; el.innerHTML=""; return; }
+  const name=activeArtistName||activeArtist;
+  const following=(_followSet instanceof Set)&&_followSet.has(activeArtist);
+  el.className="ah on";
+  el.innerHTML=`
+    <div class="ah-av">${esc(String(name).charAt(0).toUpperCase())}</div>
+    <div class="ah-info">
+      <div class="ah-name">${esc(name)}</div>
+      <div class="ah-sub">${total?total.toLocaleString()+" video"+(total===1?"":"s"):"Artist"}</div>
+    </div>
+    <button class="ah-follow${following?" on":""}" id="ahFollow" type="button">${following?"Following ✓":"Follow"}</button>`;
+  document.getElementById("ahFollow").addEventListener("click",toggleFollow);
+}
+async function toggleFollow(){
+  // Always try the POST — the backend is the auth truth. A transient failure of
+  // the earlier GET must not bounce a logged-in user to the login page.
+  try{
+    const r=await fetch(`${API}/api/video-follows`,{method:"POST",credentials:"include",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({artistSlug:activeArtist,artistName:activeArtistName||activeArtist})});
+    if(r.status===401){ location.href="auth.html"; return; }
+    if(!r.ok) return;
+    const d=await r.json();
+    if(!(_followSet instanceof Set)) _followSet=new Set();
+    if(d.following) _followSet.add(activeArtist); else _followSet.delete(activeArtist);
+    renderArtistHead();
+  }catch{}
+}
+
+// ── NOTIFICATION BELL (shared Notification feed — same bell data as the comic site) ──
+(async function initBell(){
+  const btn=document.getElementById("bellBtn"), nEl=document.getElementById("bellN"), panel=document.getElementById("bellPanel");
+  if(!btn) return;
+  let data=null;
+  try{
+    const r=await fetch(`${API}/api/me/notifications`,{credentials:"include"});
+    if(!r.ok) return;   // logged out — bell stays hidden
+    data=await r.json();
+  }catch{ return; }
+  btn.style.display="flex";
+  let unread=Number(data.unread||0);
+  if(unread){ nEl.textContent=unread>99?"99+":String(unread); nEl.style.display="flex"; }
+  let open=false;
+  btn.addEventListener("click",e=>{
+    if(e.target.closest(".bell-panel")) return;   // let links inside the panel work
+    open=!open; panel.classList.toggle("open",open);
+    if(open){
+      panel.innerHTML=(data.notifications||[]).length
+        ? data.notifications.slice(0,15).map(n=>`<a class="bn${n.read?"":" un"}" href="${esc(n.link||"#")}"><div class="bn-t">${esc(n.title||"")}</div><div class="bn-m">${esc(n.message||"")}</div></a>`).join("")
+        : `<div class="bn-empty">No notifications yet — follow artists to get updates when they post.</div>`;
+      if(unread){ fetch(`${API}/api/me/notifications/read`,{method:"POST",credentials:"include"}).catch(()=>{}); unread=0; nEl.style.display="none"; }
+    }
+  });
+  document.addEventListener("click",e=>{ if(open&&!e.target.closest("#bellBtn")){ open=false; panel.classList.remove("open"); } });
+})();
 
 function openFsheet(){ fsheetBack.classList.add("open"); fsheet.classList.add("open"); lockScroll(); }
 function closeFsheet(){ fsheetBack.classList.remove("open"); fsheet.classList.remove("open"); unlockScroll(); }
