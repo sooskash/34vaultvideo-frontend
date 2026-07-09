@@ -17,7 +17,7 @@ window.__API__ = "https://api.34vault.com";
 
   // Build the full <html> style string (theme + accent CSS vars) for an accent color.
   function buildStyles(accent) {
-    var c = accent || '#f59e0b';
+    var c = accent || '#ecba58';
     var R = parseInt(c.slice(1,3),16), G = parseInt(c.slice(3,5),16), B = parseInt(c.slice(5,7),16);
     var dark = '#' + [Math.round(R*.78),Math.round(G*.78),Math.round(B*.78)].map(function(v){ return v.toString(16).padStart(2,'0'); }).join('');
     // Lighter tint of the accent — top stop of the accent gradient. Lighten in HSL
@@ -64,11 +64,13 @@ window.__API__ = "https://api.34vault.com";
     document.documentElement.setAttribute('style', buildStyles(accent));
   }
 
-  applyAccent(localStorage.getItem('accentColor') || '#f59e0b');
+  // Video-site default is champagne gold (#ecba58) — softer, more premium than the
+  // comic site's amber. Users with a custom accent keep theirs.
+  applyAccent(localStorage.getItem('accentColor') || '#ecba58');
 
   // Re-apply when navigating back (browser restores page from cache) — live, no reload.
   window.addEventListener('pageshow', function() {
-    applyAccent(localStorage.getItem('accentColor') || '#f59e0b');
+    applyAccent(localStorage.getItem('accentColor') || '#ecba58');
   });
 
   // Sync accent color from the server (cross-device). Apply it LIVE instead of doing a
@@ -78,7 +80,7 @@ window.__API__ = "https://api.34vault.com";
     fetch(window.__API__ + '/api/me', { credentials: 'include' })
       .then(function(r) { return r.ok ? r.json() : null; })
       .then(function(u) {
-        if (u && u.accentColor && u.accentColor !== '#f59e0b') {
+        if (u && u.accentColor && u.accentColor !== '#f59e0b' && u.accentColor !== '#ecba58') {
           localStorage.setItem('accentColor', u.accentColor);
           applyAccent(u.accentColor);
         }

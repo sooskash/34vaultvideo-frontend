@@ -14,9 +14,10 @@
 <style>
   *{box-sizing:border-box}
   body{background:var(--bg,#0a0b0e);color:var(--text,#eef1f8);margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-  .topbar{position:sticky;top:0;z-index:50;height:60px;display:flex;align-items:center;gap:14px;
-    padding:0 20px;background:var(--bg,#0a0b0e);border-bottom:1px solid var(--border,#1e222e)}
-  .brand{font-size:21px;font-weight:900;letter-spacing:-1px;cursor:pointer;line-height:1}
+  .topbar{position:sticky;top:0;z-index:50;height:64px;display:flex;align-items:center;gap:14px;
+    padding:0 20px;background:rgba(10,11,14,.72);border-bottom:1px solid var(--border,#1e222e);
+    backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4)}
+  .brand{font-family:var(--font-display,inherit);font-size:21px;font-weight:700;letter-spacing:-.5px;cursor:pointer;line-height:1}
   .brand i{font-style:normal;background:var(--grad-accent,linear-gradient(120deg,#ffcb45,#f59e0b));-webkit-background-clip:text;background-clip:text;color:transparent}
   .nav-pill{height:34px;padding:0 14px;border-radius:999px;background:rgba(255,255,255,.04);
     border:1px solid var(--border2,#262b3a);color:var(--sub,#8891a8);font-size:12px;font-weight:800;cursor:pointer;transition:all .15s}
@@ -32,9 +33,9 @@
   .acard:hover{background:rgba(255,255,255,.03)}
   .aav{width:80px;height:80px;border-radius:50%;display:grid;place-items:center;font-size:30px;font-weight:900;color:#2a1500;
     background:var(--grad-accent,linear-gradient(135deg,#ffce54,#f59e0b));
-    box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--accent-40,rgba(245,158,11,.4)),0 10px 22px -8px rgba(245,158,11,.5);
+    box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--accent-40,rgba(236,186,88,.4)),0 10px 22px -8px var(--accent-45,rgba(236,186,88,.5));
     transition:transform .15s,box-shadow .15s}
-  .acard:hover .aav{transform:translateY(-3px);box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--accent),0 14px 26px -8px rgba(245,158,11,.7)}
+  .acard:hover .aav{transform:translateY(-3px);box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--accent),0 14px 26px -8px var(--accent-60,rgba(236,186,88,.7))}
   .aname{font-size:13px;font-weight:800;text-align:center;line-height:1.25;max-width:100%;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     background:var(--grad-accent);-webkit-background-clip:text;background-clip:text;color:transparent}

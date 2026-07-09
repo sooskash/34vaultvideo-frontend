@@ -42,7 +42,7 @@
   --text:#eef1f8;
   --sub:#8891a8;
   --red:#e11d48;
-  --topH:60px;
+  --topH:64px;
   --filterH:52px;
   --maxW:1280px;
   --r:10px;
@@ -58,7 +58,7 @@ body{
   background:var(--bg);color:var(--text);min-height:100dvh;
   background-image:radial-gradient(1100px 560px at 82% -8%, var(--accent-08,rgba(245,158,11,.08)), transparent 62%);
   background-attachment:fixed;background-repeat:no-repeat;
-  padding-top:calc(var(--topH) + var(--filterH));
+  padding-top:var(--topH); /* old +--filterH was a phantom gap left by the removed filter strip */
   overscroll-behavior-y:none;
 }
 a{color:inherit;text-decoration:none}
@@ -96,9 +96,9 @@ button{font-family:inherit}
   color:var(--sub);font-size:14px;pointer-events:none;
 }
 .search-input{
-  width:100%;height:40px;border-radius:999px;
-  background:rgba(255,255,255,.045);border:1px solid var(--border2);
-  color:var(--text);font-size:13px;padding:0 34px 0 36px;
+  width:100%;height:42px;border-radius:12px;
+  background:rgba(255,255,255,.035);border:1px solid var(--border2);
+  color:var(--text);font-size:13.5px;padding:0 34px 0 40px;
   outline:none;transition:border-color .15s,background .15s,box-shadow .15s;
   -webkit-appearance:none;
 }
@@ -113,13 +113,13 @@ button{font-family:inherit}
     box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px var(--accent);
   }
   .topbar-inner .avatar-btn img{width:100%;height:100%;border-radius:50%!important}
-  /* Prominent amber-lit search — full-strength amber border + soft glow ring */
+  /* Search matches desktop's quiet field (16px font stops iOS auto-zoom) */
   .search-input{
-    font-size:16px;height:42px;border-radius:14px;
-    background:var(--surface);border-color:var(--accent);
-    box-shadow:0 0 0 3px var(--accent-15,rgba(245,158,11,.15));
+    font-size:16px;height:42px;border-radius:12px;
+    background:rgba(255,255,255,.035);border-color:var(--border2);
   }
-  .search-input:focus{box-shadow:0 0 0 3px var(--accent-22,rgba(245,158,11,.22))}
+  /* .topbar-inner prefix out-specifies the base :focus rule below (source order alone loses) */
+  .topbar-inner .search-input:focus{border-color:var(--accent);background:rgba(255,255,255,.035);box-shadow:none}
   /* Chips row: FLEX-FIT — the controls SHARE the row width on ANY phone. Text pills
      grow/shrink together (segmented-bar style), the icon toggle stays fixed-size, so the
      row can never overflow or slide regardless of device width.
@@ -150,7 +150,7 @@ button{font-family:inherit}
   .filter-inner .filters-btn,.filter-inner .sort-select,.filter-inner .chip{font-size:11px;height:32px}
 }
 .search-input:hover{background:rgba(255,255,255,.06)}
-.search-input:focus{border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 3px rgba(245,158,11,.14)}
+.search-input:focus{border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 3px var(--accent-15,rgba(236,186,88,.14))}
 .search-input::placeholder{color:var(--sub)}
 .search-x{
   position:absolute;right:10px;top:50%;transform:translateY(-50%);
@@ -161,16 +161,22 @@ button{font-family:inherit}
 .search-x:hover{color:var(--text)}
 .search-x.vis{display:block}
 
+/* Gold-ringed avatar on every screen size (mobile already had it) */
+.topbar .avatar-btn{border-radius:50%;box-shadow:0 0 0 1.5px var(--bg),0 0 0 3px var(--accent-45,rgba(236,186,88,.5))}
+.topbar .avatar-btn img{border-radius:50%}
+
 /* Nav pills — desktop */
 .nav-pills{display:none;gap:4px;align-items:center;flex-shrink:0}
 @media(min-width:860px){.nav-pills{display:flex}}
 .nav-pill{
-  height:32px;padding:0 13px;border-radius:8px;
-  background:transparent;border:1px solid transparent;
-  font-size:12px;font-weight:600;color:var(--sub);
-  cursor:pointer;transition:all .15s;white-space:nowrap;
+  position:relative;height:34px;padding:0 14px;border-radius:9px;
+  background:transparent;border:0;
+  font-size:13px;font-weight:600;color:var(--sub);
+  cursor:pointer;transition:color .15s,background .15s;white-space:nowrap;
 }
-.nav-pill:hover{background:var(--surface2);border-color:var(--border2);color:var(--text)}
+.nav-pill:hover{background:rgba(255,255,255,.04);color:var(--text)}
+.nav-pill.on{color:var(--text)}
+.nav-pill.on::after{content:"";position:absolute;left:14px;right:14px;bottom:2px;height:2px;border-radius:2px;background:var(--grad-accent)}
 
 /* Profile avatar btn — points at the MAIN site's profile page */
 .avatar-btn{
@@ -185,7 +191,8 @@ button{font-family:inherit}
   overflow:visible;
 }
 .avatar-btn img{width:34px;height:34px;object-fit:cover;border-radius:9px}
-.avatar-btn:hover{transform:scale(1.06);box-shadow:0 4px 16px var(--accent-45,rgba(245,158,11,.5))}
+/* hover keeps the gold ring (box-shadow replaces, it doesn't compose — restate ring + add glow) */
+.topbar .avatar-btn:hover{transform:scale(1.06);box-shadow:0 0 0 1.5px var(--bg),0 0 0 3px var(--accent-45,rgba(236,186,88,.5)),0 4px 16px var(--accent-45,rgba(236,186,88,.5))}
 /* Account dropdown */
 .acct{position:relative}
 .acct-menu{position:absolute;top:calc(100% + 10px);right:0;min-width:210px;background:var(--panel,#111318);border:1px solid var(--border,#1e222e);border-radius:14px;padding:6px;box-shadow:0 16px 40px rgba(0,0,0,.55);display:none;z-index:1000}
@@ -405,12 +412,7 @@ button{font-family:inherit}
 @media(min-width:860px){.grid{grid-template-columns:repeat(4,1fr);gap:20px}}
 @media(min-width:1100px){.grid{grid-template-columns:repeat(4,1fr);gap:22px}}
 @media(min-width:1300px){.grid{grid-template-columns:repeat(4,1fr)}}
-/* "videos per row" toggle. Default = dense responsive grid. .g1 = big,
-   fewer-per-row layout: 1 on mobile → 3 on desktop. */
-.grid.g1{grid-template-columns:1fr}
-@media(min-width:600px){.grid.g1{grid-template-columns:repeat(2,1fr)}}
-@media(min-width:1100px){.grid.g1{grid-template-columns:repeat(3,1fr)}}
-.grid.g1 .ad-row{grid-column:1/-1}
+/* (grid-size toggle retired in the premium redesign — one considered layout) */
 /* Video-size toggle button (icon reflects current mode) */
 .gv-btn{display:inline-flex;align-items:center;justify-content:center;padding:0 11px;cursor:pointer;color:var(--sub);background-image:none}
 .gv-btn svg{width:18px;height:18px}
@@ -495,9 +497,9 @@ button{font-family:inherit}
 /* HD quality badge (rule34video DNA) — bottom-left, amber-tinted */
 .c-hd{
   position:absolute;bottom:8px;left:8px;z-index:2;
-  height:20px;padding:0 7px;border-radius:6px;
-  background:rgba(245,158,11,.92);color:#2a1500;
-  font-size:9px;font-weight:900;letter-spacing:.5px;
+  height:21px;padding:0 8px;border-radius:6px;
+  background:var(--grad-accent);color:#241a08;
+  font-size:9.5px;font-weight:900;letter-spacing:.5px;
   display:flex;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,.35);
 }
 /* Center play button — appears on hover (tube-site signature) */
@@ -507,13 +509,13 @@ button{font-family:inherit}
 }
 .card:hover .c-play{opacity:1}
 .c-play span{
-  width:46px;height:46px;border-radius:50%;
-  background:rgba(245,158,11,.92);display:grid;place-items:center;
-  box-shadow:0 6px 20px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.4);
-  transform:scale(.8);transition:transform .2s;
+  width:50px;height:50px;border-radius:50%;
+  background:var(--grad-accent);display:grid;place-items:center;
+  box-shadow:0 8px 26px rgba(0,0,0,.55);
+  transform:scale(.82);transition:transform .2s;
 }
 .card:hover .c-play span{transform:scale(1)}
-.c-play svg{width:20px;height:20px;fill:#2a1500;margin-left:2px}
+.c-play svg{width:20px;height:20px;fill:#241a08;margin-left:2px}
 
 /* Card footer */
 .c-foot{
@@ -545,8 +547,10 @@ button{font-family:inherit}
 .disc-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin:4px 0 20px}
 .disc-eyebrow{display:flex;align-items:center;gap:9px;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
 .disc-eyebrow::before{content:"";width:24px;height:2px;border-radius:2px;background:var(--grad-accent)}
-.disc-title{font-family:var(--font-display);font-size:32px;font-weight:600;letter-spacing:-.5px;line-height:1.02;margin:0}
-@media(max-width:600px){.disc-title{font-size:24px}.disc-head{margin-bottom:14px}}
+.disc-title{font-family:var(--font-display);font-size:34px;font-weight:600;letter-spacing:-.5px;line-height:1.02;margin:0}
+.disc-title .thin{color:var(--sub);font-weight:500}
+.head-ctl{display:flex;align-items:center;gap:8px;flex-shrink:0}
+@media(max-width:600px){.disc-title{font-size:26px}.disc-head{margin-bottom:16px}}
 
 /* ━━━ TOP ARTISTS RAIL ━━━ */
 .artists-rail{margin:2px 0 20px}
@@ -608,7 +612,9 @@ button{font-family:inherit}
 .cat-chip .cc-n{font-size:10px;font-weight:700;color:var(--sub,#8891a8)}
 
 /* ━━━ SKELETON ━━━ */
-.sk{border-radius:var(--r);background:var(--surface);border:1px solid var(--border);overflow:hidden}
+.sk{background:transparent;border:0;overflow:visible}
+.sk .sk-c{border-radius:14px;border:1px solid var(--border);box-shadow:0 18px 40px -20px rgba(0,0,0,.8)}
+.sk .sk-b{padding:10px 3px 0}
 .sk-c{
   aspect-ratio:16/9;
   background:linear-gradient(110deg,var(--surface) 30%,var(--surface2) 50%,var(--surface) 70%);
@@ -714,40 +720,31 @@ button{font-family:inherit}
 .sort-tab{height:auto;padding:8px 15px;border-radius:9px;border:none;background:none;font-size:13px;font-weight:700;color:var(--sub,#8b93a7);cursor:pointer;transition:color .12s,background .12s}
 .sort-tab:hover{color:var(--text);background:transparent}
 .sort-tab.on{background:var(--surface2,#1e222c);color:var(--text);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
-.sort-tab.on::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-right:7px;vertical-align:middle}
 /* filters button */
-.fbtn{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 15px;border-radius:11px;background:var(--surface,#12141a);border:1px solid var(--border,#242835);font-size:13px;font-weight:700;color:var(--sub,#8b93a7);cursor:pointer;transition:all .12s}
-.fbtn:hover{border-color:var(--accent);color:var(--text)}
+.fbtn{display:inline-flex;align-items:center;gap:7px;height:42px;padding:0 15px;border-radius:12px;background:var(--surface,#12141a);border:1px solid var(--border,#242835);font-size:13px;font-weight:700;color:var(--sub,#8b93a7);cursor:pointer;transition:all .12s}
+.fbtn:hover{border-color:var(--border2);background:var(--surface2);color:var(--text)}
 .fbtn.on{border-color:var(--accent);color:var(--accent)}
 .fbtn .filters-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--accent);color:#221200;font-size:11px;font-weight:900}
-/* grid-size toggle */
-.gv-btn2{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:11px;background:var(--surface,#12141a);border:1px solid var(--border,#242835);color:var(--sub,#8b93a7);cursor:pointer;flex-shrink:0}
-.gv-btn2 svg{width:18px;height:18px}
-.gv-btn2:hover{color:var(--text);border-color:var(--accent)}
-/* video count, right-aligned */
-.count{margin-left:auto;font-size:13px;color:var(--sub,#8b93a7);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
-.count b{color:var(--text);font-weight:800}
+/* video count — retired from the control row (lives in the search placeholder now);
+   the element stays hidden because JS still writes to it */
+.count{display:none}
 /* category chips — clean pills, no label */
-.cats{display:flex;gap:8px;overflow-x:auto;margin:14px 0 20px;padding-bottom:2px;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 93%,transparent);mask-image:linear-gradient(90deg,#000 93%,transparent)}
+.cats{display:flex;gap:8px;overflow-x:auto;margin:14px 0 20px;padding-bottom:2px;scrollbar-width:none}
 .cats::-webkit-scrollbar{display:none}
-.cat-chip{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:999px;background:var(--surface,#12141a);border:1px solid var(--border,#242835);font-size:12.5px;font-weight:700;color:var(--sub,#8b93a7);white-space:nowrap;text-decoration:none;transition:border-color .12s,color .12s}
-.cat-chip:hover{border-color:var(--accent);color:var(--text);transform:none}
-.cat-chip .cc-n{font-size:11px;font-weight:700;color:var(--dim,#5b6373);font-variant-numeric:tabular-nums}
+.cat-chip{flex-shrink:0;display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 14px;border-radius:999px;background:var(--surface,#12141a);border:1px solid var(--border,#242835);font-size:12.5px;font-weight:700;color:#c8c4cf;text-transform:capitalize;white-space:nowrap;text-decoration:none;transition:border-color .12s,color .12s,background .12s}
+.cat-chip:hover{border-color:var(--border2);background:var(--surface2);color:var(--text);transform:none}
+.cat-chip .cc-n{font-size:11px;font-weight:800;color:var(--dim,#5b6373);font-variant-numeric:tabular-nums}
 .cat-chip.on{background:var(--grad-accent);border-color:transparent;color:#241a08}
 .cat-chip.on .cc-n{color:#241a08;opacity:.6}
-/* a touch more room between cards */
-.grid{gap:16px 14px}
-/* ── mobile: clean two-line control row ── */
+/* ── mobile: same premium language, stacked ── */
 @media(max-width:600px){
-  .ctl{gap:9px 9px;margin:2px 0 2px}
-  .sort-tabs{width:100%;justify-content:space-between;padding:3px}
+  .disc-head{flex-direction:column;align-items:stretch;gap:13px}
+  .head-ctl{width:100%}
+  .sort-tabs{flex:1;justify-content:space-between;padding:3px}
   .sort-tab{flex:1;text-align:center;padding:9px 4px;font-size:12.5px}
-  .sort-tab.on::before{width:5px;height:5px;margin-right:5px}
-  .fbtn{height:38px;padding:0 13px;font-size:12.5px}
-  .gv-btn2{width:38px;height:38px}
-  .count{font-size:12.5px}          /* sits on line 2, pushed right by margin-left:auto */
-  .cats{margin:12px 0 16px;gap:7px}
-  .cat-chip{padding:6px 11px;font-size:12px}
+  .fbtn{padding:0 13px;font-size:12.5px}
+  .cats{margin:0 0 18px;gap:7px}
+  .cat-chip{height:32px;padding:0 12px;font-size:12px}
 }
 </style>
 </head>
@@ -759,6 +756,7 @@ button{font-family:inherit}
     <div class="brand" onclick="location.href='index.html'">34<span>Vault</span><span>Video</span></div>
 
     <div class="nav-pills">
+      <button class="nav-pill on" onclick="location.href='index.html'">Videos</button>
       <button class="nav-pill" onclick="location.href='artists.html'">Artists</button>
       <button class="nav-pill" onclick="location.href='https://34vault.com/'">Comics</button>
     </div>
@@ -819,22 +817,21 @@ button{font-family:inherit}
   <div class="disc-head">
     <div class="disc-titles">
       <div class="disc-eyebrow">Fresh this week</div>
-      <h1 class="disc-title">Trending</h1>
+      <h1 class="disc-title">Trending <span class="thin">now</span></h1>
+    </div>
+    <div class="head-ctl">
+      <div class="sort-tabs" id="sortTabs">
+        <button class="sort-tab on" data-sort="new" type="button" onclick="setSort('new')">Latest</button>
+        <button class="sort-tab" data-sort="views" type="button" onclick="setSort('views')">Most viewed</button>
+        <button class="sort-tab" data-sort="longest" type="button" onclick="setSort('longest')">Longest</button>
+      </div>
+      <button class="fbtn" id="filtersBtn" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg> Filters
+        <span class="filters-badge" id="filtersBadge" style="display:none">0</span>
+      </button>
     </div>
   </div>
-  <div class="ctl">
-    <div class="sort-tabs" id="sortTabs">
-      <button class="sort-tab on" data-sort="new" type="button" onclick="setSort('new')">Latest</button>
-      <button class="sort-tab" data-sort="views" type="button" onclick="setSort('views')">Most Viewed</button>
-      <button class="sort-tab" data-sort="longest" type="button" onclick="setSort('longest')">Longest</button>
-    </div>
-    <button class="fbtn" id="filtersBtn" type="button">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg> Filters
-      <span class="filters-badge" id="filtersBadge" style="display:none">0</span>
-    </button>
-    <button class="gv-btn2" id="gridViewBtn" type="button" title="Video size" aria-label="Toggle video size"></button>
-    <span class="count" id="gridCount"></span>
-  </div>
+  <span class="count" id="gridCount" aria-hidden="true"></span>
   <div class="cats" id="catsBar" style="display:none">
     <div class="cats-scroll" id="catsRow"></div>
   </div>
@@ -879,10 +876,10 @@ let total=0, offset=0, loading=false, done=false, _qToken=0;
 
 // Elements
 const grid       = document.getElementById("grid");
-// Videos-per-row toggle (persisted), DEFAULT = "2" (dense grid: 2 per row on mobile).
-// "1" = large layout.
-const gridViewBtn = document.getElementById("gridViewBtn");
-let gridMode = (function(){ try { return localStorage.getItem("videoGridMode_v1") || "2"; } catch(e) { return "2"; } })();
+// Grid-size toggle RETIRED in the premium redesign (one considered layout) — the g1
+// CSS is gone and any stored preference is ignored so everyone sees the same grid.
+const gridViewBtn = document.getElementById("gridViewBtn"); // null now; guards below keep this inert
+let gridMode = "2";
 const GV_ICON_GRID  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>';
 const GV_ICON_LARGE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2.5"/></svg>';
 function applyGridMode(){ grid.classList.toggle("g1", gridMode === "1"); if(gridViewBtn) gridViewBtn.innerHTML = (gridMode === "1" ? GV_ICON_LARGE : GV_ICON_GRID); }
@@ -1056,6 +1053,10 @@ async function fetchInto(off, mode, token){
       render();
     }
     gridCount.innerHTML = total?`<b>${total.toLocaleString()}</b> videos`:"";
+    // Premium touch: the catalog size lives in the search placeholder (default view only)
+    if(total>1000 && !srch.value.trim() && !activeCategory && !activeArtist && !activeTags.size){
+      srch.placeholder=`Search ${Math.floor(total/1000)},000+ videos`;
+    }
   }catch{ if(!all.length) showLoadError(); }
   finally{ loading=false; }
 }
@@ -1394,8 +1395,9 @@ function loadCategories(){
   fetch(`${API}/api/videos/categories`).then(r=>r.json()).then(d=>{
     const top=(d.categories||[]).slice(0,24);
     if(!top.length) return;
-    document.getElementById("catsRow").innerHTML=top.map(c=>
-      `<a class="cat-chip" href="index.html?category=${encodeURIComponent(c.slug)}">${esc(c.name)}<span class="cc-n">${c.count}</span></a>`).join("");
+    document.getElementById("catsRow").innerHTML=
+      `<a class="cat-chip${!activeCategory?" on":""}" href="index.html">All</a>`+top.map(c=>
+      `<a class="cat-chip${activeCategory===c.slug?" on":""}" href="index.html?category=${encodeURIComponent(c.slug)}">${esc(c.name)}<span class="cc-n">${c.count}</span></a>`).join("");
     _hasCats=true;
     updateRailVisibility();
   }).catch(()=>{});
@@ -1406,6 +1408,9 @@ function clearAll(){
   favOnly=false; sortMode="new"; filterSearchInput.value="";
   srchX.classList.remove("vis"); chipFavs.classList.remove("on");
   sortSel.value=sortMode;
+  syncSortTabs();
+  // Re-sync category chips ("All" lights up again) — their .on was baked in at render time
+  document.querySelectorAll("#catsRow .cat-chip").forEach(a=>a.classList.toggle("on",a.getAttribute("href")==="index.html"));
   renderFilterChips(); renderSelectedChips(); apply();
 }
 window.clearAll=clearAll;
