@@ -103,7 +103,24 @@ body{padding-top:var(--topH);padding-bottom:32px}
 .prep-sub{font-size:12px;color:var(--muted);max-width:340px;line-height:1.5}
 
 /* ── META ── */
-.v-title{font-size:18px;font-weight:900;line-height:1.25;margin-top:10px;letter-spacing:-.2px}
+.v-head{display:flex;align-items:flex-start;gap:10px;margin-top:10px}
+.v-title{flex:1;font-size:18px;font-weight:900;line-height:1.25;letter-spacing:-.2px;margin:0}
+.v-edit-btn{flex-shrink:0;height:28px;padding:0 12px;border-radius:8px;background:var(--panel2);border:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:800;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px}
+.v-edit-btn:hover{border-color:var(--accent);color:var(--text)}
+.v-edit-form{display:none;flex-direction:column;gap:10px;margin-top:10px;padding:14px;background:var(--panel);border:1px solid var(--border);border-radius:12px}
+.v-edit-form.on{display:flex}
+.v-edit-form label{font-size:11px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;display:block}
+.v-edit-form input{width:100%;height:40px;background:var(--bg);border:1px solid var(--border);border-radius:9px;color:var(--text);font-size:13.5px;padding:0 12px;outline:none;font-family:inherit}
+.v-edit-form input:focus{border-color:var(--accent)}
+.v-edit-row{display:flex;gap:10px}
+.v-edit-row>div{flex:1;min-width:0}
+.v-edit-actions{display:flex;gap:8px;justify-content:flex-end}
+.v-edit-actions button{height:36px;padding:0 16px;border-radius:9px;border:none;font-size:12.5px;font-weight:800;cursor:pointer;font-family:inherit}
+.v-edit-save{background:var(--grad-accent);color:#241a08}
+.v-edit-cancel{background:var(--panel2);color:var(--text);border:1px solid var(--border) !important}
+.v-edit-msg{font-size:12px;font-weight:700}
+.v-edit-msg.err{color:#fca5a5}
+.v-edit-msg.ok{color:#86efac}
 .v-meta{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);font-weight:700;margin-top:7px}
 .v-meta span{display:inline-flex;align-items:center;gap:5px}
 .v-meta svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.8}
@@ -466,8 +483,23 @@ async function load(){
         <label class="pc-auto"><input type="checkbox" id="pcAuto"/> Autoplay next</label>
         <div class="pc-keys">Shortcuts: space play · ←/→ seek 5s · f fullscreen · m mute · n next</div>
       </div>
-      <h1 class="v-title">${esc(v.title||"Untitled")}</h1>
-      ${(Array.isArray(v.artists)&&v.artists.length)?`<div class="v-by">${v.artists.map((n,i)=>`<a class="v-artist" href="index.html?artist=${encodeURIComponent((v.artistSlugs&&v.artistSlugs[i])||n)}">${esc(n)}</a>`).join("")}</div>`:""}
+      <div class="v-head">
+        <h1 class="v-title" id="vTitle">${esc(v.title||"Untitled")}</h1>
+        <button class="v-edit-btn" id="vEditBtn" type="button" style="display:none">✎ Edit</button>
+      </div>
+      <div id="vBy">${(Array.isArray(v.artists)&&v.artists.length)?`<div class="v-by">${v.artists.map((n,i)=>`<a class="v-artist" href="index.html?artist=${encodeURIComponent((v.artistSlugs&&v.artistSlugs[i])||n)}">${esc(n)}</a>`).join("")}</div>`:""}</div>
+      <div class="v-edit-form" id="vEditForm">
+        <div><label>Title</label><input type="text" id="veTitle" maxlength="200" /></div>
+        <div class="v-edit-row">
+          <div><label>Artist <span style="text-transform:none;font-weight:600">(replaces all credits — leave as-is for multi-artist videos)</span></label><input type="text" id="veArtist" maxlength="80" /></div>
+        </div>
+        <div><label>Tags <span style="text-transform:none;font-weight:600">(comma-separated)</span></label><input type="text" id="veTags" /></div>
+        <div class="v-edit-msg" id="veMsg"></div>
+        <div class="v-edit-actions">
+          <button class="v-edit-cancel" id="veCancel" type="button">Cancel</button>
+          <button class="v-edit-save" id="veSave" type="button">Save</button>
+        </div>
+      </div>
       <div class="v-meta">
         <span><svg viewBox="0 0 24 24"><path d="M2 12c2.5-5 6-7.5 10-7.5S19.5 7 22 12c-2.5 5-6 7.5-10 7.5S4.5 17 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>${fmtNum(v.views)} views</span>
         ${v.duration?`<span><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>${fmtDur(v.duration)}</span>`:""}
@@ -502,6 +534,46 @@ async function load(){
     autoT.addEventListener("change",()=>{ try{localStorage.setItem("vv_autonext",autoT.checked?"1":"0");}catch(e){} });
     document.getElementById("pcNext").addEventListener("click",()=>{ if(_nextVideo) location.href=upNextUrl(_nextVideo); });
     document.getElementById("pcDl").href=`${API}/api/videos/slug/${encodeURIComponent(v.slug)}/stream`;
+
+    // ── Owner/admin edit (title, tags, single-artist correction) ──
+    fetch(`${API}/api/me`,{credentials:"include"}).then(r=>r.ok?r.json():null).then(me=>{
+      if(!me||(me.role!=="OWNER"&&me.role!=="ADMIN")) return;
+      const btn=document.getElementById("vEditBtn"), form=document.getElementById("vEditForm");
+      btn.style.display="flex";
+      btn.addEventListener("click",()=>{
+        document.getElementById("veTitle").value=v.title||"";
+        document.getElementById("veArtist").value=(Array.isArray(v.artists)&&v.artists.length===1)?v.artists[0]:"";
+        document.getElementById("veTags").value=normTags(v.tags).join(", ");
+        document.getElementById("veMsg").textContent="";
+        form.classList.add("on");
+        btn.style.display="none";
+      });
+      document.getElementById("veCancel").addEventListener("click",()=>{ form.classList.remove("on"); btn.style.display="flex"; });
+      document.getElementById("veSave").addEventListener("click",async()=>{
+        const saveBtn=document.getElementById("veSave"), msg=document.getElementById("veMsg");
+        const title=document.getElementById("veTitle").value.trim();
+        if(!title){ msg.className="v-edit-msg err"; msg.textContent="Title can't be empty."; return; }
+        saveBtn.disabled=true; msg.className="v-edit-msg"; msg.textContent="Saving…";
+        try{
+          const body={title,tags:document.getElementById("veTags").value};
+          const artistVal=document.getElementById("veArtist").value.trim();
+          if(artistVal) body.artist=artistVal;
+          const r=await fetch(`${API}/api/admin/videos/${v.id}`,{method:"PATCH",credentials:"include",
+            headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+          const d=await r.json();
+          if(!r.ok) throw new Error(d.error||"Save failed");
+          document.getElementById("vTitle").textContent=d.video.title;
+          document.title=`${d.video.title} | 34VaultVideo`;
+          if(Array.isArray(d.video.artists)&&d.video.artists.length){
+            document.getElementById("vBy").innerHTML=`<div class="v-by">${d.video.artists.map((n,i)=>`<a class="v-artist" href="index.html?artist=${encodeURIComponent((d.video.artistSlugs&&d.video.artistSlugs[i])||n)}">${esc(n)}</a>`).join("")}</div>`;
+          }
+          v.title=d.video.title; v.tags=d.video.tags; v.artists=d.video.artists; v.artistSlugs=d.video.artistSlugs;
+          msg.className="v-edit-msg ok"; msg.textContent="Saved.";
+          setTimeout(()=>{ form.classList.remove("on"); btn.style.display="flex"; },700);
+        }catch(e){ msg.className="v-edit-msg err"; msg.textContent=e.message||"Failed"; }
+        finally{ saveBtn.disabled=false; }
+      });
+    }).catch(()=>{});
 
     // ── Keyboard shortcuts (skip while typing) ──
     document.addEventListener("keydown",function(e){
