@@ -45,6 +45,8 @@
   .stat .l{font-size:11px;font-weight:700;color:var(--sub,#8891a8);margin-top:2px}
   .gate{max-width:380px;margin:80px auto;text-align:center}
   .gate h1{font-size:22px}
+  textarea{width:100%;min-height:130px;background:var(--bg,#0a0b0e);border:1px solid var(--border2,#262b3a);border-radius:11px;color:var(--text,#eef1f8);font-size:13px;line-height:1.6;padding:10px 12px;outline:none;font-family:inherit;resize:vertical}
+  textarea:focus{border-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -113,6 +115,17 @@
       For listings, <b>Pages</b> controls how many pages to pull (35 videos/page). Newly added videos host automatically in the background.
     </div>
   </div>
+
+  <div class="card">
+    <h2>Bulk add</h2>
+    <label>One rule34video URL per line — single videos, artists, categories, tags, or searches</label>
+    <textarea id="bulk" placeholder="https://rule34video.com/video/3896449/pinkie-pie-s-nightclub/&#10;https://rule34video.com/models/dakized/&#10;https://rule34video.com/categories/pokemon/"></textarea>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" id="bulkGo" onclick="bulkAdd()">Add all</button>
+    </div>
+    <div class="msg" id="bulkMsg"></div>
+    <div class="hint">Each line is queued one at a time (with a polite delay between requests). Single-video URLs add that exact video with full tags; listing URLs pull their first page.</div>
+  </div>
 </div>
 
 <script>
@@ -163,6 +176,24 @@ async function scrape(){
     setTimeout(loadStats,1500);
   }catch(e){ show($("msg"),"err",e.message||"Failed"); }
   finally{ $("go").disabled=false; }
+}
+
+async function bulkAdd(){
+  const lines=$("bulk").value.split("\n").map(s=>s.trim()).filter(s=>/^https?:\/\/(www\.)?rule34video\.com\//.test(s));
+  if(!lines.length){ show($("bulkMsg"),"err","Paste at least one rule34video.com URL (one per line)."); return; }
+  $("bulkGo").disabled=true;
+  let ok=0,fail=0,added=0;
+  for(let i=0;i<lines.length;i++){
+    show($("bulkMsg"),"busy",`Adding ${i+1} of ${lines.length}… (${ok} ok${fail?`, ${fail} failed`:""})`);
+    try{
+      const d=await api("/api/admin/scrape",{method:"POST",body:JSON.stringify({url:lines[i],pages:1})});
+      ok++; added+=Number(d.added||0);
+    }catch(e){ fail++; }
+    if(i<lines.length-1) await new Promise(r=>setTimeout(r,700));   // polite to the source
+  }
+  $("bulkGo").disabled=false;
+  show($("bulkMsg"),fail&&!ok?"err":"ok",`Done — ${ok}/${lines.length} URLs processed, ${added} new videos added${fail?`, ${fail} failed`:""}.`);
+  loadStats();
 }
 
 async function host(){

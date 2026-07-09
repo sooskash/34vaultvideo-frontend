@@ -12,6 +12,7 @@
 <meta name="referrer" content="no-referrer" />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="preconnect" href="https://api.34vault.com" />
+<link rel="preconnect" href="https://cdn.34vault.com" />
 <link rel="stylesheet" href="/shared.css" />
 <title>Loading... | 34VaultVideo</title>
 <meta name="description" content="" />
@@ -256,10 +257,19 @@ function normTags(t){ if(!t)return[]; if(Array.isArray(t))return t.map(x=>String
 const PLAY_ICO='<svg viewBox="0 0 24 24"><polygon points="7 4 20 12 7 20 7 4"/></svg>';
 const NO_THUMB="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22320%22 height=%22180%22%3E%3Crect fill=%22%230d1018%22 width=%22320%22 height=%22180%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%231a1e2a%22 font-size=%2214%22 font-family=%22sans-serif%22%3ENo Thumb%3C/text%3E%3C/svg%3E";
 
+// CDN-direct thumbs (no API 302 hop); fall back to the API proxy (mirrors on first
+// hit), then the placeholder.
+const CDN_THUMBS="https://cdn.34vault.com/thumbs";
+window.__thumbFall=function(img,sid){
+  if(sid&&!img.dataset.p){ img.dataset.p="1"; img.src=API+"/api/thumb/"+sid; return; }
+  img.onerror=null; img.src=NO_THUMB;
+};
+function thumbSrc(x){ return x&&x.sourceId?CDN_THUMBS+"/"+x.sourceId+".jpg":((x&&x.thumbUrl)||NO_THUMB); }
+
 function vcard(x){
   return `<div class="vcard" onclick="location.href='watch.html?slug=${encodeURIComponent(x.slug)}'">
     <div class="c-cover">
-      <img class="c-img" src="${x.sourceId?API+'/api/thumb/'+x.sourceId:esc(x.thumbUrl||"")}" alt="${esc(x.title||"")}" loading="lazy" decoding="async" onerror="this.src='${NO_THUMB}'" />
+      <img class="c-img" src="${esc(thumbSrc(x))}" alt="${esc(x.title||"")}" loading="lazy" decoding="async" onerror="__thumbFall(this,'${esc(String(x.sourceId||""))}')" />
       ${x.duration?`<div class="c-dur">${PLAY_ICO}${fmtDur(x.duration)}</div>`:""}
     </div>
     <div class="c-title">${esc(x.title||"Untitled")}</div>
@@ -283,7 +293,7 @@ function setupUpNext(vid,next){
 function showUpNext(next){
   const shell=document.getElementById("playerShell");
   if(!shell||document.getElementById("upNext")) return;
-  const thumb=next.sourceId?API+"/api/thumb/"+next.sourceId:(next.thumbUrl||NO_THUMB);
+  const thumb=thumbSrc(next);
   const ov=document.createElement("div");
   ov.className="upnext"; ov.id="upNext";
   ov.innerHTML=`
@@ -291,7 +301,7 @@ function showUpNext(next){
       <div class="un-label">Up next</div>
       <div class="un-card" id="unCard">
         <div class="un-thumb">
-          <img src="${esc(thumb)}" alt="" onerror="this.src='${NO_THUMB}'"/>
+          <img src="${esc(thumb)}" alt="" onerror="__thumbFall(this,'${esc(String(next.sourceId||""))}')"/>
           <div class="un-play">${PLAY_ICO}</div>
           <div class="un-ring" id="unNum">8</div>
         </div>

@@ -9,6 +9,8 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="preconnect" href="https://api.34vault.com" />
 <link rel="dns-prefetch" href="https://api.34vault.com" />
+<link rel="preconnect" href="https://cdn.34vault.com" />
+<link rel="dns-prefetch" href="https://cdn.34vault.com" />
 <link rel="preconnect" href="https://rule34video.com" />
 <link rel="dns-prefetch" href="https://rule34video.com" />
 <link rel="stylesheet" href="/shared.css" />
@@ -160,6 +162,20 @@ button{font-family:inherit}
 }
 .search-x:hover{color:var(--text)}
 .search-x.vis{display:block}
+
+/* ── SEARCH SUGGESTIONS (tags / artists / categories as you type) ── */
+.sugg{position:absolute;top:calc(100% + 8px);left:0;right:0;z-index:950;display:none;
+  background:rgba(17,19,24,.97);border:1px solid var(--border2);border-radius:14px;overflow:hidden;
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  box-shadow:0 24px 60px -18px rgba(0,0,0,.85)}
+.sugg.open{display:block}
+.sugg-row{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text)}
+.sugg-row:hover{background:rgba(255,255,255,.05)}
+.sugg-k{flex-shrink:0;width:64px;text-align:center;font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+  padding:3px 0;border-radius:6px;background:rgba(255,255,255,.06);color:var(--sub)}
+.sugg-row[data-kind="artist"] .sugg-k{color:var(--accent);background:var(--accent-10,rgba(236,186,88,.1))}
+.sugg-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:capitalize}
+.sugg-c{font-size:11px;color:var(--dim,#5b6373);font-weight:700;font-variant-numeric:tabular-nums}
 
 /* Gold-ringed avatar on every screen size (mobile already had it) */
 .topbar .avatar-btn{border-radius:50%;box-shadow:0 0 0 1.5px var(--bg),0 0 0 3px var(--accent-45,rgba(236,186,88,.5))}
@@ -765,6 +781,7 @@ button{font-family:inherit}
       <span class="search-icon">🔍</span>
       <input class="search-input" id="searchInput" placeholder="Search videos" autocomplete="off" />
       <button class="search-x" id="searchX" type="button">✕</button>
+      <div class="sugg" id="sugg"></div>
     </div>
 
     <div class="acct" id="acct">
@@ -796,6 +813,33 @@ button{font-family:inherit}
   </div>
   <input class="fsheet-tagsearch" id="filterSearchInput" placeholder="Search tags…" autocomplete="off" />
   <div class="fsheet-body">
+    <div class="fsheet-section">
+      <div class="fsheet-label">Duration</div>
+      <div class="chip-wrap" id="durChips">
+        <button type="button" class="chip on" data-dur="">Any</button>
+        <button type="button" class="chip" data-dur="s">Under 5 min</button>
+        <button type="button" class="chip" data-dur="m">5–20 min</button>
+        <button type="button" class="chip" data-dur="l">Over 20 min</button>
+      </div>
+    </div>
+    <div class="fsheet-section">
+      <div class="fsheet-label">Added</div>
+      <div class="chip-wrap" id="dateChips">
+        <button type="button" class="chip on" data-days="">Any time</button>
+        <button type="button" class="chip" data-days="1">Past 24 hours</button>
+        <button type="button" class="chip" data-days="7">Past week</button>
+        <button type="button" class="chip" data-days="30">Past month</button>
+        <button type="button" class="chip" data-days="365">Past year</button>
+      </div>
+    </div>
+    <div class="fsheet-section">
+      <div class="fsheet-label">Blocked tags</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input class="fsheet-tagsearch" id="blockInput" placeholder="Never show this tag…" autocomplete="off" style="margin:0;flex:1" />
+        <button type="button" class="chip" id="blockAdd">Block</button>
+      </div>
+      <div class="chip-wrap" id="blockedChips" style="margin-top:10px"></div>
+    </div>
     <div class="fsheet-section" id="selectedSection" style="display:none">
       <div class="fsheet-label">Selected</div>
       <div class="chip-wrap" id="selectedChips"></div>
@@ -816,14 +860,14 @@ button{font-family:inherit}
         artist credits still appear on cards/watch, and the /artists page remains) -->
   <div class="disc-head">
     <div class="disc-titles">
-      <div class="disc-eyebrow">Fresh this week</div>
-      <h1 class="disc-title">Trending <span class="thin">now</span></h1>
+      <h1 class="disc-title" id="pageTitle">Latest videos</h1>
     </div>
     <div class="head-ctl">
       <div class="sort-tabs" id="sortTabs">
         <button class="sort-tab on" data-sort="new" type="button" onclick="setSort('new')">Latest</button>
         <button class="sort-tab" data-sort="views" type="button" onclick="setSort('views')">Most viewed</button>
         <button class="sort-tab" data-sort="longest" type="button" onclick="setSort('longest')">Longest</button>
+        <button class="sort-tab" data-sort="random" type="button" onclick="setSort('random')">Random</button>
       </div>
       <button class="fbtn" id="filtersBtn" type="button">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg> Filters
@@ -873,6 +917,17 @@ let activeCategory=null, activeCategoryName="";
 // Server-side paging: the catalog is 150k+, so we NEVER load it all client-side.
 // `all` holds only the loaded window; the server does filtering/sorting/paging.
 let total=0, offset=0, loading=false, done=false, _qToken=0;
+
+// ── Thumbnails: hit the R2 CDN directly (no API 302 round-trip — that hop was the
+// slow part). If a thumb isn't mirrored yet the CDN 404s and __thumbFall retries via
+// the API proxy (which mirrors it to R2 on first hit), then falls to a placeholder.
+const CDN_THUMBS="https://cdn.34vault.com/thumbs";
+window.__NOTHUMB="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22320%22 height=%22180%22%3E%3Crect fill=%22%230d1018%22 width=%22320%22 height=%22180%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%231a1e2a%22 font-size=%2214%22 font-family=%22sans-serif%22%3ENo Thumb%3C/text%3E%3C/svg%3E";
+window.__thumbFall=function(img,sid){
+  if(sid&&!img.dataset.p){ img.dataset.p="1"; img.src=(window.__API__||"")+"/api/thumb/"+sid; return; }
+  img.onerror=null; img.src=window.__NOTHUMB;
+};
+function thumbSrc(v){ return v&&v.sourceId?CDN_THUMBS+"/"+v.sourceId+".jpg":((v&&v.thumbUrl)||window.__NOTHUMB); }
 
 // Elements
 const grid       = document.getElementById("grid");
@@ -982,8 +1037,9 @@ async function load(){
   updateRailVisibility();
   renderFilterChips();
   renderSelectedChips();
-  loadCategories();       // server endpoint (full nav bar)
-  loadTags();             // server endpoint (full catalog tag list for the filter sheet)
+  loadCategories();       // server endpoint (full nav bar) — localStorage-cached
+  loadTags();             // full catalog tag list (filter sheet + suggestions) — cached
+  loadArtists();          // artists list for search suggestions — cached
   runQuery(true);         // first page from the server
 }
 
@@ -995,6 +1051,11 @@ function buildVideosUrl(off){
   if(activeCategory) p.set("category",activeCategory);
   if(activeArtist) p.set("artist",activeArtist);
   if(activeTags.size) p.set("tags",[...activeTags].join(","));
+  if(durBucket==="s") p.set("maxDur","300");
+  else if(durBucket==="m"){ p.set("minDur","300"); p.set("maxDur","1200"); }
+  else if(durBucket==="l") p.set("minDur","1200");
+  if(sinceDays) p.set("sinceDays",sinceDays);
+  if(blockedTags.size) p.set("excl",[...blockedTags].join(","));
   return `${API}/api/videos?${p.toString()}`;
 }
 
@@ -1079,19 +1140,41 @@ function sortClient(vids){
   return vids.sort((a,b)=>Number(b.id||0)-Number(a.id||0));
 }
 
-let allTagsSorted=[], popularTags=[];
+let allTagsSorted=[], popularTags=[], _suggTags=[], _suggCats=[], _suggArtists=[];
+// Filter state: duration bucket (""|s|m|l), recency window in days, blocked tags (persisted).
+let durBucket="", sinceDays="";
+let blockedTags=new Set();
+try{ blockedTags=new Set(JSON.parse(localStorage.getItem("vv_blocked")||"[]")); }catch{}
+
+// localStorage-cached GET: render instantly from the last copy (any age), then
+// refresh in the background if older than 6h. Kills the tags/categories wait —
+// repeat visitors see the filter data at 0ms.
+function cachedJSON(key,url,cb){
+  let cached=null;
+  try{ cached=JSON.parse(localStorage.getItem(key)||"null"); }catch{}
+  if(cached&&cached.d) cb(cached.d,true);
+  if(cached&&cached.d&&Date.now()-(cached.t||0)<6*3600e3) return;
+  fetch(url).then(r=>r.json()).then(d=>{
+    try{ localStorage.setItem(key,JSON.stringify({t:Date.now(),d})); }catch{}
+    cb(d,false);
+  }).catch(()=>{});
+}
+
 // The filter sheet's tag list comes from the SERVER (whole catalog), not the loaded
-// page — with server paging the grid only holds ~24 videos. Fetched once on load.
-async function loadTags(){
-  try{
-    const d=await fetch(`${API}/api/videos/tags`).then(r=>r.json());
+// page — with server paging the grid only holds ~24 videos. Cached + refreshed.
+function loadTags(){
+  cachedJSON("vv_tags_v1",`${API}/api/videos/tags`,d=>{
     const tags=Array.isArray(d.tags)?d.tags:[];
-    if(tags.length){
-      allTagsSorted=tags.map(t=>t.tag).sort();
-      popularTags=tags.slice(0,24).map(t=>t.tag);
-      renderFilterChips();
-    }
-  }catch{}
+    if(!tags.length) return;
+    _suggTags=tags;
+    allTagsSorted=tags.map(t=>t.tag).sort();
+    popularTags=tags.slice(0,24).map(t=>t.tag);
+    renderFilterChips();
+  });
+}
+// Artists list powers the search suggestions (names + counts).
+function loadArtists(){
+  cachedJSON("vv_artists_v1",`${API}/api/videos/artists`,d=>{ _suggArtists=Array.isArray(d.artists)?d.artists:[]; });
 }
 // Called after each page load — just re-render chips (tag list already loaded above).
 function buildFilters(){ renderFilterChips(); renderSelectedChips(); }
@@ -1158,12 +1241,13 @@ function updateHeaderLabels(){
 function setSort(mode){
   sortMode=mode;
   const sel=document.getElementById("sortSel"); if(sel) sel.value=mode;
-  document.querySelectorAll(".sort-tab").forEach(t=>t.classList.toggle("on",t.dataset.sort===mode));
+  syncSortTabs();
   page=1; loadedCount=PAGE; _scrollLoading=false; window.scrollTo(0,0); apply();
 }
 
 function updateFiltersUI(){
-  const count=activeTags.size;
+  // badge counts active narrowing filters (blocked tags are a preference, not a filter)
+  const count=activeTags.size+(durBucket?1:0)+(sinceDays?1:0);
   filtersBadge.style.display=count?"inline-flex":"none";
   filtersBadge.textContent=String(count);
   filtersBtn.classList.toggle("on",count>0);
@@ -1307,9 +1391,9 @@ function getBadge(v){
 
 function mkCard(v,favs){
   const slug=v.slug||"",title=v.title||"Untitled",
-        // Serve thumbs through our CDN proxy (source hotlinks are ddos-guard-blocked
-        // on many networks). Falls back to the raw url if there's no sourceId.
-        thumb=v.sourceId?`${API}/api/thumb/${v.sourceId}`:(v.thumbUrl||""),
+        // CDN-direct thumb (mirrored in R2); __thumbFall retries via the API proxy
+        // (which mirrors on first hit), then a placeholder.
+        thumb=thumbSrc(v),
         isFav=favs.has(slug);
   const tags=normTags(v.tags);
   const badge=getBadge(v);
@@ -1320,7 +1404,7 @@ function mkCard(v,favs){
       <div class="c-cover">
         ${badge?`<div class="c-new ${badge.cls}">${badge.text}</div>`:""}
         <img class="c-img" src="${esc(thumb)}" alt="${esc(title)}" loading="lazy" decoding="async" referrerpolicy="no-referrer"
-          onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22320%22 height=%22180%22%3E%3Crect fill=%22%230d1018%22 width=%22320%22 height=%22180%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%231a1e2a%22 font-size=%2214%22 font-family=%22sans-serif%22%3ENo Thumb%3C/text%3E%3C/svg%3E'" />
+          onerror="__thumbFall(this,'${esc(String(v.sourceId||""))}')" />
         ${v.duration?`<div class="c-dur"><svg viewBox="0 0 24 24"><polygon points="7 4 20 12 7 20 7 4"/></svg>${fmtDur(v.duration)}</div>`:""}
         <div class="c-hd">HD</div>
         <div class="c-play"><span><svg viewBox="0 0 24 24"><polygon points="7 4 20 12 7 20 7 4"/></svg></span></div>
@@ -1351,7 +1435,10 @@ function mkCard(v,favs){
 
   // Hover-to-preview (rule34video DNA): scrub through the source's frame screenshots.
   // Thumb is .../320x180/{N}.jpg — cycle N on hover, restore on leave. Desktop/hover only.
-  const base=frameBase(thumb);
+  // Scrub frames come from the SOURCE thumb url (.../N.jpg pattern) — never derive
+  // from our CDN thumb (thumbs/{id}.jpg also ends in \d+.jpg and would scrub across
+  // OTHER videos' thumbnails).
+  const base=frameBase(v.thumbUrl||"");
   if(base && window.matchMedia("(hover:hover)").matches){
     const img=card.querySelector(".c-img");
     let iv=null,i=1;
@@ -1392,20 +1479,24 @@ function updateRailVisibility(){
 }
 // Categories bar = the top series/parody categories (Genshin Impact, 3D, …) as chips.
 function loadCategories(){
-  fetch(`${API}/api/videos/categories`).then(r=>r.json()).then(d=>{
-    const top=(d.categories||[]).slice(0,24);
+  cachedJSON("vv_cats_v1",`${API}/api/videos/categories`,d=>{
+    _suggCats=Array.isArray(d.categories)?d.categories:[];
+    const top=_suggCats.slice(0,24);
     if(!top.length) return;
     document.getElementById("catsRow").innerHTML=
       `<a class="cat-chip${!activeCategory?" on":""}" href="index.html">All</a>`+top.map(c=>
       `<a class="cat-chip${activeCategory===c.slug?" on":""}" href="index.html?category=${encodeURIComponent(c.slug)}">${esc(c.name)}<span class="cc-n">${c.count}</span></a>`).join("");
     _hasCats=true;
     updateRailVisibility();
-  }).catch(()=>{});
+  });
 }
 
 function clearAll(){
   srch.value=""; activeTags=new Set(); activeArtist=null; activeArtistName=""; activeCategory=null; activeCategoryName="";
   favOnly=false; sortMode="new"; filterSearchInput.value="";
+  durBucket=""; sinceDays="";   // blocked tags survive Clear all — they're a preference
+  document.querySelectorAll("#durChips .chip").forEach(x=>x.classList.toggle("on",!x.dataset.dur));
+  document.querySelectorAll("#dateChips .chip").forEach(x=>x.classList.toggle("on",!x.dataset.days));
   srchX.classList.remove("vis"); chipFavs.classList.remove("on");
   sortSel.value=sortMode;
   syncSortTabs();
@@ -1434,7 +1525,12 @@ function restore(){
   }catch{}
 }
 // Keep the visible sort tabs (Latest / Most Viewed / Longest) in sync with sortMode.
-function syncSortTabs(){ document.querySelectorAll(".sort-tab").forEach(t=>t.classList.toggle("on",t.dataset.sort===sortMode)); }
+function syncSortTabs(){
+  document.querySelectorAll(".sort-tab").forEach(t=>t.classList.toggle("on",t.dataset.sort===sortMode));
+  // Quiet, professional page title that just states what you're looking at
+  const pt=document.getElementById("pageTitle");
+  if(pt) pt.textContent=sortMode==="views"?"Most viewed":sortMode==="longest"?"Longest videos":sortMode==="random"?"Random picks":"Latest videos";
+}
 // URL params (?tag=… from watch-page tag chips, ?q=… from the SearchAction schema)
 // override whatever was restored from localStorage.
 function applyUrlParams(){
@@ -1466,9 +1562,68 @@ function applyUrlParams(){
 function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
 const applyDebounced=debounce(apply,250);
 
-srch.addEventListener("input",()=>{ srchX.classList.toggle("vis",!!srch.value); applyDebounced(); });
+srch.addEventListener("input",()=>{ srchX.classList.toggle("vis",!!srch.value); buildSuggestions(srch.value); applyDebounced(); });
 srchX.addEventListener("click",()=>{ srch.value=""; srchX.classList.remove("vis"); srch.focus(); apply(); });
 chipFavs.addEventListener("click",()=>{ favOnly=!favOnly; chipFavs.classList.toggle("on",favOnly); apply(); });
+
+// ── SEARCH SUGGESTIONS — matches against the cached tag/artist/category lists,
+// rule34video-style: typed prefix ranks first, then by catalog count.
+const suggEl=document.getElementById("sugg");
+function buildSuggestions(q){
+  q=String(q||"").trim().toLowerCase();
+  if(q.length<2){ suggEl.classList.remove("open"); suggEl.innerHTML=""; return; }
+  const pre=s=>String(s||"").toLowerCase().startsWith(q)?0:1;
+  const has=s=>String(s||"").toLowerCase().includes(q);
+  const cats=_suggCats.filter(c=>has(c.name)).sort((a,b)=>pre(a.name)-pre(b.name)||b.count-a.count).slice(0,3)
+    .map(c=>({kind:"category",label:c.name,count:c.count,href:"index.html?category="+encodeURIComponent(c.slug)}));
+  const arts=_suggArtists.filter(a=>has(a.name)).sort((a,b)=>pre(a.name)-pre(b.name)||b.count-a.count).slice(0,4)
+    .map(a=>({kind:"artist",label:a.name,count:a.count,href:"index.html?artist="+encodeURIComponent(a.slug)}));
+  const tags=_suggTags.filter(t=>has(t.tag)).sort((a,b)=>pre(a.tag)-pre(b.tag)||b.count-a.count).slice(0,5)
+    .map(t=>({kind:"tag",label:t.tag,count:t.count,href:"index.html?tag="+encodeURIComponent(t.tag)}));
+  const rows=[...arts,...cats,...tags].slice(0,9);
+  if(!rows.length){ suggEl.classList.remove("open"); suggEl.innerHTML=""; return; }
+  suggEl.innerHTML=rows.map(r=>`<div class="sugg-row" data-kind="${r.kind}" data-href="${esc(r.href)}">
+    <span class="sugg-k">${r.kind}</span><span class="sugg-n">${esc(r.label)}</span><span class="sugg-c">${fmtNum(r.count)} videos</span></div>`).join("");
+  suggEl.classList.add("open");
+  // mousedown (not click) so navigation wins the race against the input's blur
+  suggEl.querySelectorAll(".sugg-row").forEach(row=>{
+    row.addEventListener("mousedown",e=>{ e.preventDefault(); location.href=row.dataset.href; });
+  });
+}
+srch.addEventListener("focus",()=>buildSuggestions(srch.value));
+srch.addEventListener("blur",()=>setTimeout(()=>{ suggEl.classList.remove("open"); },150));
+srch.addEventListener("keydown",e=>{ if(e.key==="Escape"||e.key==="Enter") suggEl.classList.remove("open"); });
+
+// ── DURATION + DATE FILTERS (rule34video parity) ──
+document.querySelectorAll("#durChips .chip").forEach(b=>b.addEventListener("click",()=>{
+  durBucket=b.dataset.dur;
+  document.querySelectorAll("#durChips .chip").forEach(x=>x.classList.toggle("on",x===b));
+  apply();
+}));
+document.querySelectorAll("#dateChips .chip").forEach(b=>b.addEventListener("click",()=>{
+  sinceDays=b.dataset.days;
+  document.querySelectorAll("#dateChips .chip").forEach(x=>x.classList.toggle("on",x===b));
+  apply();
+}));
+
+// ── BLOCKED TAGS — persistent "never show me this" list (no login needed).
+function saveBlocked(){ try{ localStorage.setItem("vv_blocked",JSON.stringify([...blockedTags])); }catch{} }
+function renderBlockedChips(){
+  const el=document.getElementById("blockedChips");
+  el.innerHTML=[...blockedTags].map(t=>`<button type="button" class="chip selected-chip" data-t="${esc(t)}">${esc(t)} <span class="chip-x">✕</span></button>`).join("");
+  el.querySelectorAll(".chip").forEach(b=>b.addEventListener("click",()=>{
+    blockedTags.delete(b.dataset.t); saveBlocked(); renderBlockedChips(); apply();
+  }));
+}
+function addBlockedTag(){
+  const inp=document.getElementById("blockInput");
+  const t=inp.value.trim().toLowerCase();
+  if(!t) return;
+  blockedTags.add(t); inp.value=""; saveBlocked(); renderBlockedChips(); apply();
+}
+document.getElementById("blockAdd").addEventListener("click",addBlockedTag);
+document.getElementById("blockInput").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); addBlockedTag(); } });
+renderBlockedChips();
 
 function openFsheet(){ fsheetBack.classList.add("open"); fsheet.classList.add("open"); lockScroll(); }
 function closeFsheet(){ fsheetBack.classList.remove("open"); fsheet.classList.remove("open"); unlockScroll(); }
