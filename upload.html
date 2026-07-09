@@ -96,6 +96,9 @@ input[type=text]:focus{border-color:var(--accent)}
       <div style="margin-top:16px">
         <label>Title</label>
         <input type="text" id="title" maxlength="180" placeholder="Give it a clear title" autocomplete="off" />
+        <label>Artist / Creator <span style="font-weight:600;text-transform:none">(optional — leave blank to upload under your own name)</span></label>
+        <input type="text" id="artist" list="artistList" maxlength="80" placeholder="e.g. Dakized" autocomplete="off" />
+        <datalist id="artistList"></datalist>
         <label>Tags <span style="font-weight:600;text-transform:none">(comma-separated, up to 20)</span></label>
         <input type="text" id="tags" placeholder="e.g. animation, 3d, overwatch" autocomplete="off" />
       </div>
@@ -104,7 +107,7 @@ input[type=text]:focus{border-color:var(--accent)}
       <div class="bar-t" id="barT"></div>
       <button class="btn" id="go" style="margin-top:8px" disabled>Upload</button>
       <div class="msg" id="msg"></div>
-      <div class="hint">The thumbnail is captured automatically from the video. Your upload appears under your name as a channel other users can follow — it goes public once approved.</div>
+      <div class="hint">The thumbnail is captured automatically from the video. Leave Artist blank to publish under your own name; type an existing artist's name to add this video to their channel, or a new name to start one. Uploads go public once approved (yours go live immediately if you're staff).</div>
     </div>
 
     <div class="card">
@@ -127,6 +130,13 @@ fetch(`${API}/api/me`,{credentials:"include"}).then(r=>{
   if(r.ok){ $("main").style.display=""; loadMine(); }
   else $("gate").style.display="";
 }).catch(()=>{ $("gate").style.display=""; });
+
+// Existing-artist autocomplete — picking a name that already has a channel merges
+// this upload into it instead of forking a duplicate. Public endpoint, no auth needed.
+fetch(`${API}/api/videos/artists`).then(r=>r.ok?r.json():null).then(d=>{
+  const list=Array.isArray(d&&d.artists)?d.artists:[];
+  $("artistList").innerHTML=list.slice(0,2000).map(a=>`<option value="${esc(a.name||a.slug)}">`).join("");
+}).catch(()=>{});
 
 // ── file pick + drag-drop ──
 $("drop").addEventListener("click",()=>$("file").click());
@@ -223,12 +233,12 @@ $("go").addEventListener("click",async()=>{
     $("barT").textContent="Finishing…";
     const cr=await fetch(`${API}/api/videos/uploads/complete`,{method:"POST",credentials:"include",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({id:d.id,ext:d.ext,title,tags:$("tags").value,duration})});
+      body:JSON.stringify({id:d.id,ext:d.ext,title,artist:$("artist").value,tags:$("tags").value,duration})});
     const cd=await cr.json();
     if(!cr.ok) throw new Error(cd.error||"Couldn't finish the upload");
-    show($("msg"),"ok","Uploaded! It's pending review — it goes public once approved.");
+    show($("msg"),"ok",cd.pending?"Uploaded! It's pending review — it goes public once approved.":"Uploaded and live!");
     $("barI").style.width="100%"; $("barT").textContent="Done";
-    file=null; thumbBlob=null; $("title").value=""; $("tags").value=""; $("pv").classList.remove("on");
+    file=null; thumbBlob=null; $("title").value=""; $("artist").value=""; $("tags").value=""; $("pv").classList.remove("on");
     loadMine();
   }catch(e){
     show($("msg"),"err",e.message||"Upload failed");
