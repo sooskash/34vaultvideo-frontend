@@ -55,7 +55,7 @@
         '<a class="acct-item" href="' + MAIN + '/settings.html"><span class="mi">&#9881;</span> Settings</a>' +
         '<div class="acct-item danger" id="acctLogout"><span class="mi">&#9099;</span> Log out</div>';
       var lo = document.getElementById("acctLogout");
-      if (lo) lo.onclick = function () { fetch(API + "/api/auth/logout", { method: "POST", credentials: "include" }).catch(function () {}).then(function () { location.reload(); }); };
+      if (lo) lo.onclick = function () { if (window.__clearAuthToken) window.__clearAuthToken(); fetch(API + "/api/auth/logout", { method: "POST", credentials: "include" }).catch(function () {}).then(function () { location.reload(); }); };
     } else {
       btn.textContent = "V";
       menu.innerHTML =

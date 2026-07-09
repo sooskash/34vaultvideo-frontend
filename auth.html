@@ -123,8 +123,12 @@ $("form").addEventListener("submit",async e=>{
   if(mode==="signup" && pw.length<6){ show("err","Password must be at least 6 characters."); return; }
   $("submit").disabled=true; const orig=$("submit").textContent; $("submit").textContent="Please wait…"; $("msg").className="msg";
   try{
-    if(mode==="signup") await api("/api/auth/register",{email,password:pw,displayName:dn||email.split("@")[0]});
-    else await api("/api/auth/login",{email,password:pw});
+    const d = mode==="signup"
+      ? await api("/api/auth/register",{email,password:pw,displayName:dn||email.split("@")[0]})
+      : await api("/api/auth/login",{email,password:pw});
+    // Fallback for browsers that restrict the cross-site session cookie (mobile
+    // Safari's ITP, notably) — see config.js for how this token gets used.
+    if(d&&d.token&&window.__setAuthToken) window.__setAuthToken(d.token);
     show("ok","Success! Redirecting…");
     setTimeout(()=>location.href=next,500);
   }catch(err){

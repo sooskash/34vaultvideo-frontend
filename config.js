@@ -1,5 +1,37 @@
 window.__API__ = "https://api.34vault.com";
 
+// ── Bearer-token auth fallback ──────────────────────────────────────────────
+// The session cookie is scoped to .34vault.com and shared cross-site with
+// SameSite=None so it reaches api.34vault.com from this (different) domain —
+// works in Chrome, but Safari's Intelligent Tracking Prevention can silently
+// drop or restrict that cross-site cookie regardless of SameSite (this is
+// what broke login specifically on mobile). Login/register now also return a
+// stateless token; it's stashed here in localStorage (same-origin, untouched
+// by any cross-site cookie policy) and attached as an Authorization header on
+// every call to the API — patched into the global fetch so every page's
+// existing `fetch(...)` calls pick it up with no per-call changes needed.
+// Cookie auth still wins server-side when it arrives; this is a fallback for
+// when it doesn't.
+(function() {
+  var TOKEN_KEY = "_v34tok";
+  window.__setAuthToken = function(t) { try { if (t) localStorage.setItem(TOKEN_KEY, t); } catch (e) {} };
+  window.__clearAuthToken = function() { try { localStorage.removeItem(TOKEN_KEY); } catch (e) {} };
+  var origFetch = window.fetch;
+  window.fetch = function(url, opts) {
+    try {
+      var u = typeof url === "string" ? url : (url && url.url) || "";
+      var tok = localStorage.getItem(TOKEN_KEY);
+      if (tok && u.indexOf(window.__API__) === 0) {
+        opts = opts || {};
+        var headers = new Headers(opts.headers || {});
+        if (!headers.has("Authorization")) headers.set("Authorization", "Bearer " + tok);
+        opts = Object.assign({}, opts, { headers: headers });
+      }
+    } catch (e) {}
+    return origFetch.call(this, url, opts);
+  };
+})();
+
 // Theme + accent color applied via style attribute on <html>
 // This is the ONLY place --accent is defined (removed from shared.css)
 // so there's zero specificity conflict on any browser including Safari
