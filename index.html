@@ -992,7 +992,7 @@ async function runQuery(reset){
     all=[]; offset=0; done=false;
     // NOTE: do NOT reset `page` here — pagination sets it before calling. apply()
     // (filter/sort/search) resets page to 1 itself.
-    grid.innerHTML='<div style="text-align:center;padding:40px;color:var(--sub)"><div class="spinner" style="margin:0 auto 12px"></div>Loading videos…</div>';
+    grid.innerHTML=new Array(12).fill('<div class="sk"><div class="sk-c"></div><div class="sk-b"><div class="sk-l"></div><div class="sk-l s"></div></div></div>').join("");
     pagArea.innerHTML=""; scrollSentinel.style.display="none";
   }
   // "Saved" = client-side favorites → fetch by slug, sort + show client-side.
