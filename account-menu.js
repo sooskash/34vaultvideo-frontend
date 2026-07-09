@@ -5,7 +5,7 @@
   var mount = document.getElementById("acctMount");
   if (!mount) return;
   var API = window.__API__ || "https://api.34vault.com";
-  var MAIN = "https://34vault.com"; // shared-account pages (profile/settings/auth) — native video ones coming
+  var MAIN = "https://34vault.com"; // Settings/account-security stay on the shared comic-site page
 
   if (!document.getElementById("acctCss")) {
     var st = document.createElement("style");
@@ -45,10 +45,13 @@
       var initial = (me.displayName || "V").charAt(0).toUpperCase();
       var avHtml = me.avatarUrl ? '<img src="' + esc(me.avatarUrl) + '" alt="">' : initial;
       btn.innerHTML = avHtml;
+      var isStaff = me.role === "OWNER" || me.role === "ADMIN";
       menu.innerHTML =
-        '<div class="acct-head"><div class="av">' + avHtml + '</div><div><div class="acct-name">' + esc(me.displayName || "You") + '</div><div class="acct-sub">34Vault account</div></div></div>' +
+        '<div class="acct-head"><div class="av">' + avHtml + '</div><div><div class="acct-name">' + esc(me.displayName || "You") + '</div><div class="acct-sub">' + (isStaff ? esc(me.role) + " · 34Vault account" : "34Vault account") + '</div></div></div>' +
+        '<a class="acct-item" href="profile.html"><span class="mi">&#128100;</span> Profile</a>' +
+        '<a class="acct-item" href="upload.html"><span class="mi">&#127909;</span> Upload</a>' +
         '<a class="acct-item" href="index.html?saved=1"><span class="mi">&#9733;</span> Saved</a>' +
-        '<a class="acct-item" href="' + MAIN + '/profile.html"><span class="mi">&#128100;</span> Profile</a>' +
+        (isStaff ? '<a class="acct-item" href="admin.html"><span class="mi">&#128737;</span> Admin</a>' : '') +
         '<a class="acct-item" href="' + MAIN + '/settings.html"><span class="mi">&#9881;</span> Settings</a>' +
         '<div class="acct-item danger" id="acctLogout"><span class="mi">&#9099;</span> Log out</div>';
       var lo = document.getElementById("acctLogout");

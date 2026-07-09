@@ -92,6 +92,16 @@
   </div>
 
   <div class="card">
+    <h2>Deep backfill — grow toward the full ~300k catalog</h2>
+    <div class="row">
+      <button class="btn" id="deepBtn" onclick="deepScrape()">⛏ Run deep backfill now</button>
+      <button class="btn ghost" onclick="loadStats()">↻ Refresh</button>
+    </div>
+    <div class="msg" id="deepMsg"></div>
+    <div class="hint">Estimates where your catalog leaves off in rule34video's listing and crawls ~200 pages forward from there, skipping anything already in your catalog. A cron also runs this automatically every 4 hours.</div>
+  </div>
+
+  <div class="card">
     <h2>Add content</h2>
     <label>rule34video URL</label>
     <div class="row">
@@ -147,7 +157,10 @@ let KEY=localStorage.getItem("_vadminKey")||"";
 
 function show(el,cls,txt){ el.className="msg "+cls; el.textContent=txt; }
 async function api(path,opts={}){
-  const r=await fetch(API+path,{...opts,headers:{...(opts.headers||{}),"x-admin-key":KEY,"Content-Type":"application/json"}});
+  // credentials:"include" so this ALSO works via an OWNER/ADMIN session cookie
+  // (requireAdminOrOwner accepts either) — the key stays the fallback for a
+  // browser that isn't logged in.
+  const r=await fetch(API+path,{...opts,credentials:"include",headers:{...(opts.headers||{}),"x-admin-key":KEY,"Content-Type":"application/json"}});
   const d=await r.json().catch(()=>({}));
   if(!r.ok) throw new Error(d.error||("HTTP "+r.status));
   return d;
@@ -206,6 +219,17 @@ async function bulkAdd(){
   $("bulkGo").disabled=false;
   show($("bulkMsg"),fail&&!ok?"err":"ok",`Done — ${ok}/${lines.length} URLs processed, ${added} new videos added${fail?`, ${fail} failed`:""}.`);
   loadStats();
+}
+
+async function deepScrape(){
+  $("deepBtn").disabled=true;
+  show($("deepMsg"),"busy","Estimating where to resume and starting…");
+  try{
+    const d=await api("/api/admin/scrape",{method:"POST",body:JSON.stringify({url:"https://rule34video.com/latest-updates/",all:true,autoStart:true,maxPages:200})});
+    show($("deepMsg"),"ok",`Started — crawling pages ${d.startPage}–${d.endPage} in the background.`);
+    setTimeout(loadStats,3000);
+  }catch(e){ show($("deepMsg"),"err",e.message||"Failed"); }
+  finally{ $("deepBtn").disabled=false; }
 }
 
 async function host(){

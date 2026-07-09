@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script src="/config.js?v=1"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="preconnect" href="https://api.34vault.com" />
+<link rel="preconnect" href="https://cdn.34vault.com" />
+<link rel="stylesheet" href="/shared.css" />
+<title>Profile | 34VaultVideo</title>
+<meta name="robots" content="noindex" />
+<meta name="rating" content="adult" />
+<style>
+body{padding-top:var(--topH);padding-bottom:60px}
+.page{max-width:820px;margin:0 auto;padding:26px 16px}
+.brand span{background:var(--grad-accent,linear-gradient(135deg,#f7d489,var(--accent) 55%,#b8913d));-webkit-background-clip:text;background-clip:text;color:transparent}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:18px}
+.card h2{font-size:14px;font-weight:800;margin:0 0 14px;display:flex;align-items:center;gap:8px}
+.hint{font-size:11.5px;color:var(--muted);line-height:1.6;margin-top:10px}
+.gate{text-align:center;padding:60px 20px}
+.btn{height:44px;padding:0 22px;border:none;border-radius:11px;background:var(--grad-accent);color:#241a08;font-size:13.5px;font-weight:800;cursor:pointer;transition:transform .12s;font-family:inherit;display:inline-flex;align-items:center;gap:7px;text-decoration:none}
+.btn:hover{transform:translateY(-1px)}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn.ghost{background:var(--panel2);border:1px solid var(--border2,var(--border));color:var(--text)}
+.btn.sm{height:32px;padding:0 14px;font-size:12px}
+.msg{display:none;margin-top:12px;font-size:13px;font-weight:700;padding:11px 14px;border-radius:10px}
+.msg.err{display:block;background:rgba(225,29,72,.12);border:1px solid rgba(225,29,72,.3);color:#fca5a5}
+.msg.ok{display:block;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac}
+.msg.busy{display:block;background:var(--panel2);border:1px solid var(--border);color:var(--muted)}
+
+/* Header */
+.ph{display:flex;align-items:center;gap:18px;margin-bottom:24px}
+.ph-av{width:76px;height:76px;border-radius:50%;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;color:#241a08;background:var(--grad-accent);box-shadow:0 0 0 3px var(--bg),0 0 0 4.5px var(--accent-40,rgba(236,186,88,.4))}
+.ph-av img{width:100%;height:100%;object-fit:cover}
+.ph-name{font-family:var(--font-display);font-size:24px;font-weight:700;letter-spacing:-.3px;display:flex;align-items:center;gap:9px}
+.ph-role{font-size:10px;font-weight:900;letter-spacing:.4px;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:var(--grad-accent);color:#241a08}
+.ph-sub{font-size:12.5px;color:var(--muted);margin-top:4px}
+
+/* Tabs */
+.tabs{display:flex;gap:4px;background:var(--panel);border:1px solid var(--border);border-radius:13px;padding:4px;margin-bottom:18px;overflow-x:auto}
+.tab{flex:1;white-space:nowrap;padding:10px 14px;border:none;background:none;border-radius:9px;font-size:13px;font-weight:800;color:var(--muted);cursor:pointer;transition:background .12s,color .12s}
+.tab.on{background:var(--panel2);color:var(--text)}
+.tab-n{margin-left:5px;font-size:10.5px;opacity:.75}
+.pane{display:none}
+.pane.on{display:block}
+
+/* Lists */
+.row{display:flex;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)}
+.row:last-child{border-bottom:none}
+.row-th{width:104px;flex-shrink:0;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#0d1018}
+.row-th img{width:100%;height:100%;object-fit:cover;display:block}
+.row-av{width:42px;height:42px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#241a08;background:var(--grad-accent);font-family:var(--font-display);text-transform:uppercase}
+.row-t{flex:1;min-width:0;font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row-s{flex-shrink:0;height:22px;padding:0 10px;border-radius:999px;font-size:10px;font-weight:800;display:inline-flex;align-items:center;background:var(--panel2);border:1px solid var(--border);color:var(--muted)}
+.row-s.live{background:rgba(34,197,94,.12);color:#86efac;border-color:rgba(34,197,94,.3)}
+.row-s.pend{background:var(--accent-10,rgba(236,186,88,.1));color:var(--accent);border-color:var(--accent-22,rgba(236,186,88,.22))}
+.row-s.DONE{background:rgba(34,197,94,.12);color:#86efac;border-color:rgba(34,197,94,.3)}
+.row-s.REJECTED{background:rgba(225,29,72,.1);color:#fca5a5;border-color:rgba(225,29,72,.3)}
+.empty{padding:30px 10px;text-align:center;color:var(--muted);font-size:13px}
+
+/* Admin */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin-bottom:16px}
+.stat{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:13px}
+.stat .n{font-size:22px;font-weight:900;font-variant-numeric:tabular-nums}
+.stat .l{font-size:10.5px;font-weight:700;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.3px}
+.admin-badge{font-size:10px;font-weight:900;color:var(--accent);text-transform:uppercase;letter-spacing:.4px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="ico-btn" onclick="location.href='index.html'">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </div>
+    <div class="brand" onclick="location.href='index.html'">34<span>Vault</span><span>Video</span></div>
+    <div class="spacer"></div>
+    <div class="desktop-nav"><a href="index.html">Videos</a><a href="artists.html">Artists</a><a href="upload.html">Upload</a><a href="request.html">Requests</a></div>
+    <div id="acctMount"></div>
+  </div>
+</div>
+
+<div class="page">
+  <div class="gate" id="gate" style="display:none">
+    <h1 style="font-family:var(--font-display);font-size:24px;font-weight:700">Log in to see your profile</h1>
+    <div class="hint" style="margin-bottom:16px">Your 34Vault comic-site account works here too.</div>
+    <a class="btn" href="auth.html?next=profile.html">Log in / Sign up</a>
+  </div>
+
+  <div id="main" style="display:none">
+    <div class="ph">
+      <div class="ph-av" id="phAv"></div>
+      <div>
+        <div class="ph-name" id="phName"></div>
+        <div class="ph-sub" id="phSub"></div>
+      </div>
+    </div>
+
+    <div class="tabs" id="tabs">
+      <button class="tab on" data-tab="uploads">Uploads <span class="tab-n" id="nUploads"></span></button>
+      <button class="tab" data-tab="follows">Following <span class="tab-n" id="nFollows"></span></button>
+      <button class="tab" data-tab="requests">Requests <span class="tab-n" id="nRequests"></span></button>
+      <button class="tab" data-tab="admin" id="tabAdmin" style="display:none">Admin</button>
+    </div>
+
+    <div class="pane on" id="pane-uploads">
+      <div class="card">
+        <h2>Your uploads</h2>
+        <div id="uploadsList"><div class="empty">Loading…</div></div>
+        <a class="btn" style="margin-top:14px" href="upload.html">🎬 Upload a video</a>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-follows">
+      <div class="card">
+        <h2>Artists you follow</h2>
+        <div id="followsList"><div class="empty">Loading…</div></div>
+        <div class="hint">You get notified when a followed artist has a new video.</div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-requests">
+      <div class="card">
+        <h2>Your requests</h2>
+        <div id="requestsList"><div class="empty">Loading…</div></div>
+        <a class="btn ghost" style="margin-top:14px" href="request.html">＋ New request</a>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-admin">
+      <div class="card">
+        <h2><span class="admin-badge">Owner tools</span></h2>
+        <div class="stats" id="adminStats">
+          <div class="stat"><div class="n">—</div><div class="l">Catalog</div></div>
+          <div class="stat"><div class="n">—</div><div class="l">Hosted</div></div>
+          <div class="stat"><div class="n">—</div><div class="l">Categories</div></div>
+          <div class="stat"><div class="n">—</div><div class="l">Artists</div></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn" id="btnDeepScrape">⛏ Run deep backfill now</button>
+          <a class="btn ghost" href="admin.html">Full scraper tools →</a>
+        </div>
+        <div class="msg" id="adminMsg"></div>
+        <div class="hint">Deep backfill jumps ahead to where your catalog likely leaves off in rule34video's listing and crawls ~200 pages forward, skipping anything you already have. The cron does this automatically every 4 hours too.</div>
+      </div>
+
+      <div class="card">
+        <h2>Pending uploads <span class="tab-n" id="upCount"></span></h2>
+        <div id="modUploads"><div class="empty">Nothing waiting for review.</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Open video requests <span class="tab-n" id="rqCount"></span></h2>
+        <div id="modRequests"><div class="empty">No open requests.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API=window.__API__||"https://api.34vault.com";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const safeUrl=u=>/^https?:\/\//i.test(String(u||""))?String(u):"";
+function show(el,cls,txt){ el.className="msg "+cls; el.textContent=txt; }
+function api(path,opts={}){
+  return fetch(API+path,{...opts,credentials:"include",headers:{...(opts.headers||{}),"Content-Type":"application/json"}})
+    .then(async r=>{ const d=await r.json().catch(()=>({})); if(!r.ok) throw new Error(d.error||("HTTP "+r.status)); return d; });
+}
+
+let ME=null;
+
+(async function boot(){
+  try{
+    ME=await api("/api/me");
+  }catch(e){ $("gate").style.display=""; return; }
+  $("main").style.display="";
+  const isStaff=ME.role==="OWNER"||ME.role==="ADMIN";
+  $("phAv").innerHTML=ME.avatarUrl?`<img src="${esc(ME.avatarUrl)}" alt=""/>`:esc((ME.displayName||"V").charAt(0).toUpperCase());
+  $("phName").innerHTML=esc(ME.displayName||"You")+(isStaff?`<span class="ph-role">${esc(ME.role)}</span>`:"");
+  const since=ME.createdAt?new Date(ME.createdAt).toLocaleDateString(undefined,{month:"long",year:"numeric"}):"";
+  $("phSub").textContent=since?`Member since ${since}`:"34Vault account";
+
+  if(isStaff){ $("tabAdmin").style.display=""; loadAdmin(); }
+  loadUploads();
+  loadFollows();
+  loadRequests();
+})();
+
+// ── tabs ──
+document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("on",x===t));
+  document.querySelectorAll(".pane").forEach(p=>p.classList.toggle("on",p.id==="pane-"+t.dataset.tab));
+}));
+
+// ── uploads ──
+async function loadUploads(){
+  try{
+    const d=await api("/api/me/video-uploads");
+    const list=Array.isArray(d.videos)?d.videos:[];
+    $("nUploads").textContent=list.length||"";
+    $("uploadsList").innerHTML=list.length?list.map(v=>`
+      <div class="row">
+        <a class="row-th" href="watch.html?slug=${encodeURIComponent(v.slug)}"><img src="https://cdn.34vault.com/thumbs/${encodeURIComponent(v.sourceId||"")}.jpg" onerror="this.style.display='none'" alt=""/></a>
+        <a class="row-t" href="watch.html?slug=${encodeURIComponent(v.slug)}">${esc(v.title)}</a>
+        <span class="row-s ${v.approved?"live":"pend"}">${v.approved?"LIVE":"PENDING"}</span>
+      </div>`).join(""):`<div class="empty">No uploads yet.</div>`;
+  }catch(e){ $("uploadsList").innerHTML=`<div class="empty">Couldn't load.</div>`; }
+}
+
+// ── follows ──
+async function loadFollows(){
+  try{
+    const d=await api("/api/video-follows");
+    const list=Array.isArray(d.follows)?d.follows:[];
+    $("nFollows").textContent=list.length||"";
+    $("followsList").innerHTML=list.length?list.map(f=>`
+      <div class="row">
+        <div class="row-av">${esc((f.artistName||f.artistSlug||"?").charAt(0))}</div>
+        <a class="row-t" href="index.html?artist=${encodeURIComponent(f.artistSlug)}" style="text-transform:capitalize">${esc(f.artistName||f.artistSlug)}</a>
+        <button class="btn ghost sm unf" data-slug="${esc(f.artistSlug)}">Unfollow</button>
+      </div>`).join(""):`<div class="empty">You're not following anyone yet — follow an artist from their channel page.</div>`;
+    document.querySelectorAll(".unf").forEach(b=>b.addEventListener("click",async()=>{
+      b.disabled=true;
+      try{ await api("/api/video-follows",{method:"POST",body:JSON.stringify({artistSlug:b.dataset.slug})}); loadFollows(); }
+      catch(e){ b.disabled=false; }
+    }));
+  }catch(e){ $("followsList").innerHTML=`<div class="empty">Couldn't load.</div>`; }
+}
+
+// ── requests ──
+async function loadRequests(){
+  try{
+    const d=await api("/api/me/video-requests");
+    const list=Array.isArray(d.requests)?d.requests:[];
+    $("nRequests").textContent=list.length||"";
+    $("requestsList").innerHTML=list.length?list.map(q=>`
+      <div class="row">
+        <div class="row-t">${esc(q.title)}</div>
+        <span class="row-s ${esc(q.status)}">${esc(q.status).replace("_"," ")}</span>
+      </div>`).join(""):`<div class="empty">No requests yet.</div>`;
+  }catch(e){ $("requestsList").innerHTML=`<div class="empty">Couldn't load.</div>`; }
+}
+
+// ── admin (session-authed — no admin key needed for OWNER/ADMIN) ──
+async function loadAdmin(){
+  try{
+    const s=await api("/api/admin/stats");
+    const els=$("adminStats").querySelectorAll(".stat .n");
+    els[0].textContent=s.total??"—"; els[1].textContent=s.hosted??"—";
+    els[2].textContent=s.categories??"—"; els[3].textContent=s.artists??"—";
+  }catch(e){}
+  await loadModQueues();
+}
+
+$("btnDeepScrape").addEventListener("click",async()=>{
+  $("btnDeepScrape").disabled=true;
+  show($("adminMsg"),"busy","Estimating where to resume and starting…");
+  try{
+    const d=await api("/api/admin/scrape",{method:"POST",body:JSON.stringify({
+      url:"https://rule34video.com/latest-updates/", all:true, autoStart:true, maxPages:200,
+    })});
+    show($("adminMsg"),"ok",`Started — crawling pages ${d.startPage}–${d.endPage} in the background. Check back in a bit for new videos.`);
+  }catch(e){ show($("adminMsg"),"err",e.message||"Failed"); }
+  finally{ $("btnDeepScrape").disabled=false; }
+});
+
+async function loadModQueues(){
+  try{
+    const d=await api("/api/admin/video-uploads");
+    const list=Array.isArray(d.videos)?d.videos:[];
+    $("upCount").textContent=list.length||"";
+    $("modUploads").innerHTML=list.length?list.map(v=>`
+      <div class="row">
+        <a class="row-th" href="watch.html?slug=${encodeURIComponent(v.slug)}" target="_blank" rel="noopener"><img src="https://cdn.34vault.com/thumbs/${encodeURIComponent(v.sourceId||"")}.jpg" onerror="this.style.display='none'" alt=""/></a>
+        <div class="row-t">${esc(v.title)} <span style="color:var(--muted);font-weight:600">by ${esc((v.artists&&v.artists[0])||"?")}</span></div>
+        <button class="btn sm mod-up" data-id="${Number(v.id)||0}" data-act="approve">Approve</button>
+        <button class="btn ghost sm mod-up" data-id="${Number(v.id)||0}" data-act="reject">Reject</button>
+      </div>`).join(""):`<div class="empty">Nothing waiting for review.</div>`;
+    document.querySelectorAll(".mod-up").forEach(b=>b.addEventListener("click",async()=>{
+      b.disabled=true;
+      try{ await api("/api/admin/video-uploads/"+b.dataset.id,{method:"POST",body:JSON.stringify({action:b.dataset.act})}); }catch(e){}
+      loadModQueues();
+    }));
+  }catch(e){}
+  try{
+    const d=await api("/api/admin/video-requests");
+    const list=(Array.isArray(d.requests)?d.requests:[]).filter(q=>q.status==="OPEN"||q.status==="IN_REVIEW");
+    $("rqCount").textContent=list.length||"";
+    $("modRequests").innerHTML=list.length?list.map(q=>{
+      const url=safeUrl(q.sourceUrl);
+      const scrapable=/^https:\/\/(www\.)?rule34video\.com\//i.test(url);
+      return `
+      <div class="row">
+        <div class="row-t">${esc(q.title)} ${url?`· <a href="${esc(url)}" target="_blank" rel="noopener" style="color:var(--accent)">link</a>`:""}</div>
+        ${scrapable?`<button class="btn sm mod-scrape" data-id="${esc(q.id)}" data-url="${esc(url)}">Scrape it</button>`:""}
+        <button class="btn ghost sm mod-rq" data-id="${esc(q.id)}" data-st="DONE">Done</button>
+        <button class="btn ghost sm mod-rq" data-id="${esc(q.id)}" data-st="REJECTED">Reject</button>
+      </div>`;
+    }).join(""):`<div class="empty">No open requests.</div>`;
+    document.querySelectorAll(".mod-rq").forEach(b=>b.addEventListener("click",async()=>{
+      b.disabled=true;
+      try{ await api("/api/admin/video-requests/"+b.dataset.id,{method:"POST",body:JSON.stringify({status:b.dataset.st})}); }catch(e){}
+      loadModQueues();
+    }));
+    document.querySelectorAll(".mod-scrape").forEach(b=>b.addEventListener("click",async()=>{
+      b.disabled=true;
+      try{
+        await api("/api/admin/scrape",{method:"POST",body:JSON.stringify({url:b.dataset.url,pages:1})});
+        await api("/api/admin/video-requests/"+b.dataset.id,{method:"POST",body:JSON.stringify({status:"DONE"})});
+      }catch(e){}
+      loadModQueues();
+    }));
+  }catch(e){}
+}
+</script>
+<script src="/account-menu.js?v=4"></script>
+</body>
+</html>

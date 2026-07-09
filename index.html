@@ -803,6 +803,7 @@ button{font-family:inherit}
       <button class="nav-pill on" onclick="location.href='index.html'">Videos</button>
       <button class="nav-pill" onclick="location.href='artists.html'">Artists</button>
       <button class="nav-pill" onclick="location.href='upload.html'">Upload</button>
+      <button class="nav-pill" onclick="location.href='request.html'">Requests</button>
       <button class="nav-pill" onclick="location.href='https://34vault.com/'">Comics</button>
     </div>
 
@@ -1041,11 +1042,14 @@ const updFavCt=()=>{ favCt.textContent=String(getFavs().size); };
     if(me){
       var initial=(me.displayName||"V").charAt(0).toUpperCase();
       var avHtml = me.avatarUrl ? `<img src="${esc(me.avatarUrl)}" alt="">` : initial;
+      var isStaff = me.role==="OWNER"||me.role==="ADMIN";
       btn.innerHTML = avHtml;
       menu.innerHTML =
-        `<div class="acct-head"><div class="av">${avHtml}</div><div><div class="acct-name">${esc(me.displayName||"You")}</div><div class="acct-sub">34Vault account</div></div></div>`+
+        `<div class="acct-head"><div class="av">${avHtml}</div><div><div class="acct-name">${esc(me.displayName||"You")}</div><div class="acct-sub">${isStaff?esc(me.role)+" · 34Vault account":"34Vault account"}</div></div></div>`+
+        `<a class="acct-item" href="profile.html"><span class="mi">&#128100;</span> Profile</a>`+
+        `<a class="acct-item" href="upload.html"><span class="mi">&#127909;</span> Upload</a>`+
         `<div class="acct-item" id="acctSaved"><span class="mi">&#9733;</span> Saved</div>`+
-        `<a class="acct-item" href="${MAIN}/profile.html"><span class="mi">&#128100;</span> Profile</a>`+
+        (isStaff?`<a class="acct-item" href="admin.html"><span class="mi">&#128737;</span> Admin</a>`:"")+
         `<a class="acct-item" href="${MAIN}/settings.html"><span class="mi">&#9881;</span> Settings</a>`+
         `<div class="acct-item danger" id="acctLogout"><span class="mi">&#9099;</span> Log out</div>`;
       var s=document.getElementById("acctSaved");
