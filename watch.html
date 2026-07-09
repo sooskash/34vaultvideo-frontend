@@ -176,6 +176,45 @@ body{padding-top:var(--topH);padding-bottom:32px}
 
 .loading{text-align:center;padding:60px 20px;color:var(--muted)}
 .loading .spinner{margin:0 auto 12px}
+
+/* ── UP NEXT (autoplay overlay when the video ends) ── */
+.upnext{
+  position:absolute;inset:0;z-index:7;
+  display:flex;align-items:center;justify-content:center;padding:18px;
+  background:rgba(8,9,13,.86);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  animation:un-in .25s ease;
+}
+@keyframes un-in{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.upnext{animation:none}}
+.un-box{width:100%;max-width:440px;text-align:center}
+.un-label{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:12px}
+.un-card{
+  display:flex;gap:12px;align-items:center;text-align:left;
+  background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px;
+  cursor:pointer;transition:border-color .15s,transform .15s;
+}
+.un-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.un-thumb{position:relative;width:130px;flex-shrink:0;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#0d1018}
+.un-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.un-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.un-play svg{width:30px;height:30px;fill:#fff;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6))}
+.un-ring{
+  position:absolute;top:6px;right:6px;min-width:26px;height:26px;padding:0 7px;border-radius:999px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(10,11,14,.72);border:1px solid rgba(255,255,255,.14);
+  font-size:11px;font-weight:900;color:#fff;
+}
+.un-info{min-width:0;flex:1}
+.un-info .un-k{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin-bottom:3px}
+.un-title{font-size:13.5px;font-weight:800;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.un-actions{display:flex;gap:8px;justify-content:center;margin-top:14px}
+.un-btn{
+  height:38px;padding:0 20px;border-radius:10px;font-size:12px;font-weight:800;
+  background:var(--panel2);border:1px solid var(--border);color:var(--text);cursor:pointer;transition:all .15s;
+}
+.un-btn:hover{border-color:var(--accent)}
+.un-btn.primary{background:var(--accent);border-color:var(--accent);color:#000}
+.un-btn.primary:hover{background:var(--accent2)}
 </style>
 </head>
 <body><noscript><div style="padding:40px 20px;text-align:center;font-family:sans-serif;color:#f0f0f0;background:#0a0b0e;min-height:100vh"><h1>34VaultVideo</h1><p style="margin-top:16px;color:#8b8fa8">This site requires JavaScript to function. Please enable JavaScript in your browser settings.</p></div></noscript>
@@ -228,6 +267,58 @@ function vcard(x){
       <span class="c-views"><svg viewBox="0 0 24 24"><path d="M2 12c2.5-5 6-7.5 10-7.5S19.5 7 22 12c-2.5 5-6 7.5-10 7.5S4.5 17 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>${fmtNum(x.views)}</span>
     </div>
   </div>`;
+}
+
+// ── UP NEXT ──────────────────────────────────────────────────────────────────
+// When the current video ends, surface the top related video with an 8s countdown
+// and auto-advance — the "keep watching" loop that multiplies pageviews (and ad
+// impressions). Navigation is a fresh view; we pass &autoplay=1 so the next page
+// tries to start playing immediately (browsers may still gate autoplay-with-sound).
+let _upNextTimer=null;
+function upNextUrl(next){ return "watch.html?slug="+encodeURIComponent(next.slug)+"&autoplay=1"; }
+function setupUpNext(vid,next){
+  if(!vid||!next||!next.slug) return;
+  vid.addEventListener("ended",function(){ showUpNext(next); });
+}
+function showUpNext(next){
+  const shell=document.getElementById("playerShell");
+  if(!shell||document.getElementById("upNext")) return;
+  const thumb=next.sourceId?API+"/api/thumb/"+next.sourceId:(next.thumbUrl||NO_THUMB);
+  const ov=document.createElement("div");
+  ov.className="upnext"; ov.id="upNext";
+  ov.innerHTML=`
+    <div class="un-box">
+      <div class="un-label">Up next</div>
+      <div class="un-card" id="unCard">
+        <div class="un-thumb">
+          <img src="${esc(thumb)}" alt="" onerror="this.src='${NO_THUMB}'"/>
+          <div class="un-play">${PLAY_ICO}</div>
+          <div class="un-ring" id="unNum">8</div>
+        </div>
+        <div class="un-info">
+          <div class="un-k">Playing next</div>
+          <div class="un-title">${esc(next.title||"Untitled")}</div>
+        </div>
+      </div>
+      <div class="un-actions">
+        <button class="un-btn primary" id="unGo">Play now</button>
+        <button class="un-btn" id="unCancel">Cancel</button>
+      </div>
+    </div>`;
+  shell.appendChild(ov);
+  const go=()=>{ location.href=upNextUrl(next); };
+  ov.querySelector("#unGo").addEventListener("click",go);
+  ov.querySelector("#unCard").addEventListener("click",go);
+  ov.querySelector("#unCancel").addEventListener("click",cancelUpNext);
+  let n=8;
+  _upNextTimer=setInterval(()=>{
+    n--; const el=document.getElementById("unNum"); if(el)el.textContent=String(n);
+    if(n<=0){ clearInterval(_upNextTimer); go(); }
+  },1000);
+}
+function cancelUpNext(){
+  if(_upNextTimer){ clearInterval(_upNextTimer); _upNextTimer=null; }
+  const ov=document.getElementById("upNext"); if(ov)ov.remove();
 }
 
 function renderPills(){
@@ -345,7 +436,7 @@ async function load(){
       ${tags.length?`<div class="v-tags">${tags.slice(0,24).map(t=>`<span class="v-tag" onclick="location.href='index.html?tag=${encodeURIComponent(t)}'">${esc(t)}</span>`).join("")}</div>`:""}
       <div class="ad-slot" id="watchAdSlot"></div>
       <div class="sec">
-        <div class="sec-head"><div class="sec-title">More Videos</div></div>
+        <div class="sec-head"><div class="sec-title">Related Videos</div></div>
         <div class="grid" id="moreGrid"></div>
       </div>
     `;
@@ -356,6 +447,10 @@ async function load(){
     vid.addEventListener("play",function(){
       fetch(`${API}/api/videos/slug/${encodeURIComponent(v.slug)}/view`,{method:"POST"}).catch(()=>{});
     },{once:true});
+
+    // Arrived via an "Up next" auto-advance → start playback right away (best-effort;
+    // autoplay-with-sound may be blocked, in which case the poster + play button stay).
+    if(new URLSearchParams(location.search).get("autoplay")==="1"){ vid.play().catch(()=>{}); }
 
     // Playback goes through the /stream endpoint: hosted videos 302 to our R2 CDN
     // (instant), un-hosted ones stream progressively via proxy (plays in ~1-2s) and
@@ -375,12 +470,14 @@ async function load(){
       });
     }
 
-    // More videos (most viewed)
-    fetch(`${API}/api/videos?limit=12&sort=views`).then(r=>r.json()).then(md=>{
+    // Related videos (shared artist / category / tags) — powers the grid + the
+    // autoplay "Up next" overlay. Backend backfills with popular so it's never empty.
+    fetch(`${API}/api/videos/slug/${encodeURIComponent(v.slug)}/related?limit=12`).then(r=>r.json()).then(md=>{
       const list=(Array.isArray(md.videos)?md.videos:[]).filter(x=>x.slug!==v.slug).slice(0,12);
       const g=document.getElementById("moreGrid");
       if(!list.length){ g.parentElement.style.display="none"; return; }
       g.innerHTML=list.map(vcard).join("");
+      setupUpNext(vid,list[0]);
     }).catch(()=>{});
 
   }catch{
