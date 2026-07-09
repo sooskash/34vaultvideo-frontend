@@ -197,15 +197,18 @@ function pick(f){
   });
 }
 
-// ── upload: presigned PUT straight to R2, with progress ──
-function putWithProgress(url,body,contentType,onPct){
+// ── upload with progress. `withCreds` sends the session cookie — needed for the
+// same-origin streaming endpoint (requireAuth); the R2 presigned PUT doesn't want
+// it (a cookie header would break its signature) so it stays off there. ──
+function putWithProgress(url,body,contentType,withCreds,onPct){
   return new Promise((res,rej)=>{
     const x=new XMLHttpRequest();
     x.open("PUT",url);
+    x.withCredentials=!!withCreds;
     x.setRequestHeader("Content-Type",contentType);
     x.upload.addEventListener("progress",e=>{ if(e.lengthComputable&&onPct) onPct(Math.round(e.loaded/e.total*100)); });
     x.addEventListener("load",()=>x.status<300?res():rej(new Error("Upload failed (HTTP "+x.status+")")));
-    x.addEventListener("error",()=>rej(new Error("Upload failed — network or storage permissions (CORS)")));
+    x.addEventListener("error",()=>rej(new Error("Upload failed — check your connection and try again")));
     x.send(body);
   });
 }
@@ -222,13 +225,17 @@ $("go").addEventListener("click",async()=>{
       body:JSON.stringify({size:file.size,contentType:file.type})});
     const d=await r.json();
     if(!r.ok) throw new Error(d.error||"Couldn't start the upload");
-    await putWithProgress(d.videoPut,file,file.type,pct=>{
+    // Video bytes go through OUR api (same-origin CORS already works everywhere
+    // else on this site) instead of straight to R2 — a direct-to-R2 PUT needs R2's
+    // OWN CORS policy configured, a separate Cloudflare setting that's easy to
+    // miss or misconfigure.
+    await putWithProgress(`${API}/api/videos/uploads/${d.id}/stream?ext=${d.ext}`,file,file.type,true,pct=>{
       $("barI").style.width=pct+"%";
       $("barT").textContent="Uploading video… "+pct+"%";
     });
     if(thumbBlob){
       $("barT").textContent="Uploading thumbnail…";
-      await putWithProgress(d.thumbPut,thumbBlob,"image/jpeg",null).catch(()=>{});
+      await putWithProgress(d.thumbPut,thumbBlob,"image/jpeg",false,null).catch(()=>{});
     }
     $("barT").textContent="Finishing…";
     const cr=await fetch(`${API}/api/videos/uploads/complete`,{method:"POST",credentials:"include",
