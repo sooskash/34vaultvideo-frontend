@@ -548,7 +548,7 @@ async function load(){
           </div>
           <div class="v-edit-row" style="margin-top:8px">
             <div><label>Scenes</label><select id="veIgScenes" style="width:100%;height:36px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12.5px;padding:0 8px;font-family:inherit"><option value="1">1 scene</option><option value="2">2 scenes</option><option value="3" selected>3 scenes</option><option value="4">4 scenes</option></select></div>
-            <div><label>Framing</label><select id="veIgCrop" style="width:100%;height:36px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12.5px;padding:0 8px;font-family:inherit"><option value="sfw">SFW auto (recommended) ✅</option><option value="sfwcrop">SFW + face crop (extra safe) ✂️</option><option value="fit">Show full frame</option><option value="fill">Zoom to fill</option></select></div>
+            <div><label>Framing</label><select id="veIgCrop" style="width:100%;height:36px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12.5px;padding:0 8px;font-family:inherit"><option value="sfw">SFW auto — clean scenes only (recommended) ✅</option><option value="cropnsfw">Crop NSFW parts — keeps more, zooms bad bits ✂️</option><option value="fit">Show full frame</option><option value="fill">Zoom to fill</option></select></div>
             <div><label>Reel size</label><select id="veIgSize" style="width:100%;height:36px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12.5px;padding:0 8px;font-family:inherit"><option value="small">Small band</option><option value="medium" selected>Medium band</option><option value="large">Large band</option></select></div>
           </div>
           <div style="margin-top:8px">
@@ -827,14 +827,18 @@ async function load(){
           // Reel size = how tall the video band is; "cover" modes (fill/top/smart/sfw)
           // let us pick a height freely, "fit" stays true 16:9.
           const sizeMap={small:680,medium:860,large:1040};
-          const useCover=(opts.crop==="fill"||opts.crop==="top"||opts.crop==="smart"||opts.crop==="sfw"||opts.crop==="sfwcrop");
+          const useCover=(opts.crop==="fill"||opts.crop==="top"||opts.crop==="smart"||opts.crop==="sfw"||opts.crop==="cropnsfw");
           const igBandW=W-80, igBandH=useCover?(sizeMap[opts.size]||860):Math.round((W-80)*9/16), igBandY=Math.round((H-igBandH)/2);
-          // curCrop is mutable so smart mode can tighten per-scene. sfw plays full/natural
-          // (safety from AI SELECTION); sfwcrop is the same AI selection but zoomed into
-          // faces (upper-centre) as an extra safety margin to test cropping.
-          let curCrop=(opts.crop==="smart")?"top":(opts.crop==="sfwcrop"?"face":(opts.crop==="sfw"?"fill":(opts.crop||"fit")));
+          // curCrop is mutable. sfw plays full/natural (safety from AI SELECTION); cropnsfw
+          // plays more footage but zooms into faces ONLY over the moments the scan flagged
+          // as NSFW (see scanSamp lookup in draw), leaving safe moments full-frame.
+          let curCrop=(opts.crop==="smart")?"top":((opts.crop==="sfw"||opts.crop==="cropnsfw")?"fill":(opts.crop||"fit"));
+          let scanSamp=null; // per-timestamp NSFW map, filled during the scan below
           const draw=()=>{
             if(opts.mode==="ig"){
+              // Crop ONLY the flagged moments: zoom to faces when the current playback
+              // time is near an unsafe sample, otherwise show the frame full.
+              if(opts.crop==="cropnsfw" && scanSamp){ const ct=src.currentTime||0; curCrop = scanSamp.some(s=>s.unsafe && Math.abs(s.t-ct)<=0.7) ? "face" : "fill"; }
               ctx.fillStyle=opts.bgColor; ctx.fillRect(0,0,W,H);
               drawFrame(40,igBandY,igBandW,igBandH);
               if(opts.charImg){ const bottomSpace=H-(igBandY+igBandH); const chH=Math.max(340,Math.min(660,bottomSpace-8)); const cW=opts.charImg.width*chH/opts.charImg.height; ctx.drawImage(opts.charImg,W-cW-24,H-chH-16,cW,chH); }
@@ -858,84 +862,66 @@ async function load(){
           let segDur=winDur;
           let segLens=null; // per-scene play lengths (sfw mode uses variable-length clean runs)
           let segs;
-          if(opts.crop==="sfw"||opts.crop==="sfwcrop"){
-            // SFW mode REQUIRES the model — skin/brightness can't read furry/animated
-            // content, and a silent fallback would give false confidence. We densely
-            // scan, keep only windows the model calls clean the WHOLE way, then verify
-            // each chosen window frame-by-frame end-to-end. If nothing is clean, we
-            // REFUSE rather than emit NSFW (this feeds automated posting).
+          if(opts.crop==="sfw"||opts.crop==="cropnsfw"){
+            // Uses an actual model (NSFWJS) — skin/brightness can't read furry/animated
+            // content. Scan the whole video, then pick ONE scene per time-bucket so the
+            // scenes are genuinely distinct and spread start→end (not adjacent chunks of
+            // one shot), all the same length.
+            //   sfw      = each scene must be clean the whole way; explicit ones dropped.
+            //   cropnsfw = keep more footage but face-crop ONLY the flagged moments.
             if(opts.onIntro) opts.onIntro(introSkip);
             if(opts.onModel) opts.onModel("loading");
             await loadNsfwModel(); // throws → caught by caller → nothing is produced
             if(opts.onModel) opts.onModel("ready");
-            // Analyse the current frame ONCE — model + skin + brightness — and derive
-            // both the unsafe verdict and the ranking score. Unsafe if the model flags
-            // it, OR it's very skin-heavy (nudity the model may under-rate on furry),
-            // OR it's black/fade.
             const analyzeFrame=async()=>{ const skin=skinRatioNow(src), bright=sampleFrame(src).bright;
               let p=null; try{ p=await nsfwProbs(src); }catch(e){}
               return { unsafe: !p || bright<=24 || probUnsafe(p) || skin>0.32, risk: p?probRisk(p):1, p, skin }; };
             // Credits/outro can be long — cut a generous tail so they're never picked.
             const endTrim=Math.min(60,Math.max(12,total*0.2));
             const span=Math.max(1,(total-endTrim)-introSkip);
-            const step=Math.min(1.0, winDur/2);            // dense: ≥2 samples/window
-            const N=Math.min(60, Math.max(12, Math.ceil(span/step)+1));
+            // Equal-length scenes, spread across the video, that fit the usable span.
+            segDur=Math.max(1.2, Math.min(winDur, span/scenes));
+            const step=Math.min(1.0, segDur/2);            // dense: ≥2 samples/scene
+            const N=Math.min(70, Math.max(12, Math.ceil(span/step)+1));
             const samp=[];
             for(let i=0;i<N;i++){
               const t=introSkip+span*(i/(N-1||1)); await seekVid(src,t);
               const a=await analyzeFrame(); samp.push({t, unsafe:a.unsafe, risk:a.risk, p:a.p, skin:a.skin});
               if(opts.onScan) opts.onScan(i+1,N);
             }
-            // Diagnostics — if anything still slips, the console has the real numbers.
+            scanSamp=samp; // draw() reads this to crop only flagged moments (cropnsfw)
             try{ console.log("[reel SFW] scan", samp.map(s=>({t:+s.t.toFixed(1), H:+(((s.p||{}).Hentai)||0).toFixed(2), P:+(((s.p||{}).Porn)||0).toFixed(2), Se:+(((s.p||{}).Sexy)||0).toFixed(2), Dr:+(((s.p||{}).Drawing)||0).toFixed(2), skin:+s.skin.toFixed(2), bad:s.unsafe}))); }catch(e){}
-            // Build CLEAN RUNS: maximal stretches of consecutive safe samples. This is
-            // what lets the reel FILL the chosen length — a long clean run can carry a
-            // whole scene (or be split into several), instead of everything collapsing
-            // to one 2.5s window.
-            const runs=[]; let cur=null;
-            for(const s of samp){
-              if(!s.unsafe){ if(!cur) cur={start:s.t,end:s.t,risk:s.risk,n:1}; else { cur.end=s.t; cur.risk+=s.risk; cur.n++; } }
-              else if(cur){ runs.push(cur); cur=null; }
-            }
-            if(cur) runs.push(cur);
-            for(const r of runs){ r.end=Math.min(r.end+step,total-0.2); r.len=r.end-r.start; r.avg=r.risk/r.n; }
-            const usable=runs.filter(r=>r.len>=Math.min(1.2,winDur)).sort((a,b)=> (a.avg+(a.start/span)*0.07)-(b.avg+(b.start/span)*0.07));
-            try{ console.log("[reel SFW] clean runs", runs.map(r=>({start:+r.start.toFixed(1),len:+r.len.toFixed(1),avg:+r.avg.toFixed(2)}))); }catch(e){}
-            if(!usable.length) throw new Error("No clean scene found in this video — it's too explicit throughout. Try another video, or use Full frame + Blur.");
-            // Fill up to `scenes` slots of ~target each, all inside clean runs. Long runs
-            // get split into several slots (jump cuts) so the Scenes control is honoured
-            // and the reel reaches the chosen length when enough clean footage exists.
-            const totalClean=usable.reduce((a,r)=>a+r.len,0);
-            // Size each slot to the clean footage we actually have, so we can reach the
-            // requested scene count by splitting long runs — not just 1 slot per run
-            // (that was capping it at ~2 scenes when clean runs were short).
-            const target=Math.max(0.8, Math.min(opts.duration/scenes, totalClean/scenes));
-            const minSlot=Math.min(target,0.8);
-            const byLen=usable.slice().sort((a,b)=>b.len-a.len);
-            const slots=[]; let progress=true;
-            while(slots.length<scenes && progress){
-              progress=false;
-              for(const r of byLen){
-                if(slots.length>=scenes) break;
-                const usedInR=slots.filter(s=>s.r===r).reduce((a,s)=>a+s.len,0);
-                const room=r.len-usedInR;
-                if(room>=minSlot){ slots.push({start:r.start+usedInR,len:Math.min(target,room),r}); progress=true; }
+            // One distinct scene per time-bucket, spread across the whole video.
+            const requireClean = opts.crop!=="cropnsfw";
+            const chosen=[];
+            for(let b=0;b<scenes;b++){
+              const lo=introSkip+span*(b/scenes), hiStart=Math.max(lo, introSkip+span*((b+1)/scenes)-segDur);
+              let best=null;
+              for(const s of samp){
+                if(s.t<lo||s.t>hiStart) continue;
+                const w=samp.filter(x=>x.t>=s.t&&x.t<s.t+segDur); if(!w.length) continue;
+                if(requireClean && w.some(x=>x.unsafe)) continue;
+                const avg=w.reduce((a,x)=>a+x.risk,0)/w.length;
+                if(!best||avg<best.avg) best={t:s.t,avg};
               }
+              if(best) chosen.push(best.t);
             }
-            slots.sort((a,b)=>a.start-b.start);
-            // Fine end-to-end verify each slot; truncate at the first unsafe frame.
-            const outSegs=[], outLens=[];
-            for(let k=0;k<slots.length;k++){
-              if(opts.onVerify) opts.onVerify(k+1,slots.length);
-              let safeLen=0;
-              for(let t=slots[k].start; t<slots[k].start+slots[k].len; t+=0.5){ await seekVid(src,t); if((await analyzeFrame()).unsafe) break; safeLen=(t+0.5)-slots[k].start; }
-              safeLen=Math.min(safeLen,slots[k].len);
-              if(safeLen>=0.8){ outSegs.push(slots[k].start); outLens.push(safeLen); }
+            chosen.sort((a,b)=>a-b);
+            // sfw: fine end-to-end verify each scene, drop any that isn't clean throughout.
+            let finalSegs=chosen;
+            if(requireClean){
+              const vs=[];
+              for(let k=0;k<chosen.length;k++){
+                if(opts.onVerify) opts.onVerify(k+1,chosen.length);
+                let ok=true; for(let t=chosen[k]; t<chosen[k]+segDur; t+=0.5){ await seekVid(src,t); if((await analyzeFrame()).unsafe){ ok=false; break; } }
+                if(ok) vs.push(chosen[k]);
+              }
+              finalSegs=vs;
             }
-            try{ console.log("[reel SFW] slots→verified", outSegs.map((t,i)=>({t:+t.toFixed(1),len:+outLens[i].toFixed(1)}))); }catch(e){}
-            if(!outSegs.length) throw new Error("No clean scene found in this video — it's too explicit throughout. Try another video, or use Full frame + Blur.");
-            segs=outSegs; segLens=outLens;
-            if(opts.onScan) opts.onScan(N,N,outSegs.length);
+            try{ console.log("[reel SFW] buckets→final", chosen.map(t=>+t.toFixed(1)), "→", finalSegs.map(t=>+t.toFixed(1))); }catch(e){}
+            if(!finalSegs.length) throw new Error("No clean scene found in this video — it's too explicit throughout. Try another video, or use Crop NSFW / Full frame + Blur.");
+            segs=finalSegs; segLens=finalSegs.map(()=>segDur); // equal lengths, evenly spread
+            if(opts.onScan) opts.onScan(N,N,finalSegs.length);
           } else if(scenes<=1){ segs=[Math.max(opts.start||0,introSkip)]; segDur=Math.max(1,opts.duration/segs.length); }
           else { const lo=introSkip, hi=Math.max(lo+winDur,total-winDur); segs=[]; for(let i=0;i<scenes;i++) segs.push(lo+(hi-lo)*(i/(scenes-1))); segs.sort((a,b)=>a-b); segDur=Math.max(1,opts.duration/segs.length); }
           // Build the play list. Normally we play each clean scene once. If "Loop to
@@ -1054,7 +1040,7 @@ async function load(){
             onVerify:(k,n)=>{ m.textContent=`Verifying scene ${k}/${n} frame-by-frame…`; },
             onTick:e=>{m.textContent=`Recording… ${e.toFixed(0)}/${dur}s`;}});
           download(out.blob,`34vault-reel-${v.sourceId}.${out.ext}`);
-          const sceneNote=(crop==="sfw"||crop==="sfwcrop")?` · AI-verified, ${foundScenes||0} clean scene${foundScenes===1?"":"s"}${foundScenes<scenes?` (only ${foundScenes} of ${scenes} were clean)`:""}`:"";
+          const sceneNote=(crop==="sfw"||crop==="cropnsfw")?` · AI-checked, ${foundScenes||0} scene${foundScenes===1?"":"s"}${foundScenes<scenes?` (only ${foundScenes} of ${scenes} usable)`:""}`:"";
           m.className="v-edit-msg ok"; m.textContent=`Done — downloaded (${(out.blob.size/1048576).toFixed(1)} MB${out.ext==="webm"?", webm — Chrome exports mp4":""})${sceneNote}.`;
           cap.style.display="block"; cap.value=buildCaptionClient();
         }catch(e){ m.className="v-edit-msg err"; m.textContent=e.message||"Failed"; }
