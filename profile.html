@@ -145,6 +145,20 @@ body{padding-top:var(--topH);padding-bottom:60px}
       </div>
 
       <div class="card">
+        <h2>Promo channels</h2>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn" id="btnPromoBackfill">📣 Pack Discord channels now</button>
+        </div>
+        <div class="msg" id="promoMsg"></div>
+        <div class="hint">Once the Discord webhooks / Telegram bot env vars are set on Render, new videos auto-post every 2 hours. This button additionally packs each configured Discord channel with its top-viewed videos — run it once when the server launches. Promo teaser clips are made per-video from the ✎ Edit panel on any watch page.</div>
+      </div>
+
+      <div class="card">
+        <h2>Recent promo clips <span class="tab-n" id="clipCount"></span></h2>
+        <div id="clipsList"><div class="empty">No clips generated yet.</div></div>
+      </div>
+
+      <div class="card">
         <h2>Pending uploads <span class="tab-n" id="upCount"></span></h2>
         <div id="modUploads"><div class="empty">Nothing waiting for review.</div></div>
       </div>
@@ -251,6 +265,31 @@ async function loadAdmin(){
     els[2].textContent=s.categories??"—"; els[3].textContent=s.artists??"—";
   }catch(e){}
   await loadModQueues();
+  loadClips();
+}
+
+$("btnPromoBackfill").addEventListener("click",async()=>{
+  $("btnPromoBackfill").disabled=true;
+  show($("promoMsg"),"busy","Starting channel backfill…");
+  try{
+    const d=await api("/api/admin/promo/backfill",{method:"POST",body:JSON.stringify({perChannel:6})});
+    show($("promoMsg"),"ok",`Packing ${d.channels} channel${d.channels===1?"":"s"} with ${d.perChannel} top videos each — posts land over the next few minutes.`);
+  }catch(e){ show($("promoMsg"),"err",e.message||"Failed"); }
+  finally{ $("btnPromoBackfill").disabled=false; }
+});
+
+async function loadClips(){
+  try{
+    const d=await api("/api/admin/clips");
+    const list=Array.isArray(d.clips)?d.clips:[];
+    $("clipCount").textContent=list.length||"";
+    if(!list.length) return;
+    $("clipsList").innerHTML=list.map(c=>`
+      <div class="row">
+        <div class="row-t">${esc(c.key.replace(/^clips\//,""))} <span style="color:var(--muted);font-weight:600">· ${(c.sizeBytes/1048576).toFixed(1)} MB</span></div>
+        <a class="btn ghost sm" href="${esc(safeUrl(c.url))}" target="_blank" rel="noopener">Open</a>
+      </div>`).join("");
+  }catch(e){}
 }
 
 $("btnDeepScrape").addEventListener("click",async()=>{
