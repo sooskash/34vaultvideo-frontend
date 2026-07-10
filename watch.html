@@ -762,7 +762,7 @@ async function load(){
           function drawFrame(dx,dy,dw,dh){
             const sw=src.videoWidth,sh=src.videoHeight; if(!sw||!sh) return;
             const crop=curCrop;
-            ctx.save(); if(opts.censor) ctx.filter="blur("+(opts.mode==="ig"?14:12)+"px)";
+            ctx.save(); if(opts.censor||curBlur) ctx.filter="blur("+(opts.mode==="ig"?(curBlur&&!opts.censor?30:14):12)+"px)";
             if(crop==="fit"){
               let w=dw,h=dw*sh/sw; if(h>dh){ h=dh; w=dh*sw/sh; }
               ctx.drawImage(src,dx+(dw-w)/2,dy+(dh-h)/2,w,h);
@@ -786,10 +786,23 @@ async function load(){
           const sizeMap={small:680,medium:860,large:1040};
           const useCover=(opts.crop==="fill"||opts.crop==="top"||opts.crop==="smart"||opts.crop==="sfw");
           const igBandW=W-80, igBandH=useCover?(sizeMap[opts.size]||860):Math.round((W-80)*9/16), igBandY=Math.round((H-igBandH)/2);
-          // curCrop is mutable so smart/sfw modes can switch it per-scene (see loop below).
-          let curCrop=(opts.crop==="smart"||opts.crop==="sfw")?"fill":(opts.crop||"fit");
+          // curCrop/curBlur are mutable so the live guard can react per-frame.
+          let curCrop=(opts.crop==="smart"||opts.crop==="sfw")?"top":(opts.crop||"fit");
+          let curBlur=false, _lastGuard=0;
+          // Live NSFW guard: for sfw/smart, sample the frame that's ACTUALLY on screen
+          // and react in real time. A segment drifts into explicit content mid-play, so
+          // a one-off check at the seek point isn't enough — this re-checks continuously
+          // and tightens the crop (top → face) or blurs when skin spikes.
+          function nsfwGuard(){
+            if(opts.crop!=="sfw"&&opts.crop!=="smart") return;
+            const now=Date.now(); if(now-_lastGuard<90) return; _lastGuard=now;
+            const sk=skinRatioNow(src);
+            if(opts.crop==="sfw"){ curBlur=sk>0.34; curCrop=sk>0.18?"face":(sk>0.10?"top":"fill"); }
+            else { curBlur=false; curCrop=sk>0.16?"top":"fill"; }
+          }
           const draw=()=>{
             if(opts.mode==="ig"){
+              nsfwGuard();
               ctx.fillStyle=opts.bgColor; ctx.fillRect(0,0,W,H);
               drawFrame(40,igBandY,igBandW,igBandH);
               if(opts.charImg){ const bottomSpace=H-(igBandY+igBandH); const chH=Math.max(340,Math.min(660,bottomSpace-8)); const cW=opts.charImg.width*chH/opts.charImg.height; ctx.drawImage(opts.charImg,W-cW-24,H-chH-16,cW,chH); }
@@ -813,17 +826,21 @@ async function load(){
           let segs;
           if(opts.crop==="sfw"){
             // SFW mode: don't just crop — pick the *safest* moments. Scan the whole
-            // video, then greedily choose the lowest-skin timestamps (spread apart so
-            // they're distinct scenes) and play those in order. This is what actually
-            // keeps explicit frames out, vs. hoping a crop hides them.
+            // video densely, then score each candidate by the AVERAGE skin over the
+            // window it would actually play (segDur), not a single frame — a frame can
+            // be clean then turn explicit a second later, which is what broke before.
+            // Choose the lowest-average windows, spread apart, played in order. The
+            // live guard (nsfwGuard) then handles any remaining drift frame-by-frame.
             if(opts.onIntro) opts.onIntro(introSkip);
-            const N=Math.min(28,Math.max(10,Math.floor((total-introSkip)/2)));
+            const span=Math.max(1,total-0.4-introSkip);
+            const N=Math.min(40,Math.max(14,Math.floor(span/1.2)));
             const samp=[];
-            for(let i=0;i<N;i++){ const t=Math.max(introSkip,(total-0.4-introSkip)*(i/(N-1||1))+introSkip); await seekVid(src,t); samp.push({t,skin:skinRatioNow(src)}); if(opts.onScan) opts.onScan(i+1,N); }
-            const gap=Math.max(2,(total-introSkip)/(scenes*3||1));
+            for(let i=0;i<N;i++){ const t=introSkip+span*(i/(N-1||1)); await seekVid(src,t); samp.push({t,skin:skinRatioNow(src)}); if(opts.onScan) opts.onScan(i+1,N); }
+            const scored=samp.map(s=>{ const win=samp.filter(x=>x.t>=s.t&&x.t<s.t+segDur); return {t:s.t, avg:win.reduce((a,x)=>a+x.skin,0)/(win.length||1)}; });
+            const gap=Math.max(segDur*0.8,span/(scenes*3||1));
             const chosen=[];
-            for(const s of samp.slice().sort((a,b)=>a.skin-b.skin)){ if(chosen.every(c=>Math.abs(c.t-s.t)>=gap)){ chosen.push(s); if(chosen.length>=scenes) break; } }
-            if(!chosen.length) chosen.push(samp[0]||{t:introSkip,skin:0});
+            for(const s of scored.slice().sort((a,b)=>a.avg-b.avg)){ if(chosen.every(c=>Math.abs(c.t-s.t)>=gap)){ chosen.push(s); if(chosen.length>=scenes) break; } }
+            if(!chosen.length) chosen.push(scored[0]||{t:introSkip,avg:0});
             chosen.sort((a,b)=>a.t-b.t);
             segs=chosen.map(c=>c.t);
           } else if(scenes<=1){ segs=[Math.max(opts.start||0,introSkip)]; }
