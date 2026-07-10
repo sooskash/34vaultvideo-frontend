@@ -579,6 +579,7 @@ async function load(){
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
             <span style="font-size:11px;color:var(--muted)">SFW auto uses an AI model to watch the video and keep only clean scenes — no manual scrubbing. First run downloads the model (~6 MB), then it's cached.</span>
             <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:700;cursor:pointer"><input type="checkbox" id="veIgBlur" style="width:auto;height:auto;accent-color:var(--accent)" /> Blur clip (optional)</label>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:700;cursor:pointer"><input type="checkbox" id="veIgLoop" style="width:auto;height:auto;accent-color:var(--accent)" /> Loop to fill length</label>
             <button class="v-edit-save" id="veIgGo" type="button" style="height:32px;padding:0 14px;font-size:11.5px">📱 Generate Reel</button>
           </div>
           <div class="v-edit-msg" id="veIgMsg" style="margin-top:6px"></div>
@@ -873,8 +874,8 @@ async function load(){
             const analyzeFrame=async()=>{ const skin=skinRatioNow(src), bright=sampleFrame(src).bright;
               let p=null; try{ p=await nsfwProbs(src); }catch(e){}
               return { unsafe: !p || bright<=24 || probUnsafe(p) || skin>0.32, risk: p?probRisk(p):1, p, skin }; };
-            // Credits usually sit in the last 5–10s — never select from there.
-            const endTrim=Math.min(10,Math.max(5,total*0.05));
+            // Credits/outro can be long — cut a generous tail so they're never picked.
+            const endTrim=Math.min(60,Math.max(12,total*0.2));
             const span=Math.max(1,(total-endTrim)-introSkip);
             const step=Math.min(1.0, winDur/2);            // dense: ≥2 samples/window
             const N=Math.min(60, Math.max(12, Math.ceil(span/step)+1));
@@ -897,7 +898,7 @@ async function load(){
             }
             if(cur) runs.push(cur);
             for(const r of runs){ r.end=Math.min(r.end+step,total-0.2); r.len=r.end-r.start; r.avg=r.risk/r.n; }
-            const usable=runs.filter(r=>r.len>=Math.min(1.2,winDur)).sort((a,b)=> (a.avg+(a.start/span)*0.03)-(b.avg+(b.start/span)*0.03));
+            const usable=runs.filter(r=>r.len>=Math.min(1.2,winDur)).sort((a,b)=> (a.avg+(a.start/span)*0.07)-(b.avg+(b.start/span)*0.07));
             try{ console.log("[reel SFW] clean runs", runs.map(r=>({start:+r.start.toFixed(1),len:+r.len.toFixed(1),avg:+r.avg.toFixed(2)}))); }catch(e){}
             if(!usable.length) throw new Error("No clean scene found in this video — it's too explicit throughout. Try another video, or use Full frame + Blur.");
             // Fill up to `scenes` slots of ~target each, all inside clean runs. Long runs
@@ -931,19 +932,26 @@ async function load(){
             if(opts.onScan) opts.onScan(N,N,outSegs.length);
           } else if(scenes<=1){ segs=[Math.max(opts.start||0,introSkip)]; segDur=Math.max(1,opts.duration/segs.length); }
           else { const lo=introSkip, hi=Math.max(lo+winDur,total-winDur); segs=[]; for(let i=0;i<scenes;i++) segs.push(lo+(hi-lo)*(i/(scenes-1))); segs.sort((a,b)=>a-b); segDur=Math.max(1,opts.duration/segs.length); }
-          // Play each segment back-to-back while recording the canvas continuously —
-          // the seeks between them read as clean cuts.
+          // Build the play list. Normally we play each clean scene once. If "Loop to
+          // fill length" is on, we cycle through the clean scenes (replaying them) until
+          // the chosen duration is reached — only when you actually want that.
+          const plan=segLens ? segs.map((s,i)=>({start:s,len:Math.max(0.6,segLens[i])})) : segs.map(s=>({start:s,len:segDur}));
+          const playList=[];
+          if(opts.loop){
+            let acc=0,pi=0,guard=0;
+            while(acc<opts.duration-0.1 && guard++ < plan.length*40){ const slot=plan[pi%plan.length]; pi++; const len=Math.min(slot.len,opts.duration-acc); playList.push({start:slot.start,len}); acc+=len; }
+          } else { for(const slot of plan) playList.push(slot); }
+          // Play back-to-back while recording the canvas continuously — seeks read as cuts.
           rec.start(); draw();
           const gt0=Date.now();
-          for(let idx=0; idx<segs.length; idx++){
-            const st=segs[idx], playLen=(segLens&&segLens[idx]!=null)?segLens[idx]:segDur;
-            await seekVid(src,st);
+          for(const c of playList){
+            await seekVid(src,c.start);
             // smart mode tightens the crop on skin-heavy scenes; sfw plays full (its
             // safety comes from the AI scene selection above, not cropping).
             if(opts.crop==="smart"){ curCrop = skinRatioNow(src)>0.16 ? "top" : "fill"; }
             await src.play().catch(()=>{});
             const st0=Date.now();
-            await new Promise(res=>{ const iv=setInterval(()=>{ if(opts.onTick)opts.onTick((Date.now()-gt0)/1000); if(Date.now()-st0>=playLen*1000){ clearInterval(iv); res(); } },150); });
+            await new Promise(res=>{ const iv=setInterval(()=>{ if(opts.onTick)opts.onTick((Date.now()-gt0)/1000); if(Date.now()-st0>=c.len*1000){ clearInterval(iv); res(); } },100); });
             src.pause();
           }
           cancelAnimationFrame(raf); rec.stop(); src.pause();
@@ -1031,7 +1039,7 @@ async function load(){
           // renderClip does the intro detection, AI scene selection and chronological
           // ordering itself — we just hand it the settings.
           let foundScenes=null;
-          const out=await renderClip({mode:"ig",start,scenes,skip,autoSkip,crop,size,emojiImg:igEmojiImg,duration:dur,censor:document.getElementById("veIgBlur").checked,bgColor:IG_BG[document.getElementById("veIgTpl").value]||IG_BG.cork,topLines,charImg:igCharImg,
+          const out=await renderClip({mode:"ig",start,scenes,skip,autoSkip,crop,size,emojiImg:igEmojiImg,duration:dur,loop:document.getElementById("veIgLoop").checked,censor:document.getElementById("veIgBlur").checked,bgColor:IG_BG[document.getElementById("veIgTpl").value]||IG_BG.cork,topLines,charImg:igCharImg,
             onIntro:s=>{ if(s>0.5) m.textContent=`Skipping ~${s.toFixed(0)}s intro…`; },
             onModel:st=>{ if(st==="loading") m.textContent="Loading the AI content model (first run ~10 MB, then cached)…"; },
             onScan:(i,n,found)=>{ if(found!=null){ foundScenes=found; } else { m.textContent=`AI-scanning frames… ${i}/${n}`; } },
