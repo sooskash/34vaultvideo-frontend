@@ -511,7 +511,7 @@ async function load(){
           </div>
         </div>
         <div>
-          <label>Promo clip <span style="text-transform:none;font-weight:600">(watermarked teaser for socials — rendered server-side)</span></label>
+          <label>Promo clip <span style="text-transform:none;font-weight:600">(watermarked teaser for Twitter — records in your browser, downloads when done)</span></label>
           <div class="v-edit-row">
             <div><label>Start (sec)</label><input type="number" id="veClipStart" min="0" /></div>
             <div><label>Length (sec)</label><input type="number" id="veClipDur" min="3" max="30" value="10" /></div>
@@ -605,32 +605,104 @@ async function load(){
         btn.style.display="none";
       });
 
-      // ── Promo clip: scrub the player to the moment you want, "Use player time",
-      // Generate → server renders a watermarked teaser from the R2 copy ──
+      // ── CLIENT-SIDE CLIP RENDERER ──────────────────────────────────────────
+      // Renders entirely in the browser (canvas + MediaRecorder) — no server CPU,
+      // can't OOM the backend, unlimited. The source video loads through the
+      // same-origin /clipsrc proxy so drawing it to canvas doesn't taint it.
+      const IG_BG={cork:"#E9A7B6",plaster:"#D9D6D0",kraft:"#C7A876"};
+      const CLIP_FONT_STACK='"Arial Black","Segoe UI",Arial,sans-serif';
+      function pickMime(){
+        const c=["video/mp4;codecs=avc1.42E01E,mp4a.40.2","video/mp4","video/webm;codecs=vp9,opus","video/webm"];
+        for(const m of c){ try{ if(window.MediaRecorder&&MediaRecorder.isTypeSupported(m)) return m; }catch(e){} }
+        return "";
+      }
+      function buildCaptionClient(){
+        const cats=Array.isArray(v.categories)?v.categories:[];
+        const franchise=cats.find(c=>c&&!/^(3d|2d|sfm|blender|koikatsu|hentai)$/i.test(c))||"";
+        const tags=normTags(v.tags).slice(0,4);
+        const is3d=tags.some(t=>/3d|blender|sfm|koikatsu|vam/i.test(t))||cats.some(c=>/3d/i.test(c));
+        const style=is3d?"slick 3D-rendered animation with fluid motion":"smooth 2D anime-style animation";
+        const blurb=franchise?`${franchise} — one of the most-requested series in the scene, reimagined here in ${style}.`:`A piece of ${style} that keeps fans of the genre coming back.`;
+        const tl=tags.map(t=>"#"+t.toLowerCase().replace(/[^a-z0-9]+/g,"")).filter(x=>x.length>1).join(" ");
+        return `${v.title}\n\n${blurb}\n\n▶ Full video on 34VaultVideo\n${tl}`;
+      }
+      function download(blob,name){
+        const u=URL.createObjectURL(blob); const a=document.createElement("a");
+        a.href=u; a.download=name; document.body.appendChild(a); a.click();
+        setTimeout(()=>{ a.remove(); URL.revokeObjectURL(u); },1000);
+      }
+      // opts: {mode:"ig"|"tw", start, duration, censor, bgColor, topLines, charImg, onTick}
+      async function renderClip(opts){
+        if(!v.r2Key) throw new Error("This video isn't hosted yet — play it once, then try.");
+        if(!window.MediaRecorder) throw new Error("Your browser can't record video (no MediaRecorder).");
+        const src=document.createElement("video");
+        src.playsInline=true; src.preload="auto"; src.style.display="none";
+        src.src=`/clipsrc?key=${encodeURIComponent(v.r2Key)}`;
+        document.body.appendChild(src);
+        try{
+          await new Promise((res,rej)=>{ src.onloadedmetadata=res; src.onerror=()=>rej(new Error("Couldn't load the video source.")); });
+          await new Promise((res)=>{ src.onseeked=res; try{ src.currentTime=Math.min(opts.start,(src.duration||1)-0.2); }catch(e){ res(); } });
+          const W=opts.mode==="ig"?1080:1280, H=opts.mode==="ig"?1920:720;
+          const cv=document.createElement("canvas"); cv.width=W; cv.height=H;
+          const ctx=cv.getContext("2d");
+          const cstream=cv.captureStream(30);
+          let stream=cstream;
+          try{
+            const cap=src.captureStream?src.captureStream():(src.mozCaptureStream&&src.mozCaptureStream());
+            const at=cap&&cap.getAudioTracks?cap.getAudioTracks():[];
+            if(at.length) stream=new MediaStream([...cstream.getVideoTracks(),...at]);
+          }catch(e){}
+          const mime=pickMime();
+          const rec=new MediaRecorder(stream, mime?{mimeType:mime,videoBitsPerSecond:6000000}:undefined);
+          const chunks=[]; rec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+          const stopped=new Promise(r=>rec.onstop=r);
+          let raf;
+          const draw=()=>{
+            if(opts.mode==="ig"){
+              ctx.fillStyle=opts.bgColor; ctx.fillRect(0,0,W,H);
+              const cw=W-80, ch=cw*(src.videoHeight/src.videoWidth||0.5625), cy=(H-ch)/2;
+              ctx.save(); if(opts.censor) ctx.filter="blur(14px)";
+              ctx.drawImage(src,40,cy,cw,ch); ctx.restore();
+              if(opts.charImg){ const chH=660, cW=opts.charImg.width*chH/opts.charImg.height; ctx.drawImage(opts.charImg,W-cW-24,H-chH-20,cW,chH); }
+              ctx.fillStyle="#111"; ctx.textAlign="center"; ctx.textBaseline="alphabetic"; ctx.font="bold 72px "+CLIP_FONT_STACK;
+              (opts.topLines||[]).forEach((ln,i)=>ctx.fillText(ln,W/2,250+i*90));
+            } else {
+              ctx.fillStyle="#000"; ctx.fillRect(0,0,W,H);
+              const s=Math.min(W/src.videoWidth,H/src.videoHeight)||1, dw=src.videoWidth*s, dh=src.videoHeight*s;
+              ctx.save(); if(opts.censor) ctx.filter="blur(12px)";
+              ctx.drawImage(src,(W-dw)/2,(H-dh)/2,dw,dh); ctx.restore();
+              ctx.font="bold 34px "+CLIP_FONT_STACK; ctx.textAlign="center"; ctx.fillStyle="rgba(255,255,255,.92)";
+              ctx.fillText("34VAULTVIDEO.COM",W/2,H-28);
+            }
+            raf=requestAnimationFrame(draw);
+          };
+          rec.start(); await src.play().catch(()=>{}); draw();
+          const t0=Date.now();
+          await new Promise(res=>{ const iv=setInterval(()=>{ const el=(Date.now()-t0)/1000; if(opts.onTick)opts.onTick(el); if(el>=opts.duration){ clearInterval(iv); res(); } },200); });
+          cancelAnimationFrame(raf); rec.stop(); src.pause();
+          await stopped;
+          const ext=mime.indexOf("mp4")>=0?"mp4":"webm";
+          return { blob:new Blob(chunks,{type:mime||"video/webm"}), ext };
+        } finally { try{ src.remove(); }catch(e){} }
+      }
+
       document.getElementById("veClipUseTime").addEventListener("click",()=>{
         document.getElementById("veClipStart").value=Math.floor(vid.currentTime||0);
       });
       document.getElementById("veClipGo").addEventListener("click",async()=>{
         const goB=document.getElementById("veClipGo"), m=document.getElementById("veClipMsg");
-        goB.disabled=true; m.className="v-edit-msg"; m.textContent="Rendering… this takes ~30-90s, hang on.";
+        const dur=Math.min(30,Math.max(3,parseInt(document.getElementById("veClipDur").value,10)||10));
+        goB.disabled=true; m.className="v-edit-msg"; m.textContent="Recording in your browser…";
         try{
-          const r=await fetch(`${API}/api/admin/videos/${v.id}/clip`,{method:"POST",credentials:"include",
-            headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({
-              start:parseInt(document.getElementById("veClipStart").value,10)||0,
-              duration:parseInt(document.getElementById("veClipDur").value,10)||10,
-              censor:document.getElementById("veClipBlur").checked,
-            })});
-          const d=await r.json();
-          if(!r.ok) throw new Error(d.error||"Failed");
-          m.className="v-edit-msg ok";
-          m.innerHTML=`Done (${(d.sizeBytes/1048576).toFixed(1)} MB) — <a href="${esc(d.clipUrl)}" target="_blank" rel="noopener" style="color:var(--accent)">open / download clip</a>`;
+          const out=await renderClip({mode:"tw",start:parseInt(document.getElementById("veClipStart").value,10)||0,duration:dur,censor:document.getElementById("veClipBlur").checked,onTick:e=>{m.textContent=`Recording… ${e.toFixed(0)}/${dur}s`;}});
+          download(out.blob,`34vault-clip-${v.sourceId}.${out.ext}`);
+          m.className="v-edit-msg ok"; m.textContent=`Done — downloaded (${(out.blob.size/1048576).toFixed(1)} MB${out.ext==="webm"?", webm":""}).`;
         }catch(e){ m.className="v-edit-msg err"; m.textContent=e.message||"Failed"; }
         finally{ goB.disabled=false; }
       });
 
-      // ── Instagram meme Reel: 3-panel format from this clip ──
-      let igCharB64=null;
+      // ── Instagram meme Reel: 3-panel format, rendered in-browser ──
+      let igCharImg=null;
       document.getElementById("veIgChar").addEventListener("click",()=>document.getElementById("veIgCharFile").click());
       document.getElementById("veIgCharFile").addEventListener("change",()=>{
         const f=document.getElementById("veIgCharFile").files[0];
@@ -638,28 +710,19 @@ async function load(){
         if(!f) return;
         if(!/^image\/(png|jpeg)$/.test(f.type)){ document.getElementById("veIgMsg").className="v-edit-msg err"; document.getElementById("veIgMsg").textContent="PNG or JPEG only."; return; }
         const fr=new FileReader();
-        fr.onload=()=>{ igCharB64=fr.result; document.getElementById("veIgCharName").textContent="✓ "+f.name; };
+        fr.onload=()=>{ const im=new Image(); im.onload=()=>{ igCharImg=im; document.getElementById("veIgCharName").textContent="✓ "+f.name; }; im.src=fr.result; };
         fr.readAsDataURL(f);
       });
       document.getElementById("veIgGo").addEventListener("click",async()=>{
         const goB=document.getElementById("veIgGo"), m=document.getElementById("veIgMsg"), cap=document.getElementById("veIgCaption");
-        goB.disabled=true; m.className="v-edit-msg"; m.textContent="Rendering the Reel… ~30-90s.";
+        const dur=Math.min(30,Math.max(3,parseInt(document.getElementById("veClipDur").value,10)||10));
+        goB.disabled=true; m.className="v-edit-msg"; m.textContent="Recording the Reel in your browser…";
         try{
-          const body={
-            template:document.getElementById("veIgTpl").value,
-            topText:document.getElementById("veIgTop").value.replace(/\s*\/\s*/g,"\n"),
-            start:parseInt(document.getElementById("veClipStart").value,10)||0,
-            duration:parseInt(document.getElementById("veClipDur").value,10)||10,
-            censor:document.getElementById("veIgBlur").checked,
-          };
-          if(igCharB64) body.characterBase64=igCharB64;
-          const r=await fetch(`${API}/api/admin/videos/${v.id}/ig-clip`,{method:"POST",credentials:"include",
-            headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-          const d=await r.json();
-          if(!r.ok) throw new Error(d.error||"Failed");
-          m.className="v-edit-msg ok";
-          m.innerHTML=`Done (${(d.sizeBytes/1048576).toFixed(1)} MB) — <a href="${esc(d.clipUrl)}" target="_blank" rel="noopener" style="color:var(--accent)">open / download Reel</a>`;
-          if(d.caption){ cap.style.display="block"; cap.value=d.caption; }
+          const topLines=document.getElementById("veIgTop").value.split(/\s*\/\s*|\n/).map(s=>s.trim()).filter(Boolean).slice(0,3);
+          const out=await renderClip({mode:"ig",start:parseInt(document.getElementById("veClipStart").value,10)||0,duration:dur,censor:document.getElementById("veIgBlur").checked,bgColor:IG_BG[document.getElementById("veIgTpl").value]||IG_BG.cork,topLines,charImg:igCharImg,onTick:e=>{m.textContent=`Recording… ${e.toFixed(0)}/${dur}s`;}});
+          download(out.blob,`34vault-reel-${v.sourceId}.${out.ext}`);
+          m.className="v-edit-msg ok"; m.textContent=`Done — downloaded (${(out.blob.size/1048576).toFixed(1)} MB${out.ext==="webm"?", webm — Chrome exports mp4":""}).`;
+          cap.style.display="block"; cap.value=buildCaptionClient();
         }catch(e){ m.className="v-edit-msg err"; m.textContent=e.message||"Failed"; }
         finally{ goB.disabled=false; }
       });
