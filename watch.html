@@ -762,11 +762,12 @@ async function load(){
         return nsfw>0.30 || p.Hentai>0.25 || p.Porn>0.15 || nsfw>safe; }
       // opts: {mode, start, duration, scenes, skip, autoSkip, crop, size, censor, bgColor, topLines, emojiImg, charImg, onTick, onScan, onModel, onVerify, onIntro}
       async function renderClip(opts){
-        if(!v.r2Key) throw new Error("This video isn't hosted yet — play it once, then try.");
+        if(!v.r2Key && !v.slug) throw new Error("This video can't be processed (no source).");
         if(!window.MediaRecorder) throw new Error("Your browser can't record video (no MediaRecorder).");
         const src=document.createElement("video");
         src.playsInline=true; src.preload="auto"; src.style.display="none"; src.crossOrigin="anonymous";
-        src.src=`/clipsrc?key=${encodeURIComponent(v.r2Key)}`;
+        // Uploaded videos have an R2 key; aggregated ones don't — proxy the API stream by slug.
+        src.src = v.r2Key ? `/clipsrc?key=${encodeURIComponent(v.r2Key)}` : `/clipsrc?slug=${encodeURIComponent(v.slug)}`;
         document.body.appendChild(src);
         try{
           // Kick loading by PLAYING first — browsers defer media load until play(),
@@ -891,37 +892,44 @@ async function load(){
             }
             scanSamp=samp; // draw() reads this to crop only flagged moments (cropnsfw)
             try{ console.log("[reel SFW] scan", samp.map(s=>({t:+s.t.toFixed(1), H:+(((s.p||{}).Hentai)||0).toFixed(2), P:+(((s.p||{}).Porn)||0).toFixed(2), Se:+(((s.p||{}).Sexy)||0).toFixed(2), Dr:+(((s.p||{}).Drawing)||0).toFixed(2), skin:+s.skin.toFixed(2), bad:s.unsafe}))); }catch(e){}
-            // One distinct scene per time-bucket, spread across the whole video.
+            // One distinct scene per time-bucket, spread across the whole video. In each
+            // bucket take the LONGEST clean run and use up to segDur of it — if the clean
+            // stretch is shorter than segDur we use the shorter piece rather than dropping
+            // the whole scene (that's why "4 scenes" was collapsing to 2). cropnsfw takes
+            // the lowest-risk spot regardless and crops the flagged moments.
             const requireClean = opts.crop!=="cropnsfw";
-            const chosen=[];
+            const chosen=[]; // {t,len}
             for(let b=0;b<scenes;b++){
-              const lo=introSkip+span*(b/scenes), hiStart=Math.max(lo, introSkip+span*((b+1)/scenes)-segDur);
-              let best=null;
-              for(const s of samp){
-                if(s.t<lo||s.t>hiStart) continue;
-                const w=samp.filter(x=>x.t>=s.t&&x.t<s.t+segDur); if(!w.length) continue;
-                if(requireClean && w.some(x=>x.unsafe)) continue;
-                const avg=w.reduce((a,x)=>a+x.risk,0)/w.length;
-                if(!best||avg<best.avg) best={t:s.t,avg};
-              }
-              if(best) chosen.push(best.t);
+              const lo=introSkip+span*(b/scenes), hi=introSkip+span*((b+1)/scenes);
+              const region=samp.filter(s=>s.t>=lo&&s.t<hi);
+              if(!region.length) continue;
+              if(!requireClean){ let best=region[0]; for(const s of region) if(s.risk<best.risk) best=s; chosen.push({t:best.t,len:segDur}); continue; }
+              // clean runs inside this bucket
+              const runs=[]; let cur=null;
+              for(const s of region){ if(!s.unsafe){ if(!cur) cur={start:s.t,end:s.t,risk:s.risk,n:1}; else{ cur.end=s.t; cur.risk+=s.risk; cur.n++; } } else if(cur){ runs.push(cur); cur=null; } }
+              if(cur) runs.push(cur);
+              if(!runs.length) continue; // whole bucket explicit
+              for(const r of runs){ r.end=Math.min(r.end+step,hi,total-0.2); r.len=r.end-r.start; r.avg=r.risk/r.n; }
+              runs.sort((a,b)=> (b.len-a.len)||(a.avg-b.avg)); // longest, then cleanest
+              chosen.push({t:runs[0].start, len:Math.max(0.8,Math.min(segDur,runs[0].len))});
             }
-            chosen.sort((a,b)=>a-b);
-            // sfw: fine end-to-end verify each scene, drop any that isn't clean throughout.
-            let finalSegs=chosen;
+            chosen.sort((a,b)=>a.t-b.t);
+            // sfw: fine end-to-end verify each scene, truncate at the first unsafe frame.
+            let final=chosen;
             if(requireClean){
               const vs=[];
               for(let k=0;k<chosen.length;k++){
                 if(opts.onVerify) opts.onVerify(k+1,chosen.length);
-                let ok=true; for(let t=chosen[k]; t<chosen[k]+segDur; t+=0.5){ await seekVid(src,t); if((await analyzeFrame()).unsafe){ ok=false; break; } }
-                if(ok) vs.push(chosen[k]);
+                let safeLen=0; for(let t=chosen[k].t; t<chosen[k].t+chosen[k].len; t+=0.5){ await seekVid(src,t); if((await analyzeFrame()).unsafe) break; safeLen=(t+0.5)-chosen[k].t; }
+                safeLen=Math.min(safeLen,chosen[k].len);
+                if(safeLen>=0.8) vs.push({t:chosen[k].t,len:safeLen});
               }
-              finalSegs=vs;
+              final=vs;
             }
-            try{ console.log("[reel SFW] buckets→final", chosen.map(t=>+t.toFixed(1)), "→", finalSegs.map(t=>+t.toFixed(1))); }catch(e){}
-            if(!finalSegs.length) throw new Error("No clean scene found in this video — it's too explicit throughout. Try another video, or use Crop NSFW / Full frame + Blur.");
-            segs=finalSegs; segLens=finalSegs.map(()=>segDur); // equal lengths, evenly spread
-            if(opts.onScan) opts.onScan(N,N,finalSegs.length);
+            try{ console.log("[reel SFW] buckets→final", chosen.map(c=>+c.t.toFixed(1)), "→", final.map(c=>({t:+c.t.toFixed(1),len:+c.len.toFixed(1)}))); }catch(e){}
+            if(!final.length) throw new Error("No clean scene found in this video — it's too explicit throughout. Try another video, or use Crop NSFW / Full frame + Blur.");
+            segs=final.map(c=>c.t); segLens=final.map(c=>c.len);
+            if(opts.onScan) opts.onScan(N,N,final.length);
           } else if(scenes<=1){ segs=[Math.max(opts.start||0,introSkip)]; segDur=Math.max(1,opts.duration/segs.length); }
           else { const lo=introSkip, hi=Math.max(lo+winDur,total-winDur); segs=[]; for(let i=0;i<scenes;i++) segs.push(lo+(hi-lo)*(i/(scenes-1))); segs.sort((a,b)=>a-b); segDur=Math.max(1,opts.duration/segs.length); }
           // Build the play list. Normally we play each clean scene once. If "Loop to
