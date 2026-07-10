@@ -523,6 +523,29 @@ async function load(){
           </div>
           <div class="v-edit-msg" id="veClipMsg" style="margin-top:6px"></div>
         </div>
+        <div>
+          <label>Instagram meme clip <span style="text-transform:none;font-weight:600">(3-panel Reel: caption · clip · character — uses Start/Length above)</span></label>
+          <div class="v-edit-row">
+            <div>
+              <label>Template</label>
+              <select id="veIgTpl" style="width:100%;height:40px;background:var(--bg);border:1px solid var(--border);border-radius:9px;color:var(--text);font-size:13.5px;padding:0 10px;font-family:inherit">
+                <option value="cork">Pink cork</option>
+                <option value="plaster">Gray plaster</option>
+                <option value="kraft">Tan kraft</option>
+              </select>
+            </div>
+            <div><label>Top caption <span style="text-transform:none;font-weight:600">(one line each)</span></label><input type="text" id="veIgTop" placeholder="Nothing Is Perfect / Me :-" /></div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+            <button class="v-edit-cancel" id="veIgChar" type="button" style="height:32px;padding:0 12px;font-size:11.5px">🧍 Character PNG</button>
+            <span id="veIgCharName" style="font-size:11px;color:var(--muted)"></span>
+            <input type="file" id="veIgCharFile" accept="image/png,image/jpeg" style="display:none" />
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:700;cursor:pointer"><input type="checkbox" id="veIgBlur" style="width:auto;height:auto;accent-color:var(--accent)" /> Blur clip</label>
+            <button class="v-edit-save" id="veIgGo" type="button" style="height:32px;padding:0 14px;font-size:11.5px">📱 Generate Reel</button>
+          </div>
+          <div class="v-edit-msg" id="veIgMsg" style="margin-top:6px"></div>
+          <textarea id="veIgCaption" readonly placeholder="Suggested caption appears here after generating" style="display:none;width:100%;margin-top:8px;min-height:90px;background:var(--bg);border:1px solid var(--border);border-radius:9px;color:var(--text);font-size:12px;line-height:1.5;padding:10px;font-family:inherit;resize:vertical"></textarea>
+        </div>
         <div class="v-edit-msg" id="veMsg"></div>
         <div class="v-edit-actions">
           <button class="v-edit-cancel" id="veCancel" type="button">Cancel</button>
@@ -605,6 +628,42 @@ async function load(){
         }catch(e){ m.className="v-edit-msg err"; m.textContent=e.message||"Failed"; }
         finally{ goB.disabled=false; }
       });
+
+      // ── Instagram meme Reel: 3-panel format from this clip ──
+      let igCharB64=null;
+      document.getElementById("veIgChar").addEventListener("click",()=>document.getElementById("veIgCharFile").click());
+      document.getElementById("veIgCharFile").addEventListener("change",()=>{
+        const f=document.getElementById("veIgCharFile").files[0];
+        document.getElementById("veIgCharFile").value="";
+        if(!f) return;
+        if(!/^image\/(png|jpeg)$/.test(f.type)){ document.getElementById("veIgMsg").className="v-edit-msg err"; document.getElementById("veIgMsg").textContent="PNG or JPEG only."; return; }
+        const fr=new FileReader();
+        fr.onload=()=>{ igCharB64=fr.result; document.getElementById("veIgCharName").textContent="✓ "+f.name; };
+        fr.readAsDataURL(f);
+      });
+      document.getElementById("veIgGo").addEventListener("click",async()=>{
+        const goB=document.getElementById("veIgGo"), m=document.getElementById("veIgMsg"), cap=document.getElementById("veIgCaption");
+        goB.disabled=true; m.className="v-edit-msg"; m.textContent="Rendering the Reel… ~30-90s.";
+        try{
+          const body={
+            template:document.getElementById("veIgTpl").value,
+            topText:document.getElementById("veIgTop").value.replace(/\s*\/\s*/g,"\n"),
+            start:parseInt(document.getElementById("veClipStart").value,10)||0,
+            duration:parseInt(document.getElementById("veClipDur").value,10)||10,
+            censor:document.getElementById("veIgBlur").checked,
+          };
+          if(igCharB64) body.characterBase64=igCharB64;
+          const r=await fetch(`${API}/api/admin/videos/${v.id}/ig-clip`,{method:"POST",credentials:"include",
+            headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+          const d=await r.json();
+          if(!r.ok) throw new Error(d.error||"Failed");
+          m.className="v-edit-msg ok";
+          m.innerHTML=`Done (${(d.sizeBytes/1048576).toFixed(1)} MB) — <a href="${esc(d.clipUrl)}" target="_blank" rel="noopener" style="color:var(--accent)">open / download Reel</a>`;
+          if(d.caption){ cap.style.display="block"; cap.value=d.caption; }
+        }catch(e){ m.className="v-edit-msg err"; m.textContent=e.message||"Failed"; }
+        finally{ goB.disabled=false; }
+      });
+
       document.getElementById("veCancel").addEventListener("click",()=>{ form.classList.remove("on"); btn.style.display="flex"; pendingThumbB64=null; });
 
       // "Use current frame" — grabs whatever the LIVE <video> is showing right now.
