@@ -526,7 +526,7 @@ async function load(){
           <div class="v-edit-msg" id="veClipMsg" style="margin-top:6px"></div>
         </div>
         <div>
-          <label>Instagram meme clip <span style="text-transform:none;font-weight:600">(3-panel Reel: caption · clip · character — uses Start/Length above)</span></label>
+          <label>Instagram meme clip <span style="text-transform:none;font-weight:600">(3-panel Reel: caption · clip · character · emoji — auto-skips intros, crops NSFW per-scene)</span></label>
           <div class="v-edit-row">
             <div>
               <label>Template</label>
@@ -547,9 +547,20 @@ async function load(){
             </div>
           </div>
           <div class="v-edit-row" style="margin-top:8px">
-            <div><label>Scenes</label><select id="veIgScenes" style="width:100%;height:36px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12.5px;padding:0 8px;font-family:inherit"><option value="1">1 scene</option><option value="2">2 scenes</option><option value="3">3 scenes</option></select></div>
-            <div><label>Framing</label><select id="veIgCrop" style="width:100%;height:36px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12.5px;padding:0 8px;font-family:inherit"><option value="fit">Fit (whole frame)</option><option value="fill">Fill (zoom to frame)</option><option value="top">Hide bottom (NSFW-cut)</option></select></div>
-            <div><label>Skip intro (sec)</label><input type="number" id="veIgSkip" min="0" value="0" /></div>
+            <div><label>Scenes</label><select id="veIgScenes" style="width:100%;height:36px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12.5px;padding:0 8px;font-family:inherit"><option value="1">1 scene</option><option value="2">2 scenes</option><option value="3" selected>3 scenes</option><option value="4">4 scenes</option></select></div>
+            <div><label>Framing</label><select id="veIgCrop" style="width:100%;height:36px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12.5px;padding:0 8px;font-family:inherit"><option value="fit">Fit (whole frame)</option><option value="fill">Fill (zoom to frame)</option><option value="smart">Smart (auto-crop NSFW)</option><option value="top">Hide bottom (NSFW-cut)</option></select></div>
+            <div><label>Reel size</label><select id="veIgSize" style="width:100%;height:36px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12.5px;padding:0 8px;font-family:inherit"><option value="small">Small band</option><option value="medium" selected>Medium band</option><option value="large">Large band</option></select></div>
+          </div>
+          <div style="margin-top:8px">
+            <label>Emoji <span style="text-transform:none;font-weight:600">(shows under the caption, meme-style)</span></label>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <input type="text" id="veIgEmoji" placeholder="🫤" maxlength="6" style="width:74px;text-align:center;font-size:20px" />
+              <span id="veIgEmojiPicks" style="display:inline-flex;gap:4px;flex-wrap:wrap"></span>
+            </div>
+          </div>
+          <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:8px">
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:700;cursor:pointer"><input type="checkbox" id="veIgAutoSkip" checked style="width:auto;height:auto;accent-color:var(--accent)" /> Auto-skip intro/title card</label>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:700">Skip intro (sec)<input type="number" id="veIgSkip" min="0" value="0" style="width:64px;height:32px" /></label>
           </div>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px">
             <select id="veCharPreset" style="flex:1;min-width:120px;height:32px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;padding:0 8px;font-family:inherit"><option value="">Character presets…</option></select>
@@ -674,7 +685,19 @@ async function load(){
         a.href=u; a.download=name; document.body.appendChild(a); a.click();
         setTimeout(()=>{ a.remove(); URL.revokeObjectURL(u); },1000);
       }
-      // opts: {mode:"ig"|"tw", start, duration, censor, bgColor, topLines, charImg, onTick}
+      // ── frame analysis (shared 64x36 sampler; source is same-origin so readable) ──
+      const _anc=document.createElement("canvas"); _anc.width=64; _anc.height=36; const _anx=_anc.getContext("2d");
+      function seekVid(sv,t){ return new Promise(res=>{ const to=setTimeout(res,3500); sv.addEventListener("seeked",()=>{clearTimeout(to);res();},{once:true}); try{ sv.currentTime=Math.min(Math.max(0,t),(sv.duration||1)-0.2); }catch(e){ clearTimeout(to); res(); } }); }
+      function skinRatioNow(sv){ try{ _anx.drawImage(sv,0,0,64,36); const d=_anx.getImageData(0,0,64,36).data; let s=0,n=0; for(let p=0;p<d.length;p+=4){ const r=d[p],g=d[p+1],b=d[p+2]; n++; if(r>95&&g>40&&b>20&&r>g&&r>b&&Math.abs(r-g)>15&&(Math.max(r,g,b)-Math.min(r,g,b))>15) s++; } return s/(n||1); }catch(e){ return 0; } }
+      function frameStats(sv){ try{ _anx.drawImage(sv,0,0,64,36); const d=_anx.getImageData(0,0,64,36).data; let sum=0,rS=0,gS=0,bS=0,n=0; for(let p=0;p<d.length;p+=4){ const r=d[p],g=d[p+1],b=d[p+2]; sum+=(r+g+b)/3; rS+=r;gS+=g;bS+=b; n++; } return {bright:sum/n, spread:Math.abs(rS/n-gS/n)+Math.abs(gS/n-bS/n)+Math.abs(rS/n-bS/n)}; }catch(e){ return {bright:100,spread:100}; } }
+      // First timestamp that looks like real video vs an intro/title/warning card
+      // (those are dark + low colour spread). Best-effort; returns 0 if unsure.
+      async function detectIntroEnd(sv){
+        const limit=Math.min(20,(sv.duration||0)*0.5);
+        for(let t=0;t<=limit;t+=0.6){ await seekVid(sv,t); const st=frameStats(sv); if(st.bright>55||st.spread>22) return t; }
+        return 0;
+      }
+      // opts: {mode, start, duration, scenes, skip, autoSkip, crop, size, censor, bgColor, topLines, emoji, charImg, onTick}
       async function renderClip(opts){
         if(!v.r2Key) throw new Error("This video isn't hosted yet — play it once, then try.");
         if(!window.MediaRecorder) throw new Error("Your browser can't record video (no MediaRecorder).");
@@ -717,7 +740,7 @@ async function load(){
           //  top  = show top ~66% (crops the bottom, where explicit content usually is)
           function drawFrame(dx,dy,dw,dh){
             const sw=src.videoWidth,sh=src.videoHeight; if(!sw||!sh) return;
-            const crop=opts.crop||"fit";
+            const crop=curCrop;
             ctx.save(); if(opts.censor) ctx.filter="blur("+(opts.mode==="ig"?14:12)+"px)";
             if(crop==="fit"){
               let w=dw,h=dw*sh/sw; if(h>dh){ h=dh; w=dh*sw/sh; }
@@ -733,7 +756,13 @@ async function load(){
             }
             ctx.restore();
           }
-          const igBandW=W-80, igBandH=(opts.crop==="fill"||opts.crop==="top")?900:Math.round((W-80)*9/16), igBandY=Math.round((H-igBandH)/2);
+          // Reel size = how tall the video band is; "cover" modes (fill/top/smart)
+          // let us pick a height freely, "fit" stays true 16:9.
+          const sizeMap={small:680,medium:860,large:1040};
+          const useCover=(opts.crop==="fill"||opts.crop==="top"||opts.crop==="smart");
+          const igBandW=W-80, igBandH=useCover?(sizeMap[opts.size]||860):Math.round((W-80)*9/16), igBandY=Math.round((H-igBandH)/2);
+          // curCrop is mutable so "smart" mode can switch per-scene (see loop below).
+          let curCrop=(opts.crop==="smart")?"fill":(opts.crop||"fit");
           const draw=()=>{
             if(opts.mode==="ig"){
               ctx.fillStyle=opts.bgColor; ctx.fillRect(0,0,W,H);
@@ -741,6 +770,7 @@ async function load(){
               if(opts.charImg){ const bottomSpace=H-(igBandY+igBandH); const chH=Math.max(340,Math.min(660,bottomSpace-8)); const cW=opts.charImg.width*chH/opts.charImg.height; ctx.drawImage(opts.charImg,W-cW-24,H-chH-16,cW,chH); }
               ctx.fillStyle="#111"; ctx.textAlign="center"; ctx.textBaseline="alphabetic"; ctx.font="bold 72px "+CLIP_FONT_STACK;
               (opts.topLines||[]).forEach((ln,i)=>ctx.fillText(ln,W/2,200+i*90));
+              if(opts.emoji){ const ey=200+((opts.topLines||[]).length)*90+120; ctx.font="130px "+CLIP_FONT_STACK; ctx.fillText(opts.emoji,W/2,ey); }
             } else {
               ctx.fillStyle="#000"; ctx.fillRect(0,0,W,H);
               drawFrame(0,0,W,H);
@@ -749,14 +779,25 @@ async function load(){
             }
             raf=requestAnimationFrame(draw);
           };
-          // One or more scenes: play each segment back-to-back while recording the
-          // canvas continuously — the seeks between them read as clean cuts.
+          // Work out where to start (skip intro/title card) then spread the scenes
+          // evenly across the rest of the video, always in chronological order.
+          let introSkip=Math.max(0,opts.skip||0);
+          if(opts.autoSkip){ try{ const d=await detectIntroEnd(src); introSkip=Math.max(introSkip,d); if(opts.onIntro) opts.onIntro(introSkip); }catch(e){} }
+          const scenes=Math.max(1,Math.min(4,opts.scenes||1));
+          const total=src.duration||0, segDur=Math.max(1,opts.duration/scenes);
+          let segs;
+          if(scenes<=1){ segs=[Math.max(opts.start||0,introSkip)]; }
+          else { const lo=introSkip, hi=Math.max(lo+segDur,total-segDur); segs=[]; for(let i=0;i<scenes;i++) segs.push(lo+(hi-lo)*(i/(scenes-1))); }
+          segs.sort((a,b)=>a-b);
+          // Play each segment back-to-back while recording the canvas continuously —
+          // the seeks between them read as clean cuts.
           rec.start(); draw();
-          const segs=(opts.segments&&opts.segments.length)?opts.segments:[opts.start||0];
-          const segDur=Math.max(1,opts.duration/segs.length);
           const gt0=Date.now();
           for(const st of segs){
-            await new Promise(res=>{ const to=setTimeout(res,3500); src.addEventListener("seeked",()=>{clearTimeout(to);res();},{once:true}); try{ src.currentTime=Math.min(Math.max(0,st),(src.duration||1)-0.2); }catch(e){ clearTimeout(to); res(); } });
+            await seekVid(src,st);
+            // Smart framing: only the scenes that actually look explicit get the
+            // top-crop (hides the bottom); tamer scenes stay full-cover.
+            if(opts.crop==="smart") curCrop = skinRatioNow(src)>0.16 ? "top" : "fill";
             await src.play().catch(()=>{});
             const st0=Date.now();
             await new Promise(res=>{ const iv=setInterval(()=>{ if(opts.onTick)opts.onTick((Date.now()-gt0)/1000); if(Date.now()-st0>=segDur*1000){ clearInterval(iv); res(); } },150); });
@@ -873,22 +914,35 @@ async function load(){
         goB.disabled=true; m.className="v-edit-msg"; m.textContent="Recording the Reel in your browser…";
         try{
           const topLines=document.getElementById("veIgTop").value.split(/\s*\/\s*|\n/).map(s=>s.trim()).filter(Boolean).slice(0,3);
-          const scenes=Math.max(1,Math.min(3,parseInt(document.getElementById("veIgScenes").value,10)||1));
+          const scenes=Math.max(1,Math.min(4,parseInt(document.getElementById("veIgScenes").value,10)||1));
           const skip=Math.max(0,parseInt(document.getElementById("veIgSkip").value,10)||0);
+          const autoSkip=document.getElementById("veIgAutoSkip").checked;
           const crop=document.getElementById("veIgCrop").value||"fit";
+          const size=document.getElementById("veIgSize").value||"medium";
+          const emoji=(document.getElementById("veIgEmoji").value||"").trim();
           const start=Math.max(parseInt(document.getElementById("veClipStart").value,10)||0, skip);
-          let segments=[start];
-          if(scenes>1){
-            const total=v.duration||0, segDur=dur/scenes, lo=skip, hi=Math.max(lo+segDur, total-segDur);
-            segments=[]; for(let i=0;i<scenes;i++) segments.push(Math.round(lo+(hi-lo)*(scenes>1?i/(scenes-1):0)));
-          }
-          const out=await renderClip({mode:"ig",start,segments,crop,duration:dur,censor:document.getElementById("veIgBlur").checked,bgColor:IG_BG[document.getElementById("veIgTpl").value]||IG_BG.cork,topLines,charImg:igCharImg,onTick:e=>{m.textContent=`Recording… ${e.toFixed(0)}/${dur}s`;}});
+          // renderClip does the intro detection, chronological scene spread and
+          // per-scene smart crop itself — we just hand it the settings.
+          const out=await renderClip({mode:"ig",start,scenes,skip,autoSkip,crop,size,emoji,duration:dur,censor:document.getElementById("veIgBlur").checked,bgColor:IG_BG[document.getElementById("veIgTpl").value]||IG_BG.cork,topLines,charImg:igCharImg,
+            onIntro:s=>{ if(s>0.5) m.textContent=`Skipping ~${s.toFixed(0)}s intro…`; },
+            onTick:e=>{m.textContent=`Recording… ${e.toFixed(0)}/${dur}s`;}});
           download(out.blob,`34vault-reel-${v.sourceId}.${out.ext}`);
           m.className="v-edit-msg ok"; m.textContent=`Done — downloaded (${(out.blob.size/1048576).toFixed(1)} MB${out.ext==="webm"?", webm — Chrome exports mp4":""}).`;
           cap.style.display="block"; cap.value=buildCaptionClient();
         }catch(e){ m.className="v-edit-msg err"; m.textContent=e.message||"Failed"; }
         finally{ goB.disabled=false; }
       });
+
+      // Emoji quick-picks — one tap drops a meme-style emoji into the field.
+      (function(){
+        const picks=["🫤","😳","😱","💀","🤨","👀","😭","🥵","😩","🙃"];
+        const wrap=document.getElementById("veIgEmojiPicks"), inp=document.getElementById("veIgEmoji");
+        if(!wrap||!inp) return;
+        picks.forEach(e=>{ const b=document.createElement("button"); b.type="button"; b.textContent=e;
+          b.style.cssText="height:32px;min-width:34px;font-size:18px;background:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer;line-height:1";
+          b.addEventListener("click",()=>{ inp.value = inp.value.trim()===e ? "" : e; });
+          wrap.appendChild(b); });
+      })();
 
       document.getElementById("veCancel").addEventListener("click",()=>{ form.classList.remove("on"); btn.style.display="flex"; pendingThumbB64=null; });
 
