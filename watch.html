@@ -892,41 +892,43 @@ async function load(){
             }
             scanSamp=samp; // draw() reads this to crop only flagged moments (cropnsfw)
             try{ console.log("[reel SFW] scan", samp.map(s=>({t:+s.t.toFixed(1), H:+(((s.p||{}).Hentai)||0).toFixed(2), P:+(((s.p||{}).Porn)||0).toFixed(2), Se:+(((s.p||{}).Sexy)||0).toFixed(2), Dr:+(((s.p||{}).Drawing)||0).toFixed(2), skin:+s.skin.toFixed(2), bad:s.unsafe}))); }catch(e){}
-            // One distinct scene per time-bucket, spread across the whole video. In each
-            // bucket take the LONGEST clean run and use up to segDur of it — if the clean
-            // stretch is shorter than segDur we use the shorter piece rather than dropping
-            // the whole scene (that's why "4 scenes" was collapsing to 2). cropnsfw takes
-            // the lowest-risk spot regardless and crops the flagged moments.
             const requireClean = opts.crop!=="cropnsfw";
-            const chosen=[]; // {t,len}
-            for(let b=0;b<scenes;b++){
-              const lo=introSkip+span*(b/scenes), hi=introSkip+span*((b+1)/scenes);
-              const region=samp.filter(s=>s.t>=lo&&s.t<hi);
-              if(!region.length) continue;
-              if(!requireClean){ let best=region[0]; for(const s of region) if(s.risk<best.risk) best=s; chosen.push({t:best.t,len:segDur}); continue; }
-              // clean runs inside this bucket
+            let final=[]; // {t,len}
+            if(!requireClean){
+              // cropnsfw: one lowest-risk start per time-bucket across the whole video,
+              // full length; draw() crops the flagged moments.
+              for(let b=0;b<scenes;b++){ const lo=introSkip+span*(b/scenes), hi=introSkip+span*((b+1)/scenes);
+                const region=samp.filter(s=>s.t>=lo&&s.t<hi); if(!region.length) continue;
+                let best=region[0]; for(const s of region) if(s.risk<best.risk) best=s; final.push({t:best.t,len:segDur}); }
+            } else {
+              // sfw: gather ALL clean runs, then carve `scenes` sub-scenes out of them —
+              // round-robin (one per run per pass) so scenes come from DIFFERENT clean
+              // regions first (distinct/spread); when clean footage is localized (e.g. only
+              // the first 30s is clean) a run is split into several sub-scenes SPREAD across
+              // it, so they're still different moments, not one continuous shot.
               const runs=[]; let cur=null;
-              for(const s of region){ if(!s.unsafe){ if(!cur) cur={start:s.t,end:s.t,risk:s.risk,n:1}; else{ cur.end=s.t; cur.risk+=s.risk; cur.n++; } } else if(cur){ runs.push(cur); cur=null; } }
+              for(const s of samp){ if(!s.unsafe){ if(!cur) cur={start:s.t,end:s.t,risk:s.risk,n:1}; else{ cur.end=s.t; cur.risk+=s.risk; cur.n++; } } else if(cur){ runs.push(cur); cur=null; } }
               if(cur) runs.push(cur);
-              if(!runs.length) continue; // whole bucket explicit
-              for(const r of runs){ r.end=Math.min(r.end+step,hi,total-0.2); r.len=r.end-r.start; r.avg=r.risk/r.n; }
-              runs.sort((a,b)=> (b.len-a.len)||(a.avg-b.avg)); // longest, then cleanest
-              chosen.push({t:runs[0].start, len:Math.max(0.8,Math.min(segDur,runs[0].len))});
-            }
-            chosen.sort((a,b)=>a.t-b.t);
-            // sfw: fine end-to-end verify each scene, truncate at the first unsafe frame.
-            let final=chosen;
-            if(requireClean){
-              const vs=[];
-              for(let k=0;k<chosen.length;k++){
-                if(opts.onVerify) opts.onVerify(k+1,chosen.length);
-                let safeLen=0; for(let t=chosen[k].t; t<chosen[k].t+chosen[k].len; t+=0.5){ await seekVid(src,t); if((await analyzeFrame()).unsafe) break; safeLen=(t+0.5)-chosen[k].t; }
-                safeLen=Math.min(safeLen,chosen[k].len);
-                if(safeLen>=0.8) vs.push({t:chosen[k].t,len:safeLen});
+              for(const r of runs){ r.end=Math.min(r.end+step,total-0.2); r.len=r.end-r.start; r.avg=r.risk/r.n; }
+              const usable=runs.filter(r=>r.len>=1.0).sort((a,b)=> (a.avg-b.avg)||(b.len-a.len));
+              try{ console.log("[reel SFW] clean runs", usable.map(r=>({start:+r.start.toFixed(1),len:+r.len.toFixed(1),avg:+r.avg.toFixed(2)}))); }catch(e){}
+              if(!usable.length) throw new Error("No clean scene found in this video — it's too explicit throughout. Try another video, or use Crop NSFW / Full frame + Blur.");
+              const totalClean=usable.reduce((a,r)=>a+r.len,0);
+              const per=Math.max(0.8, Math.min(segDur, totalClean/scenes));
+              for(const r of usable) r.cap=Math.max(1,Math.floor(r.len/per));
+              const cnt=new Map(); let made=0;
+              while(made<scenes){ let any=false; for(const r of usable){ if(made>=scenes) break; const c=cnt.get(r)||0; if(c<r.cap){ cnt.set(r,c+1); made++; any=true; } } if(!any) break; }
+              const slots=[];
+              for(const r of usable){ const c=cnt.get(r)||0; if(!c) continue; const spacing=r.len/c, sub=Math.min(segDur,spacing); for(let j=0;j<c;j++) slots.push({start:r.start+j*spacing, len:sub}); }
+              slots.sort((a,b)=>a.start-b.start);
+              // fine verify each slot; truncate at the first unsafe frame
+              for(let k=0;k<slots.length;k++){ if(opts.onVerify) opts.onVerify(k+1,slots.length);
+                let safeLen=0; for(let t=slots[k].start; t<slots[k].start+slots[k].len; t+=0.5){ await seekVid(src,t); if((await analyzeFrame()).unsafe) break; safeLen=(t+0.5)-slots[k].start; }
+                safeLen=Math.min(safeLen,slots[k].len); if(safeLen>=0.8) final.push({t:slots[k].start,len:safeLen});
               }
-              final=vs;
             }
-            try{ console.log("[reel SFW] buckets→final", chosen.map(c=>+c.t.toFixed(1)), "→", final.map(c=>({t:+c.t.toFixed(1),len:+c.len.toFixed(1)}))); }catch(e){}
+            final.sort((a,b)=>a.t-b.t);
+            try{ console.log("[reel SFW] final", final.map(c=>({t:+c.t.toFixed(1),len:+c.len.toFixed(1)}))); }catch(e){}
             if(!final.length) throw new Error("No clean scene found in this video — it's too explicit throughout. Try another video, or use Crop NSFW / Full frame + Blur.");
             segs=final.map(c=>c.t); segLens=final.map(c=>c.len);
             if(opts.onScan) opts.onScan(N,N,final.length);
