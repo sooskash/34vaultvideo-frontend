@@ -854,6 +854,7 @@ async function load(){
           const total=src.duration||0;
           const winDur=Math.max(1,opts.duration/scenes);
           let segDur=winDur;
+          let segLens=null; // per-scene play lengths (sfw mode uses variable-length clean runs)
           let segs;
           if(opts.crop==="sfw"){
             // SFW mode REQUIRES the model — skin/brightness can't read furry/animated
@@ -885,42 +886,64 @@ async function load(){
             }
             // Diagnostics — if anything still slips, the console has the real numbers.
             try{ console.log("[reel SFW] scan", samp.map(s=>({t:+s.t.toFixed(1), H:+(((s.p||{}).Hentai)||0).toFixed(2), P:+(((s.p||{}).Porn)||0).toFixed(2), Se:+(((s.p||{}).Sexy)||0).toFixed(2), Dr:+(((s.p||{}).Drawing)||0).toFixed(2), skin:+s.skin.toFixed(2), bad:s.unsafe}))); }catch(e){}
-            // A window is a candidate only if EVERY sample inside it is safe.
-            const wins=samp.map(s=>{ const w=samp.filter(x=>x.t>=s.t&&x.t<s.t+winDur);
-              return { t:s.t, bad:w.some(x=>x.unsafe), avgRisk:w.reduce((a,x)=>a+x.risk,0)/(w.length||1) }; });
-            const cand=wins.filter(w=>!w.bad).sort((a,b)=> (a.avgRisk+(a.t/span)*0.03) - (b.avgRisk+(b.t/span)*0.03));
-            const gap=Math.max(winDur*0.9, span/(scenes*3||1));
-            const picked=[];
-            for(const w of cand){ if(picked.every(c=>Math.abs(c.t-w.t)>=gap)){ picked.push(w.t); if(picked.length>=scenes) break; } }
-            // Fine end-to-end verify: step through each picked window and drop it if any
-            // frame is unsafe (catches drift the coarse scan stepped over).
-            const verified=[];
-            for(let k=0;k<picked.length;k++){
-              if(opts.onVerify) opts.onVerify(k+1,picked.length);
-              let ok=true;
-              for(let t=picked[k]; t<picked[k]+winDur; t+=0.5){ await seekVid(src,t); if((await analyzeFrame()).unsafe){ ok=false; break; } }
-              if(ok) verified.push(picked[k]);
+            // Build CLEAN RUNS: maximal stretches of consecutive safe samples. This is
+            // what lets the reel FILL the chosen length — a long clean run can carry a
+            // whole scene (or be split into several), instead of everything collapsing
+            // to one 2.5s window.
+            const runs=[]; let cur=null;
+            for(const s of samp){
+              if(!s.unsafe){ if(!cur) cur={start:s.t,end:s.t,risk:s.risk,n:1}; else { cur.end=s.t; cur.risk+=s.risk; cur.n++; } }
+              else if(cur){ runs.push(cur); cur=null; }
             }
-            try{ console.log("[reel SFW] picked", picked.map(t=>+t.toFixed(1)), "→ verified", verified.map(t=>+t.toFixed(1))); }catch(e){}
-            if(!verified.length) throw new Error("No clean scene found in this video — it's too explicit throughout. Try another video, or use Full frame + Blur.");
-            verified.sort((a,b)=>a-b);
-            segs=verified;
-            if(opts.onScan) opts.onScan(N,N,verified.length);
-            segDur=winDur; // fixed per-scene length; fewer safe scenes → shorter (safe) reel
+            if(cur) runs.push(cur);
+            for(const r of runs){ r.end=Math.min(r.end+step,total-0.2); r.len=r.end-r.start; r.avg=r.risk/r.n; }
+            const usable=runs.filter(r=>r.len>=Math.min(1.2,winDur)).sort((a,b)=> (a.avg+(a.start/span)*0.03)-(b.avg+(b.start/span)*0.03));
+            try{ console.log("[reel SFW] clean runs", runs.map(r=>({start:+r.start.toFixed(1),len:+r.len.toFixed(1),avg:+r.avg.toFixed(2)}))); }catch(e){}
+            if(!usable.length) throw new Error("No clean scene found in this video — it's too explicit throughout. Try another video, or use Full frame + Blur.");
+            // Fill up to `scenes` slots of ~target each, all inside clean runs. Long runs
+            // get split into several slots (jump cuts) so the Scenes control is honoured
+            // and the reel reaches the chosen length when enough clean footage exists.
+            const target=Math.max(0.8,opts.duration/scenes);
+            const byLen=usable.slice().sort((a,b)=>b.len-a.len);
+            const slots=[]; let progress=true;
+            while(slots.length<scenes && progress){
+              progress=false;
+              for(const r of byLen){
+                if(slots.length>=scenes) break;
+                const usedInR=slots.filter(s=>s.r===r).reduce((a,s)=>a+s.len,0);
+                const room=r.len-usedInR;
+                if(room>=Math.min(target,1.2)){ slots.push({start:r.start+usedInR,len:Math.min(target,room),r}); progress=true; }
+              }
+            }
+            slots.sort((a,b)=>a.start-b.start);
+            // Fine end-to-end verify each slot; truncate at the first unsafe frame.
+            const outSegs=[], outLens=[];
+            for(let k=0;k<slots.length;k++){
+              if(opts.onVerify) opts.onVerify(k+1,slots.length);
+              let safeLen=0;
+              for(let t=slots[k].start; t<slots[k].start+slots[k].len; t+=0.5){ await seekVid(src,t); if((await analyzeFrame()).unsafe) break; safeLen=(t+0.5)-slots[k].start; }
+              safeLen=Math.min(safeLen,slots[k].len);
+              if(safeLen>=0.8){ outSegs.push(slots[k].start); outLens.push(safeLen); }
+            }
+            try{ console.log("[reel SFW] slots→verified", outSegs.map((t,i)=>({t:+t.toFixed(1),len:+outLens[i].toFixed(1)}))); }catch(e){}
+            if(!outSegs.length) throw new Error("No clean scene found in this video — it's too explicit throughout. Try another video, or use Full frame + Blur.");
+            segs=outSegs; segLens=outLens;
+            if(opts.onScan) opts.onScan(N,N,outSegs.length);
           } else if(scenes<=1){ segs=[Math.max(opts.start||0,introSkip)]; segDur=Math.max(1,opts.duration/segs.length); }
           else { const lo=introSkip, hi=Math.max(lo+winDur,total-winDur); segs=[]; for(let i=0;i<scenes;i++) segs.push(lo+(hi-lo)*(i/(scenes-1))); segs.sort((a,b)=>a-b); segDur=Math.max(1,opts.duration/segs.length); }
           // Play each segment back-to-back while recording the canvas continuously —
           // the seeks between them read as clean cuts.
           rec.start(); draw();
           const gt0=Date.now();
-          for(const st of segs){
+          for(let idx=0; idx<segs.length; idx++){
+            const st=segs[idx], playLen=(segLens&&segLens[idx]!=null)?segLens[idx]:segDur;
             await seekVid(src,st);
             // smart mode tightens the crop on skin-heavy scenes; sfw plays full (its
             // safety comes from the AI scene selection above, not cropping).
             if(opts.crop==="smart"){ curCrop = skinRatioNow(src)>0.16 ? "top" : "fill"; }
             await src.play().catch(()=>{});
             const st0=Date.now();
-            await new Promise(res=>{ const iv=setInterval(()=>{ if(opts.onTick)opts.onTick((Date.now()-gt0)/1000); if(Date.now()-st0>=segDur*1000){ clearInterval(iv); res(); } },150); });
+            await new Promise(res=>{ const iv=setInterval(()=>{ if(opts.onTick)opts.onTick((Date.now()-gt0)/1000); if(Date.now()-st0>=playLen*1000){ clearInterval(iv); res(); } },150); });
             src.pause();
           }
           cancelAnimationFrame(raf); rec.stop(); src.pause();
