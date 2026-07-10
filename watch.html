@@ -636,12 +636,24 @@ async function load(){
         if(!v.r2Key) throw new Error("This video isn't hosted yet — play it once, then try.");
         if(!window.MediaRecorder) throw new Error("Your browser can't record video (no MediaRecorder).");
         const src=document.createElement("video");
-        src.playsInline=true; src.preload="auto"; src.style.display="none";
+        src.playsInline=true; src.preload="auto"; src.style.display="none"; src.crossOrigin="anonymous";
         src.src=`/clipsrc?key=${encodeURIComponent(v.r2Key)}`;
         document.body.appendChild(src);
         try{
-          await new Promise((res,rej)=>{ src.onloadedmetadata=res; src.onerror=()=>rej(new Error("Couldn't load the video source.")); });
-          await new Promise((res)=>{ src.onseeked=res; try{ src.currentTime=Math.min(opts.start,(src.duration||1)-0.2); }catch(e){ res(); } });
+          // Kick loading by PLAYING first — browsers defer media load until play(),
+          // so awaiting loadedmetadata before playing deadlocks. This runs inside the
+          // Generate click (a user gesture) so unmuted autoplay is allowed; fall back
+          // to muted if a browser still blocks it.
+          try{ await src.play(); } catch(e){ src.muted=true; try{ await src.play(); }catch(_){} }
+          if(src.readyState<1){
+            await new Promise((res,rej)=>{
+              const to=setTimeout(()=>src.readyState>=1?res():rej(new Error("Video load timed out — try again.")),25000);
+              src.addEventListener("loadedmetadata",()=>{clearTimeout(to);res();},{once:true});
+              src.addEventListener("error",()=>{clearTimeout(to);rej(new Error("Couldn't load the video source."));},{once:true});
+            });
+          }
+          src.pause();
+          await new Promise((res)=>{ const to=setTimeout(res,5000); src.addEventListener("seeked",()=>{clearTimeout(to);res();},{once:true}); try{ src.currentTime=Math.min(opts.start,(src.duration||1)-0.2); }catch(e){ clearTimeout(to); res(); } });
           const W=opts.mode==="ig"?1080:1280, H=opts.mode==="ig"?1920:720;
           const cv=document.createElement("canvas"); cv.width=W; cv.height=H;
           const ctx=cv.getContext("2d");
