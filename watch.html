@@ -577,7 +577,7 @@ async function load(){
             <span id="veIgCharName" style="font-size:11px;color:var(--muted);width:100%"></span>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
-            <span style="font-size:11px;color:var(--muted)">SFW auto scans the video and keeps only clean scenes — no manual scrubbing needed.</span>
+            <span style="font-size:11px;color:var(--muted)">SFW auto uses an AI model to watch the video and keep only clean scenes — no manual scrubbing. First run downloads the model (~6 MB), then it's cached.</span>
             <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:700;cursor:pointer"><input type="checkbox" id="veIgBlur" style="width:auto;height:auto;accent-color:var(--accent)" /> Blur clip (optional)</label>
             <button class="v-edit-save" id="veIgGo" type="button" style="height:32px;padding:0 14px;font-size:11.5px">📱 Generate Reel</button>
           </div>
@@ -720,7 +720,38 @@ async function load(){
         for(let t=0;t<=limit;t+=0.6){ await seekVid(sv,t); const st=frameStats(sv); if(st.bright>55||st.spread>22) return t; }
         return 0;
       }
-      // opts: {mode, start, duration, scenes, skip, autoSkip, crop, size, censor, bgColor, topLines, emoji, charImg, onTick}
+      // ── REAL content analysis: NSFWJS (TensorFlow.js). Skin/brightness can't read
+      // drawn/animated content — this model is trained on Drawing/Hentai/Neutral/Porn/
+      // Sexy so it actually understands the frame. Bundled model loaded as script tags
+      // from jsdelivr (no cross-origin model fetch, CORS-free), cached after first use. ──
+      let _nsfwModel=null, _nsfwTry=null;
+      function _loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement("script"); s.src=src; s.async=false; s.onload=()=>res(); s.onerror=()=>rej(new Error("Failed to load "+src)); document.head.appendChild(s); }); }
+      function loadNsfwModel(){
+        if(_nsfwModel) return Promise.resolve(_nsfwModel);
+        if(_nsfwTry) return _nsfwTry;
+        const M="https://cdn.jsdelivr.net/npm/nsfwjs@4.2.1/dist/models/mobilenet_v2_mid/";
+        _nsfwTry=(async()=>{
+          if(!window.tf) await _loadScript("https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js");
+          if(!window.nsfwjs){
+            await _loadScript(M+"model.min.js");
+            await _loadScript(M+"group1-shard1of2.min.js");
+            await _loadScript(M+"group1-shard2of2.min.js");
+            await _loadScript("https://cdn.jsdelivr.net/npm/nsfwjs@4.2.1/dist/browser/nsfwjs.min.js");
+          }
+          _nsfwModel=await window.nsfwjs.load("MobileNetV2Mid");
+          return _nsfwModel;
+        })();
+        return _nsfwTry;
+      }
+      const _clsC=document.createElement("canvas"); _clsC.width=224; _clsC.height=224; const _clsX=_clsC.getContext("2d");
+      // 0..1 "explicit" risk for the current frame — Hentai/Porn count fully, Sexy less.
+      async function nsfwRiskNow(sv){
+        _clsX.drawImage(sv,0,0,224,224);
+        const preds=await _nsfwModel.classify(_clsC);
+        let h=0,p=0,s=0; for(const q of preds){ if(q.className==="Hentai")h=q.probability; else if(q.className==="Porn")p=q.probability; else if(q.className==="Sexy")s=q.probability; }
+        return h+p+s*0.6;
+      }
+      // opts: {mode, start, duration, scenes, skip, autoSkip, crop, size, censor, bgColor, topLines, emojiImg, charImg, onTick, onScan, onModel, onIntro}
       async function renderClip(opts){
         if(!v.r2Key) throw new Error("This video isn't hosted yet — play it once, then try.");
         if(!window.MediaRecorder) throw new Error("Your browser can't record video (no MediaRecorder).");
@@ -789,26 +820,13 @@ async function load(){
           const sizeMap={small:680,medium:860,large:1040};
           const useCover=(opts.crop==="fill"||opts.crop==="top"||opts.crop==="smart"||opts.crop==="sfw");
           const igBandW=W-80, igBandH=useCover?(sizeMap[opts.size]||860):Math.round((W-80)*9/16), igBandY=Math.round((H-igBandH)/2);
-          // curCrop is mutable so smart mode can tighten per-scene; sfw stays full.
+          // curCrop is mutable so smart mode can tighten per-scene; sfw plays full/natural
+          // (safety comes from AI scene SELECTION, not from cropping/blurring the video).
           let curCrop=(opts.crop==="smart")?"top":(opts.crop==="sfw"?"fill":(opts.crop||"fit"));
-          // Frame-HOLD for SFW: never show an explicit OR black frame. If the live
-          // frame isn't safe we redraw the last safe one instead of blurring it — a
-          // brief freeze reads as intentional; a blur or black flash gives it away and
-          // risks the Instagram ban. Selection already keeps scenes safe; this is the
-          // frame-by-frame backstop for any drift.
-          const holdCv=document.createElement("canvas"); holdCv.width=igBandW; holdCv.height=igBandH;
-          const holdCtx=holdCv.getContext("2d"); let haveHold=false;
-          function sfwSafe(){ const s=sampleFrame(src); return s.bright>24 && s.bright<236 && s.skin<0.12; }
           const draw=()=>{
             if(opts.mode==="ig"){
               ctx.fillStyle=opts.bgColor; ctx.fillRect(0,0,W,H);
-              if(opts.crop==="sfw"){
-                if(sfwSafe()){ drawFrame(40,igBandY,igBandW,igBandH); try{ holdCtx.clearRect(0,0,igBandW,igBandH); holdCtx.drawImage(cv,40,igBandY,igBandW,igBandH,0,0,igBandW,igBandH); haveHold=true; }catch(e){} }
-                else if(haveHold){ ctx.drawImage(holdCv,40,igBandY); }
-                else { drawFrame(40,igBandY,igBandW,igBandH); }
-              } else {
-                drawFrame(40,igBandY,igBandW,igBandH);
-              }
+              drawFrame(40,igBandY,igBandW,igBandH);
               if(opts.charImg){ const bottomSpace=H-(igBandY+igBandH); const chH=Math.max(340,Math.min(660,bottomSpace-8)); const cW=opts.charImg.width*chH/opts.charImg.height; ctx.drawImage(opts.charImg,W-cW-24,H-chH-16,cW,chH); }
               ctx.fillStyle="#111"; ctx.textAlign="center"; ctx.textBaseline="alphabetic"; ctx.font="bold 72px "+CLIP_FONT_STACK;
               (opts.topLines||[]).forEach((ln,i)=>ctx.fillText(ln,W/2,200+i*90));
@@ -830,35 +848,47 @@ async function load(){
           let segDur=winDur;
           let segs;
           if(opts.crop==="sfw"){
-            // SFW mode: don't crop-and-hope — SELECT only genuinely safe moments and
-            // drop the rest. Scan densely for skin AND brightness; score each candidate
-            // over the window it would play, then keep only windows that stay clean the
-            // whole time and aren't black/fades (a black frame has skin 0, so it would
-            // otherwise score as "safest" — that was the black-scene bug). Bias slightly
-            // earlier so we favour the build-up, not the climax.
+            // SFW mode: an ACTUAL model looks at each candidate frame (NSFWJS) and we
+            // SELECT only windows it judges clean the whole time, then play them
+            // naturally. Skin/brightness is only a black-frame reject + fallback if the
+            // model can't load. Bias slightly earlier (build-up) and skip the credits.
             if(opts.onIntro) opts.onIntro(introSkip);
-            const span=Math.max(1,total-0.4-introSkip);
-            const N=Math.min(48,Math.max(16,Math.floor(span/1.0)));
+            let ai=false;
+            if(opts.onModel) opts.onModel("loading");
+            try{ await loadNsfwModel(); ai=true; }catch(e){ ai=false; }
+            if(opts.onModel) opts.onModel(ai?"ready":"fallback");
+            // Credits usually sit in the last 5–10s — never select from there.
+            const endTrim=Math.min(10,Math.max(5,total*0.05));
+            const span=Math.max(1,(total-endTrim)-introSkip);
+            const N=Math.min(ai?34:48,Math.max(14,Math.floor(span/1.0)));
             const samp=[];
-            for(let i=0;i<N;i++){ const t=introSkip+span*(i/(N-1||1)); await seekVid(src,t); samp.push(Object.assign({t},sampleFrame(src))); if(opts.onScan) opts.onScan(i+1,N); }
+            for(let i=0;i<N;i++){
+              const t=introSkip+span*(i/(N-1||1)); await seekVid(src,t);
+              const bright=sampleFrame(src).bright;
+              let risk;
+              if(ai){ try{ risk=await nsfwRiskNow(src); }catch(e){ risk=sampleFrame(src).skin; } }
+              else { risk=sampleFrame(src).skin; }
+              samp.push({t,risk,bright});
+              if(opts.onScan) opts.onScan(i+1,N);
+            }
+            const RISK_MAX=ai?0.18:0.15, AVG_MAX=ai?0.12:0.08; // per-frame + window caps
             const wins=samp.map(s=>{ const w=samp.filter(x=>x.t>=s.t&&x.t<s.t+winDur); return {
               t:s.t,
-              avgSkin:w.reduce((a,x)=>a+x.skin,0)/(w.length||1),
-              maxSkin:w.reduce((a,x)=>Math.max(a,x.skin),0),
-              minBright:w.reduce((a,x)=>Math.min(a,x.bright),999),
-              avgBright:w.reduce((a,x)=>a+x.bright,0)/(w.length||1) }; });
-            // Strictly safe: low average, no spikes, not black/fade, not a static card.
-            const safe=wins.filter(w=> w.avgSkin<0.08 && w.maxSkin<0.15 && w.minBright>26 && w.avgBright<232);
-            const rank=w=> w.avgSkin + (w.t/span)*0.03; // mild earliness bias
+              avgRisk:w.reduce((a,x)=>a+x.risk,0)/(w.length||1),
+              maxRisk:w.reduce((a,x)=>Math.max(a,x.risk),0),
+              minBright:w.reduce((a,x)=>Math.min(a,x.bright),999) }; });
+            // Safe = model never flags it over the window AND it isn't a black/fade frame.
+            const safe=wins.filter(w=> w.avgRisk<AVG_MAX && w.maxRisk<RISK_MAX && w.minBright>26);
+            const rank=w=> w.avgRisk + (w.t/span)*0.03; // mild earliness bias
             safe.sort((a,b)=>rank(a)-rank(b));
             const gap=Math.max(winDur*0.9, span/(scenes*3||1));
             const chosen=[];
             for(const w of safe){ if(chosen.every(c=>Math.abs(c.t-w.t)>=gap)){ chosen.push(w); if(chosen.length>=scenes) break; } }
             if(!chosen.length){
               // Nothing cleared the bar — take the single safest NON-BLACK window so we
-              // never emit a black clip; the frame-hold backstop covers the remainder.
-              const nb=wins.filter(w=>w.minBright>26).sort((a,b)=>a.avgSkin-b.avgSkin);
-              chosen.push(nb[0]||wins.slice().sort((a,b)=>a.avgSkin-b.avgSkin)[0]||{t:introSkip});
+              // never emit a black clip.
+              const nb=wins.filter(w=>w.minBright>26).sort((a,b)=>a.avgRisk-b.avgRisk);
+              chosen.push(nb[0]||wins.slice().sort((a,b)=>a.avgRisk-b.avgRisk)[0]||{t:introSkip});
             }
             chosen.sort((a,b)=>a.t-b.t);
             segs=chosen.map(c=>c.t);
@@ -875,8 +905,8 @@ async function load(){
           const gt0=Date.now();
           for(const st of segs){
             await seekVid(src,st);
-            // smart mode tightens the crop on skin-heavy scenes; sfw stays full (its
-            // safety comes from selection + the frame-hold backstop, not cropping).
+            // smart mode tightens the crop on skin-heavy scenes; sfw plays full (its
+            // safety comes from the AI scene selection above, not cropping).
             if(opts.crop==="smart"){ curCrop = skinRatioNow(src)>0.16 ? "top" : "fill"; }
             await src.play().catch(()=>{});
             const st0=Date.now();
@@ -965,15 +995,17 @@ async function load(){
           const crop=document.getElementById("veIgCrop").value||"fit";
           const size=document.getElementById("veIgSize").value||"medium";
           const start=Math.max(parseInt(document.getElementById("veClipStart").value,10)||0, skip);
-          // renderClip does the intro detection, chronological scene spread and
-          // per-scene SFW/smart framing itself — we just hand it the settings.
-          let foundScenes=null;
+          // renderClip does the intro detection, AI scene selection and chronological
+          // ordering itself — we just hand it the settings.
+          let foundScenes=null, usedAI=false;
           const out=await renderClip({mode:"ig",start,scenes,skip,autoSkip,crop,size,emojiImg:igEmojiImg,duration:dur,censor:document.getElementById("veIgBlur").checked,bgColor:IG_BG[document.getElementById("veIgTpl").value]||IG_BG.cork,topLines,charImg:igCharImg,
             onIntro:s=>{ if(s>0.5) m.textContent=`Skipping ~${s.toFixed(0)}s intro…`; },
-            onScan:(i,n,found)=>{ if(found!=null){ foundScenes=found; } else { m.textContent=`Scanning for safe scenes… ${i}/${n}`; } },
+            onModel:st=>{ if(st==="loading") m.textContent="Loading the AI content model (first run ~6 MB, then cached)…"; else if(st==="ready") usedAI=true; },
+            onScan:(i,n,found)=>{ if(found!=null){ foundScenes=found; } else { m.textContent=`${usedAI?"AI":"Skin"}-checking scenes… ${i}/${n}`; } },
             onTick:e=>{m.textContent=`Recording… ${e.toFixed(0)}/${dur}s`;}});
           download(out.blob,`34vault-reel-${v.sourceId}.${out.ext}`);
-          const sceneNote=(crop==="sfw"&&foundScenes!=null)?` · ${foundScenes} safe scene${foundScenes===1?"":"s"} used`:"";
+          let sceneNote="";
+          if(crop==="sfw"){ sceneNote=` · ${usedAI?"AI":"basic"} check, ${foundScenes||0} safe scene${foundScenes===1?"":"s"}`; if(!usedAI) sceneNote+=" (AI model didn't load — used basic check; review before posting)"; }
           m.className="v-edit-msg ok"; m.textContent=`Done — downloaded (${(out.blob.size/1048576).toFixed(1)} MB${out.ext==="webm"?", webm — Chrome exports mp4":""})${sceneNote}.`;
           cap.style.display="block"; cap.value=buildCaptionClient();
         }catch(e){ m.className="v-edit-msg err"; m.textContent=e.message||"Failed"; }
