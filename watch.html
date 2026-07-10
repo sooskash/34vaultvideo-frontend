@@ -744,14 +744,22 @@ async function load(){
         return _nsfwTry;
       }
       const _clsC=document.createElement("canvas"); _clsC.width=224; _clsC.height=224; const _clsX=_clsC.getContext("2d");
-      // 0..1 "explicit" risk for the current frame — Hentai/Porn count fully, Sexy less.
-      async function nsfwRiskNow(sv){
+      async function nsfwProbs(sv){
         _clsX.drawImage(sv,0,0,224,224);
         const preds=await _nsfwModel.classify(_clsC);
-        let h=0,p=0,s=0; for(const q of preds){ if(q.className==="Hentai")h=q.probability; else if(q.className==="Porn")p=q.probability; else if(q.className==="Sexy")s=q.probability; }
-        return h+p+s*0.6;
+        const p={Drawing:0,Hentai:0,Neutral:0,Porn:0,Sexy:0};
+        for(const q of preds){ if(p[q.className]!=null) p[q.className]=q.probability; }
+        return p;
       }
-      // opts: {mode, start, duration, scenes, skip, autoSkip, crop, size, censor, bgColor, topLines, emojiImg, charImg, onTick, onScan, onModel, onIntro}
+      // Ranking score + a hard unsafe test. Tuned to prefer false positives (drop a
+      // safe scene) over false negatives (leak NSFW) because this drives automated IG
+      // posting. Drawn content gives a raised "Hentai" baseline, so we also compare the
+      // explicit classes against Drawing+Neutral: an ordinary drawn frame (Drawing high)
+      // stays safe, while a sexual one (Hentai/Porn dominates) is caught.
+      function probRisk(p){ return p.Hentai+p.Porn+p.Sexy*0.7; }
+      function probUnsafe(p){ const nsfw=p.Hentai+p.Porn+p.Sexy, safe=p.Neutral+p.Drawing;
+        return nsfw>0.30 || p.Hentai>0.25 || p.Porn>0.15 || nsfw>safe; }
+      // opts: {mode, start, duration, scenes, skip, autoSkip, crop, size, censor, bgColor, topLines, emojiImg, charImg, onTick, onScan, onModel, onVerify, onIntro}
       async function renderClip(opts){
         if(!v.r2Key) throw new Error("This video isn't hosted yet — play it once, then try.");
         if(!window.MediaRecorder) throw new Error("Your browser can't record video (no MediaRecorder).");
@@ -848,57 +856,56 @@ async function load(){
           let segDur=winDur;
           let segs;
           if(opts.crop==="sfw"){
-            // SFW mode: an ACTUAL model looks at each candidate frame (NSFWJS) and we
-            // SELECT only windows it judges clean the whole time, then play them
-            // naturally. Skin/brightness is only a black-frame reject + fallback if the
-            // model can't load. Bias slightly earlier (build-up) and skip the credits.
+            // SFW mode REQUIRES the model — skin/brightness can't read furry/animated
+            // content, and a silent fallback would give false confidence. We densely
+            // scan, keep only windows the model calls clean the WHOLE way, then verify
+            // each chosen window frame-by-frame end-to-end. If nothing is clean, we
+            // REFUSE rather than emit NSFW (this feeds automated posting).
             if(opts.onIntro) opts.onIntro(introSkip);
-            let ai=false;
             if(opts.onModel) opts.onModel("loading");
-            try{ await loadNsfwModel(); ai=true; }catch(e){ ai=false; }
-            if(opts.onModel) opts.onModel(ai?"ready":"fallback");
+            await loadNsfwModel(); // throws → caught by caller → nothing is produced
+            if(opts.onModel) opts.onModel("ready");
+            // A frame is unsafe if the model flags it, OR it's very skin-heavy (nudity
+            // the model may under-rate on furry), OR it's black/fade.
+            const frameUnsafe=async()=>{ const skin=skinRatioNow(src), bright=sampleFrame(src).bright;
+              if(bright<=24) return true;
+              let p; try{ p=await nsfwProbs(src); }catch(e){ return true; }
+              return probUnsafe(p) || skin>0.32; };
+            const frameScore=async()=>{ let p; try{ p=await nsfwProbs(src); }catch(e){ return 1; } return probRisk(p); };
             // Credits usually sit in the last 5–10s — never select from there.
             const endTrim=Math.min(10,Math.max(5,total*0.05));
             const span=Math.max(1,(total-endTrim)-introSkip);
-            const N=Math.min(ai?34:48,Math.max(14,Math.floor(span/1.0)));
+            const step=Math.min(1.0, winDur/2);            // dense: ≥2 samples/window
+            const N=Math.min(60, Math.max(12, Math.ceil(span/step)+1));
             const samp=[];
             for(let i=0;i<N;i++){
               const t=introSkip+span*(i/(N-1||1)); await seekVid(src,t);
-              const bright=sampleFrame(src).bright;
-              let risk;
-              if(ai){ try{ risk=await nsfwRiskNow(src); }catch(e){ risk=sampleFrame(src).skin; } }
-              else { risk=sampleFrame(src).skin; }
-              samp.push({t,risk,bright});
+              samp.push({t, unsafe:await frameUnsafe(), risk:await frameScore()});
               if(opts.onScan) opts.onScan(i+1,N);
             }
-            const RISK_MAX=ai?0.18:0.15, AVG_MAX=ai?0.12:0.08; // per-frame + window caps
-            const wins=samp.map(s=>{ const w=samp.filter(x=>x.t>=s.t&&x.t<s.t+winDur); return {
-              t:s.t,
-              avgRisk:w.reduce((a,x)=>a+x.risk,0)/(w.length||1),
-              maxRisk:w.reduce((a,x)=>Math.max(a,x.risk),0),
-              minBright:w.reduce((a,x)=>Math.min(a,x.bright),999) }; });
-            // Safe = model never flags it over the window AND it isn't a black/fade frame.
-            const safe=wins.filter(w=> w.avgRisk<AVG_MAX && w.maxRisk<RISK_MAX && w.minBright>26);
-            const rank=w=> w.avgRisk + (w.t/span)*0.03; // mild earliness bias
-            safe.sort((a,b)=>rank(a)-rank(b));
+            // A window is a candidate only if EVERY sample inside it is safe.
+            const wins=samp.map(s=>{ const w=samp.filter(x=>x.t>=s.t&&x.t<s.t+winDur);
+              return { t:s.t, bad:w.some(x=>x.unsafe), avgRisk:w.reduce((a,x)=>a+x.risk,0)/(w.length||1) }; });
+            const cand=wins.filter(w=>!w.bad).sort((a,b)=> (a.avgRisk+(a.t/span)*0.03) - (b.avgRisk+(b.t/span)*0.03));
             const gap=Math.max(winDur*0.9, span/(scenes*3||1));
-            const chosen=[];
-            for(const w of safe){ if(chosen.every(c=>Math.abs(c.t-w.t)>=gap)){ chosen.push(w); if(chosen.length>=scenes) break; } }
-            if(!chosen.length){
-              // Nothing cleared the bar — take the single safest NON-BLACK window so we
-              // never emit a black clip.
-              const nb=wins.filter(w=>w.minBright>26).sort((a,b)=>a.avgRisk-b.avgRisk);
-              chosen.push(nb[0]||wins.slice().sort((a,b)=>a.avgRisk-b.avgRisk)[0]||{t:introSkip});
+            const picked=[];
+            for(const w of cand){ if(picked.every(c=>Math.abs(c.t-w.t)>=gap)){ picked.push(w.t); if(picked.length>=scenes) break; } }
+            // Fine end-to-end verify: step through each picked window and drop it if any
+            // frame is unsafe (catches drift the coarse scan stepped over).
+            const verified=[];
+            for(let k=0;k<picked.length;k++){
+              if(opts.onVerify) opts.onVerify(k+1,picked.length);
+              let ok=true;
+              for(let t=picked[k]; t<picked[k]+winDur; t+=0.5){ await seekVid(src,t); if(await frameUnsafe()){ ok=false; break; } }
+              if(ok) verified.push(picked[k]);
             }
-            chosen.sort((a,b)=>a.t-b.t);
-            segs=chosen.map(c=>c.t);
-            if(opts.onScan) opts.onScan(N,N,chosen.length);
-          } else if(scenes<=1){ segs=[Math.max(opts.start||0,introSkip)]; }
-          else { const lo=introSkip, hi=Math.max(lo+winDur,total-winDur); segs=[]; for(let i=0;i<scenes;i++) segs.push(lo+(hi-lo)*(i/(scenes-1))); }
-          segs.sort((a,b)=>a-b);
-          // Fewer safe scenes than requested? Each plays longer so the reel still fills
-          // the requested length.
-          segDur=Math.max(1,opts.duration/segs.length);
+            if(!verified.length) throw new Error("No clean scene found in this video — it's too explicit throughout. Try another video, or use Full frame + Blur.");
+            verified.sort((a,b)=>a-b);
+            segs=verified;
+            if(opts.onScan) opts.onScan(N,N,verified.length);
+            segDur=winDur; // fixed per-scene length; fewer safe scenes → shorter (safe) reel
+          } else if(scenes<=1){ segs=[Math.max(opts.start||0,introSkip)]; segDur=Math.max(1,opts.duration/segs.length); }
+          else { const lo=introSkip, hi=Math.max(lo+winDur,total-winDur); segs=[]; for(let i=0;i<scenes;i++) segs.push(lo+(hi-lo)*(i/(scenes-1))); segs.sort((a,b)=>a-b); segDur=Math.max(1,opts.duration/segs.length); }
           // Play each segment back-to-back while recording the canvas continuously —
           // the seeks between them read as clean cuts.
           rec.start(); draw();
@@ -997,15 +1004,15 @@ async function load(){
           const start=Math.max(parseInt(document.getElementById("veClipStart").value,10)||0, skip);
           // renderClip does the intro detection, AI scene selection and chronological
           // ordering itself — we just hand it the settings.
-          let foundScenes=null, usedAI=false;
+          let foundScenes=null;
           const out=await renderClip({mode:"ig",start,scenes,skip,autoSkip,crop,size,emojiImg:igEmojiImg,duration:dur,censor:document.getElementById("veIgBlur").checked,bgColor:IG_BG[document.getElementById("veIgTpl").value]||IG_BG.cork,topLines,charImg:igCharImg,
             onIntro:s=>{ if(s>0.5) m.textContent=`Skipping ~${s.toFixed(0)}s intro…`; },
-            onModel:st=>{ if(st==="loading") m.textContent="Loading the AI content model (first run ~6 MB, then cached)…"; else if(st==="ready") usedAI=true; },
-            onScan:(i,n,found)=>{ if(found!=null){ foundScenes=found; } else { m.textContent=`${usedAI?"AI":"Skin"}-checking scenes… ${i}/${n}`; } },
+            onModel:st=>{ if(st==="loading") m.textContent="Loading the AI content model (first run ~10 MB, then cached)…"; },
+            onScan:(i,n,found)=>{ if(found!=null){ foundScenes=found; } else { m.textContent=`AI-scanning frames… ${i}/${n}`; } },
+            onVerify:(k,n)=>{ m.textContent=`Verifying scene ${k}/${n} frame-by-frame…`; },
             onTick:e=>{m.textContent=`Recording… ${e.toFixed(0)}/${dur}s`;}});
           download(out.blob,`34vault-reel-${v.sourceId}.${out.ext}`);
-          let sceneNote="";
-          if(crop==="sfw"){ sceneNote=` · ${usedAI?"AI":"basic"} check, ${foundScenes||0} safe scene${foundScenes===1?"":"s"}`; if(!usedAI) sceneNote+=" (AI model didn't load — used basic check; review before posting)"; }
+          const sceneNote=(crop==="sfw")?` · AI-verified, ${foundScenes||0} clean scene${foundScenes===1?"":"s"}${foundScenes<scenes?` (only ${foundScenes} of ${scenes} were clean)`:""}`:"";
           m.className="v-edit-msg ok"; m.textContent=`Done — downloaded (${(out.blob.size/1048576).toFixed(1)} MB${out.ext==="webm"?", webm — Chrome exports mp4":""})${sceneNote}.`;
           cap.style.display="block"; cap.value=buildCaptionClient();
         }catch(e){ m.className="v-edit-msg err"; m.textContent=e.message||"Failed"; }
