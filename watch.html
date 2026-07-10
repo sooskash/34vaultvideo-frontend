@@ -710,6 +710,20 @@ async function load(){
       const _anc=document.createElement("canvas"); _anc.width=64; _anc.height=36; const _anx=_anc.getContext("2d");
       function seekVid(sv,t){ return new Promise(res=>{ const tgt=Math.min(Math.max(0,t),(sv.duration||1)-0.2); if(Math.abs((sv.currentTime||0)-tgt)<0.04){ res(); return; } const to=setTimeout(res,3500); sv.addEventListener("seeked",()=>{clearTimeout(to);res();},{once:true}); try{ sv.currentTime=tgt; }catch(e){ clearTimeout(to); res(); } }); }
       function skinRatioNow(sv){ try{ _anx.drawImage(sv,0,0,64,36); const d=_anx.getImageData(0,0,64,36).data; let s=0,n=0; for(let p=0;p<d.length;p+=4){ const r=d[p],g=d[p+1],b=d[p+2]; n++; if(r>95&&g>40&&b>20&&r>g&&r>b&&Math.abs(r-g)>15&&(Math.max(r,g,b)-Math.min(r,g,b))>15) s++; } return s/(n||1); }catch(e){ return 0; } }
+      const _isFlesh=(r,g,b)=> r>95&&g>40&&b>20&&r>g&&r>b&&Math.abs(r-g)>15&&(Math.max(r,g,b)-Math.min(r,g,b))>15;
+      // Skin ratio, brightness, AND the densest local flesh cell (8x8 grid). The last one
+      // catches a genital/nudity close-up on a DARK-furred character: the overall skin
+      // ratio stays low (mostly dark fur) but one cell is almost all flesh. Reddish
+      // genitals pass the flesh test (r≫g,b), so a concentrated red region trips maxCell.
+      function regionStats(sv){ try{ _anx.drawImage(sv,0,0,64,36); const d=_anx.getImageData(0,0,64,36).data;
+        const GX=8,GY=8, cw=64/GX, chh=36/GY, cell=new Array(GX*GY).fill(0), cnt=new Array(GX*GY).fill(0);
+        let s=0,sum=0,n=0;
+        for(let y=0;y<36;y++){ for(let x=0;x<64;x++){ const i=(y*64+x)*4, r=d[i],g=d[i+1],b=d[i+2]; n++; sum+=(r+g+b)/3;
+          const idx=Math.min(GY-1,Math.floor(y/chh))*GX+Math.min(GX-1,Math.floor(x/cw)); cnt[idx]++;
+          if(_isFlesh(r,g,b)){ s++; cell[idx]++; } } }
+        let mx=0; for(let k=0;k<cell.length;k++){ const f=cell[k]/(cnt[k]||1); if(f>mx) mx=f; }
+        return { skin:s/(n||1), bright:sum/(n||1), maxCell:mx };
+      }catch(e){ return { skin:1, bright:0, maxCell:1 }; } }
       // Skin ratio + brightness in one pass. Note: a black frame has skin=0, which
       // would score as "safest" — so brightness lets us reject black/fade frames.
       function sampleFrame(sv){ try{ _anx.drawImage(sv,0,0,64,36); const d=_anx.getImageData(0,0,64,36).data; let s=0,sum=0,n=0; for(let p=0;p<d.length;p+=4){ const r=d[p],g=d[p+1],b=d[p+2]; n++; sum+=(r+g+b)/3; if(r>95&&g>40&&b>20&&r>g&&r>b&&Math.abs(r-g)>15&&(Math.max(r,g,b)-Math.min(r,g,b))>15) s++; } return {skin:s/(n||1), bright:sum/(n||1)}; }catch(e){ return {skin:1, bright:0}; } }
@@ -874,9 +888,11 @@ async function load(){
             if(opts.onModel) opts.onModel("loading");
             await loadNsfwModel(); // throws → caught by caller → nothing is produced
             if(opts.onModel) opts.onModel("ready");
-            const analyzeFrame=async()=>{ const skin=skinRatioNow(src), bright=sampleFrame(src).bright;
+            const analyzeFrame=async()=>{ const rs=regionStats(src);
               let p=null; try{ p=await nsfwProbs(src); }catch(e){}
-              return { unsafe: !p || bright<=24 || probUnsafe(p) || skin>0.32, risk: p?probRisk(p):1, p, skin }; };
+              // unsafe if: model flags it, OR lots of skin overall, OR a dense flesh cell
+              // (genital/nudity close-up on dark fur), OR black/fade.
+              return { unsafe: !p || rs.bright<=24 || probUnsafe(p) || rs.skin>0.32 || rs.maxCell>0.55, risk: p?probRisk(p):rs.skin, p, skin:rs.skin, maxCell:rs.maxCell }; };
             // Credits/outro can be long — cut a generous tail so they're never picked.
             const endTrim=Math.min(60,Math.max(12,total*0.2));
             const span=Math.max(1,(total-endTrim)-introSkip);
@@ -887,11 +903,11 @@ async function load(){
             const samp=[];
             for(let i=0;i<N;i++){
               const t=introSkip+span*(i/(N-1||1)); await seekVid(src,t);
-              const a=await analyzeFrame(); samp.push({t, unsafe:a.unsafe, risk:a.risk, p:a.p, skin:a.skin});
+              const a=await analyzeFrame(); samp.push({t, unsafe:a.unsafe, risk:a.risk, p:a.p, skin:a.skin, maxCell:a.maxCell});
               if(opts.onScan) opts.onScan(i+1,N);
             }
             scanSamp=samp; // draw() reads this to crop only flagged moments (cropnsfw)
-            try{ console.log("[reel SFW] scan", samp.map(s=>({t:+s.t.toFixed(1), H:+(((s.p||{}).Hentai)||0).toFixed(2), P:+(((s.p||{}).Porn)||0).toFixed(2), Se:+(((s.p||{}).Sexy)||0).toFixed(2), Dr:+(((s.p||{}).Drawing)||0).toFixed(2), skin:+s.skin.toFixed(2), bad:s.unsafe}))); }catch(e){}
+            try{ console.log("[reel SFW] scan", samp.map(s=>({t:+s.t.toFixed(1), H:+(((s.p||{}).Hentai)||0).toFixed(2), P:+(((s.p||{}).Porn)||0).toFixed(2), skin:+s.skin.toFixed(2), cell:+(s.maxCell||0).toFixed(2), bad:s.unsafe}))); }catch(e){}
             const requireClean = opts.crop!=="cropnsfw";
             let final=[]; // {t,len}
             if(!requireClean){
