@@ -548,7 +548,7 @@ async function load(){
           </div>
           <div class="v-edit-row" style="margin-top:8px">
             <div><label>Scenes</label><select id="veIgScenes" style="width:100%;height:36px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12.5px;padding:0 8px;font-family:inherit"><option value="1">1 scene</option><option value="2">2 scenes</option><option value="3" selected>3 scenes</option><option value="4">4 scenes</option></select></div>
-            <div><label>Framing</label><select id="veIgCrop" style="width:100%;height:36px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12.5px;padding:0 8px;font-family:inherit"><option value="sfw">SFW only (safest scenes) ✅</option><option value="fit">Fit (whole frame)</option><option value="fill">Fill (zoom to frame)</option><option value="smart">Smart (auto-crop NSFW)</option><option value="top">Hide bottom (NSFW-cut)</option><option value="face">Face zoom</option></select></div>
+            <div><label>Framing</label><select id="veIgCrop" style="width:100%;height:36px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12.5px;padding:0 8px;font-family:inherit"><option value="sfw">SFW auto (recommended) ✅</option><option value="fit">Show full frame</option><option value="fill">Zoom to fill</option></select></div>
             <div><label>Reel size</label><select id="veIgSize" style="width:100%;height:36px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12.5px;padding:0 8px;font-family:inherit"><option value="small">Small band</option><option value="medium" selected>Medium band</option><option value="large">Large band</option></select></div>
           </div>
           <div style="margin-top:8px">
@@ -577,8 +577,8 @@ async function load(){
             <span id="veIgCharName" style="font-size:11px;color:var(--muted);width:100%"></span>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
-            <button class="v-edit-cancel" id="veIgSfw" type="button" style="height:32px;padding:0 12px;font-size:11.5px">🔍 Find SFW moment</button>
-            <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:700;cursor:pointer"><input type="checkbox" id="veIgBlur" style="width:auto;height:auto;accent-color:var(--accent)" /> Blur clip</label>
+            <span style="font-size:11px;color:var(--muted)">SFW auto scans the video and keeps only clean scenes — no manual scrubbing needed.</span>
+            <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);text-transform:none;letter-spacing:0;font-weight:700;cursor:pointer"><input type="checkbox" id="veIgBlur" style="width:auto;height:auto;accent-color:var(--accent)" /> Blur clip (optional)</label>
             <button class="v-edit-save" id="veIgGo" type="button" style="height:32px;padding:0 14px;font-size:11.5px">📱 Generate Reel</button>
           </div>
           <div class="v-edit-msg" id="veIgMsg" style="margin-top:6px"></div>
@@ -709,6 +709,9 @@ async function load(){
       const _anc=document.createElement("canvas"); _anc.width=64; _anc.height=36; const _anx=_anc.getContext("2d");
       function seekVid(sv,t){ return new Promise(res=>{ const to=setTimeout(res,3500); sv.addEventListener("seeked",()=>{clearTimeout(to);res();},{once:true}); try{ sv.currentTime=Math.min(Math.max(0,t),(sv.duration||1)-0.2); }catch(e){ clearTimeout(to); res(); } }); }
       function skinRatioNow(sv){ try{ _anx.drawImage(sv,0,0,64,36); const d=_anx.getImageData(0,0,64,36).data; let s=0,n=0; for(let p=0;p<d.length;p+=4){ const r=d[p],g=d[p+1],b=d[p+2]; n++; if(r>95&&g>40&&b>20&&r>g&&r>b&&Math.abs(r-g)>15&&(Math.max(r,g,b)-Math.min(r,g,b))>15) s++; } return s/(n||1); }catch(e){ return 0; } }
+      // Skin ratio + brightness in one pass. Note: a black frame has skin=0, which
+      // would score as "safest" — so brightness lets us reject black/fade frames.
+      function sampleFrame(sv){ try{ _anx.drawImage(sv,0,0,64,36); const d=_anx.getImageData(0,0,64,36).data; let s=0,sum=0,n=0; for(let p=0;p<d.length;p+=4){ const r=d[p],g=d[p+1],b=d[p+2]; n++; sum+=(r+g+b)/3; if(r>95&&g>40&&b>20&&r>g&&r>b&&Math.abs(r-g)>15&&(Math.max(r,g,b)-Math.min(r,g,b))>15) s++; } return {skin:s/(n||1), bright:sum/(n||1)}; }catch(e){ return {skin:1, bright:0}; } }
       function frameStats(sv){ try{ _anx.drawImage(sv,0,0,64,36); const d=_anx.getImageData(0,0,64,36).data; let sum=0,rS=0,gS=0,bS=0,n=0; for(let p=0;p<d.length;p+=4){ const r=d[p],g=d[p+1],b=d[p+2]; sum+=(r+g+b)/3; rS+=r;gS+=g;bS+=b; n++; } return {bright:sum/n, spread:Math.abs(rS/n-gS/n)+Math.abs(gS/n-bS/n)+Math.abs(rS/n-bS/n)}; }catch(e){ return {bright:100,spread:100}; } }
       // First timestamp that looks like real video vs an intro/title/warning card
       // (those are dark + low colour spread). Best-effort; returns 0 if unsure.
@@ -762,7 +765,7 @@ async function load(){
           function drawFrame(dx,dy,dw,dh){
             const sw=src.videoWidth,sh=src.videoHeight; if(!sw||!sh) return;
             const crop=curCrop;
-            ctx.save(); if(opts.censor||curBlur) ctx.filter="blur("+(opts.mode==="ig"?(curBlur&&!opts.censor?30:14):12)+"px)";
+            ctx.save(); if(opts.censor) ctx.filter="blur("+(opts.mode==="ig"?14:12)+"px)";
             if(crop==="fit"){
               let w=dw,h=dw*sh/sw; if(h>dh){ h=dh; w=dh*sw/sh; }
               ctx.drawImage(src,dx+(dw-w)/2,dy+(dh-h)/2,w,h);
@@ -786,30 +789,30 @@ async function load(){
           const sizeMap={small:680,medium:860,large:1040};
           const useCover=(opts.crop==="fill"||opts.crop==="top"||opts.crop==="smart"||opts.crop==="sfw");
           const igBandW=W-80, igBandH=useCover?(sizeMap[opts.size]||860):Math.round((W-80)*9/16), igBandY=Math.round((H-igBandH)/2);
-          // curCrop/curBlur are mutable so the live guard can react per-frame.
-          let curCrop=(opts.crop==="smart"||opts.crop==="sfw")?"top":(opts.crop||"fit");
-          let curBlur=false, _lastGuard=0;
-          // Live NSFW guard: for sfw/smart, sample the frame that's ACTUALLY on screen
-          // and react in real time. A segment drifts into explicit content mid-play, so
-          // a one-off check at the seek point isn't enough — this re-checks continuously
-          // and tightens the crop (top → face) or blurs when skin spikes.
-          function nsfwGuard(){
-            if(opts.crop!=="sfw"&&opts.crop!=="smart") return;
-            const now=Date.now(); if(now-_lastGuard<90) return; _lastGuard=now;
-            const sk=skinRatioNow(src);
-            if(opts.crop==="sfw"){ curBlur=sk>0.34; curCrop=sk>0.18?"face":(sk>0.10?"top":"fill"); }
-            else { curBlur=false; curCrop=sk>0.16?"top":"fill"; }
-          }
+          // curCrop is mutable so smart mode can tighten per-scene; sfw stays full.
+          let curCrop=(opts.crop==="smart")?"top":(opts.crop==="sfw"?"fill":(opts.crop||"fit"));
+          // Frame-HOLD for SFW: never show an explicit OR black frame. If the live
+          // frame isn't safe we redraw the last safe one instead of blurring it — a
+          // brief freeze reads as intentional; a blur or black flash gives it away and
+          // risks the Instagram ban. Selection already keeps scenes safe; this is the
+          // frame-by-frame backstop for any drift.
+          const holdCv=document.createElement("canvas"); holdCv.width=igBandW; holdCv.height=igBandH;
+          const holdCtx=holdCv.getContext("2d"); let haveHold=false;
+          function sfwSafe(){ const s=sampleFrame(src); return s.bright>24 && s.bright<236 && s.skin<0.12; }
           const draw=()=>{
             if(opts.mode==="ig"){
-              nsfwGuard();
               ctx.fillStyle=opts.bgColor; ctx.fillRect(0,0,W,H);
-              drawFrame(40,igBandY,igBandW,igBandH);
+              if(opts.crop==="sfw"){
+                if(sfwSafe()){ drawFrame(40,igBandY,igBandW,igBandH); try{ holdCtx.clearRect(0,0,igBandW,igBandH); holdCtx.drawImage(cv,40,igBandY,igBandW,igBandH,0,0,igBandW,igBandH); haveHold=true; }catch(e){} }
+                else if(haveHold){ ctx.drawImage(holdCv,40,igBandY); }
+                else { drawFrame(40,igBandY,igBandW,igBandH); }
+              } else {
+                drawFrame(40,igBandY,igBandW,igBandH);
+              }
               if(opts.charImg){ const bottomSpace=H-(igBandY+igBandH); const chH=Math.max(340,Math.min(660,bottomSpace-8)); const cW=opts.charImg.width*chH/opts.charImg.height; ctx.drawImage(opts.charImg,W-cW-24,H-chH-16,cW,chH); }
               ctx.fillStyle="#111"; ctx.textAlign="center"; ctx.textBaseline="alphabetic"; ctx.font="bold 72px "+CLIP_FONT_STACK;
               (opts.topLines||[]).forEach((ln,i)=>ctx.fillText(ln,W/2,200+i*90));
               if(opts.emojiImg){ const box=210, iw=opts.emojiImg.width||1, ih=opts.emojiImg.height||1, s=Math.min(box/iw,box/ih), w=iw*s, h=ih*s; const ey=200+((opts.topLines||[]).length)*90+20; ctx.drawImage(opts.emojiImg,(W-w)/2,ey,w,h); }
-              else if(opts.emoji){ const ey=200+((opts.topLines||[]).length)*90+120; ctx.font="130px "+CLIP_FONT_STACK; ctx.fillText(opts.emoji,W/2,ey); }
             } else {
               ctx.fillStyle="#000"; ctx.fillRect(0,0,W,H);
               drawFrame(0,0,W,H);
@@ -822,42 +825,59 @@ async function load(){
           let introSkip=Math.max(0,opts.skip||0);
           if(opts.autoSkip){ try{ const d=await detectIntroEnd(src); introSkip=Math.max(introSkip,d); if(opts.onIntro) opts.onIntro(introSkip); }catch(e){} }
           const scenes=Math.max(1,Math.min(4,opts.scenes||1));
-          const total=src.duration||0, segDur=Math.max(1,opts.duration/scenes);
+          const total=src.duration||0;
+          const winDur=Math.max(1,opts.duration/scenes);
+          let segDur=winDur;
           let segs;
           if(opts.crop==="sfw"){
-            // SFW mode: don't just crop — pick the *safest* moments. Scan the whole
-            // video densely, then score each candidate by the AVERAGE skin over the
-            // window it would actually play (segDur), not a single frame — a frame can
-            // be clean then turn explicit a second later, which is what broke before.
-            // Choose the lowest-average windows, spread apart, played in order. The
-            // live guard (nsfwGuard) then handles any remaining drift frame-by-frame.
+            // SFW mode: don't crop-and-hope — SELECT only genuinely safe moments and
+            // drop the rest. Scan densely for skin AND brightness; score each candidate
+            // over the window it would play, then keep only windows that stay clean the
+            // whole time and aren't black/fades (a black frame has skin 0, so it would
+            // otherwise score as "safest" — that was the black-scene bug). Bias slightly
+            // earlier so we favour the build-up, not the climax.
             if(opts.onIntro) opts.onIntro(introSkip);
             const span=Math.max(1,total-0.4-introSkip);
-            const N=Math.min(40,Math.max(14,Math.floor(span/1.2)));
+            const N=Math.min(48,Math.max(16,Math.floor(span/1.0)));
             const samp=[];
-            for(let i=0;i<N;i++){ const t=introSkip+span*(i/(N-1||1)); await seekVid(src,t); samp.push({t,skin:skinRatioNow(src)}); if(opts.onScan) opts.onScan(i+1,N); }
-            const scored=samp.map(s=>{ const win=samp.filter(x=>x.t>=s.t&&x.t<s.t+segDur); return {t:s.t, avg:win.reduce((a,x)=>a+x.skin,0)/(win.length||1)}; });
-            const gap=Math.max(segDur*0.8,span/(scenes*3||1));
+            for(let i=0;i<N;i++){ const t=introSkip+span*(i/(N-1||1)); await seekVid(src,t); samp.push(Object.assign({t},sampleFrame(src))); if(opts.onScan) opts.onScan(i+1,N); }
+            const wins=samp.map(s=>{ const w=samp.filter(x=>x.t>=s.t&&x.t<s.t+winDur); return {
+              t:s.t,
+              avgSkin:w.reduce((a,x)=>a+x.skin,0)/(w.length||1),
+              maxSkin:w.reduce((a,x)=>Math.max(a,x.skin),0),
+              minBright:w.reduce((a,x)=>Math.min(a,x.bright),999),
+              avgBright:w.reduce((a,x)=>a+x.bright,0)/(w.length||1) }; });
+            // Strictly safe: low average, no spikes, not black/fade, not a static card.
+            const safe=wins.filter(w=> w.avgSkin<0.08 && w.maxSkin<0.15 && w.minBright>26 && w.avgBright<232);
+            const rank=w=> w.avgSkin + (w.t/span)*0.03; // mild earliness bias
+            safe.sort((a,b)=>rank(a)-rank(b));
+            const gap=Math.max(winDur*0.9, span/(scenes*3||1));
             const chosen=[];
-            for(const s of scored.slice().sort((a,b)=>a.avg-b.avg)){ if(chosen.every(c=>Math.abs(c.t-s.t)>=gap)){ chosen.push(s); if(chosen.length>=scenes) break; } }
-            if(!chosen.length) chosen.push(scored[0]||{t:introSkip,avg:0});
+            for(const w of safe){ if(chosen.every(c=>Math.abs(c.t-w.t)>=gap)){ chosen.push(w); if(chosen.length>=scenes) break; } }
+            if(!chosen.length){
+              // Nothing cleared the bar — take the single safest NON-BLACK window so we
+              // never emit a black clip; the frame-hold backstop covers the remainder.
+              const nb=wins.filter(w=>w.minBright>26).sort((a,b)=>a.avgSkin-b.avgSkin);
+              chosen.push(nb[0]||wins.slice().sort((a,b)=>a.avgSkin-b.avgSkin)[0]||{t:introSkip});
+            }
             chosen.sort((a,b)=>a.t-b.t);
             segs=chosen.map(c=>c.t);
+            if(opts.onScan) opts.onScan(N,N,chosen.length);
           } else if(scenes<=1){ segs=[Math.max(opts.start||0,introSkip)]; }
-          else { const lo=introSkip, hi=Math.max(lo+segDur,total-segDur); segs=[]; for(let i=0;i<scenes;i++) segs.push(lo+(hi-lo)*(i/(scenes-1))); }
+          else { const lo=introSkip, hi=Math.max(lo+winDur,total-winDur); segs=[]; for(let i=0;i<scenes;i++) segs.push(lo+(hi-lo)*(i/(scenes-1))); }
           segs.sort((a,b)=>a-b);
+          // Fewer safe scenes than requested? Each plays longer so the reel still fills
+          // the requested length.
+          segDur=Math.max(1,opts.duration/segs.length);
           // Play each segment back-to-back while recording the canvas continuously —
           // the seeks between them read as clean cuts.
           rec.start(); draw();
           const gt0=Date.now();
           for(const st of segs){
             await seekVid(src,st);
-            // Per-scene framing:
-            //  smart = crop the explicit scenes (top), leave tame ones full
-            //  sfw   = these are already the safest frames, but zoom to faces if any
-            //          skin remains, else full-cover
+            // smart mode tightens the crop on skin-heavy scenes; sfw stays full (its
+            // safety comes from selection + the frame-hold backstop, not cropping).
             if(opts.crop==="smart"){ curCrop = skinRatioNow(src)>0.16 ? "top" : "fill"; }
-            else if(opts.crop==="sfw"){ const sk=skinRatioNow(src); curCrop = sk>0.20 ? "face" : (sk>0.10 ? "top" : "fill"); }
             await src.play().catch(()=>{});
             const st0=Date.now();
             await new Promise(res=>{ const iv=setInterval(()=>{ if(opts.onTick)opts.onTick((Date.now()-gt0)/1000); if(Date.now()-st0>=segDur*1000){ clearInterval(iv); res(); } },150); });
@@ -933,41 +953,6 @@ async function load(){
       document.getElementById("veCharDel").addEventListener("click",()=>{ const sel=document.getElementById("veCharPreset"); if(sel.value==="") return; const arr=lsGet("vv_char_presets",[]); arr.splice(+sel.value,1); lsSet("vv_char_presets",arr); loadCharPresets(); });
       loadCharPresets();
 
-      // ── SFW auto-scan: sample frames, pick the window with the least skin-tone
-      // area (a dependency-free heuristic — best-effort, NOT a guarantee; always
-      // review + Blur for Instagram). Sets the shared Start field. ──
-      document.getElementById("veIgSfw").addEventListener("click",async()=>{
-        const b=document.getElementById("veIgSfw"), m=document.getElementById("veIgMsg");
-        if(!v.r2Key){ m.className="v-edit-msg err"; m.textContent="Video must be hosted first — play it once."; return; }
-        b.disabled=true; m.className="v-edit-msg"; m.textContent="Scanning for a safer moment…";
-        const src=document.createElement("video"); src.muted=true; src.playsInline=true; src.preload="auto"; src.crossOrigin="anonymous"; src.style.display="none";
-        src.src=`/clipsrc?key=${encodeURIComponent(v.r2Key)}`; document.body.appendChild(src);
-        try{
-          try{ await src.play(); }catch(e){}
-          if(src.readyState<1) await new Promise((res,rej)=>{ const to=setTimeout(()=>src.readyState>=1?res():rej(new Error("Video load timed out")),25000); src.addEventListener("loadedmetadata",()=>{clearTimeout(to);res();},{once:true}); src.addEventListener("error",()=>{clearTimeout(to);rej(new Error("Couldn't load video"));},{once:true}); });
-          src.pause();
-          const dur=src.duration||0; if(!dur){ throw new Error("No duration"); }
-          const clipLen=Math.min(30,Math.max(3,parseInt(document.getElementById("veClipDur").value,10)||8));
-          const N=Math.min(16,Math.max(6,Math.floor(dur/2)));
-          const c=document.createElement("canvas"); c.width=80; c.height=45; const cx=c.getContext("2d");
-          const scores=[];
-          for(let i=0;i<N;i++){
-            const t=Math.max(0,(dur-0.3)*(i/(N-1||1)));
-            await new Promise(res=>{ const to=setTimeout(res,3500); src.addEventListener("seeked",()=>{clearTimeout(to);res();},{once:true}); try{ src.currentTime=t; }catch(e){ clearTimeout(to); res(); } });
-            cx.drawImage(src,0,0,80,45);
-            const d=cx.getImageData(0,0,80,45).data; let skin=0,tot=0;
-            for(let p=0;p<d.length;p+=4){ const r=d[p],g=d[p+1],bl=d[p+2]; tot++; if(r>95&&g>40&&bl>20&&r>g&&r>bl&&Math.abs(r-g)>15&&(Math.max(r,g,bl)-Math.min(r,g,bl))>15) skin++; }
-            scores.push({t,skin:skin/(tot||1)});
-            m.textContent=`Scanning… ${i+1}/${N}`;
-          }
-          let best=scores[0],bestAvg=2;
-          for(const sc of scores){ const win=scores.filter(x=>x.t>=sc.t&&x.t<sc.t+clipLen); const avg=win.reduce((a,x)=>a+x.skin,0)/(win.length||1); if(avg<bestAvg){ bestAvg=avg; best=sc; } }
-          document.getElementById("veClipStart").value=Math.floor(best.t);
-          m.className="v-edit-msg ok"; m.textContent=`Suggested start ${Math.floor(best.t)}s (skin ~${Math.round(bestAvg*100)}%). Best-effort — review it, and keep Blur on for IG.`;
-        }catch(e){ m.className="v-edit-msg err"; m.textContent=e.message||"Scan failed"; }
-        finally{ b.disabled=false; try{ src.remove(); }catch(e){} }
-      });
-
       document.getElementById("veIgGo").addEventListener("click",async()=>{
         const goB=document.getElementById("veIgGo"), m=document.getElementById("veIgMsg"), cap=document.getElementById("veIgCaption");
         const dur=Math.min(30,Math.max(3,parseInt(document.getElementById("veClipDur").value,10)||10));
@@ -982,12 +967,14 @@ async function load(){
           const start=Math.max(parseInt(document.getElementById("veClipStart").value,10)||0, skip);
           // renderClip does the intro detection, chronological scene spread and
           // per-scene SFW/smart framing itself — we just hand it the settings.
+          let foundScenes=null;
           const out=await renderClip({mode:"ig",start,scenes,skip,autoSkip,crop,size,emojiImg:igEmojiImg,duration:dur,censor:document.getElementById("veIgBlur").checked,bgColor:IG_BG[document.getElementById("veIgTpl").value]||IG_BG.cork,topLines,charImg:igCharImg,
             onIntro:s=>{ if(s>0.5) m.textContent=`Skipping ~${s.toFixed(0)}s intro…`; },
-            onScan:(i,n)=>{ m.textContent=`Finding the safest scenes… ${i}/${n}`; },
+            onScan:(i,n,found)=>{ if(found!=null){ foundScenes=found; } else { m.textContent=`Scanning for safe scenes… ${i}/${n}`; } },
             onTick:e=>{m.textContent=`Recording… ${e.toFixed(0)}/${dur}s`;}});
           download(out.blob,`34vault-reel-${v.sourceId}.${out.ext}`);
-          m.className="v-edit-msg ok"; m.textContent=`Done — downloaded (${(out.blob.size/1048576).toFixed(1)} MB${out.ext==="webm"?", webm — Chrome exports mp4":""}).`;
+          const sceneNote=(crop==="sfw"&&foundScenes!=null)?` · ${foundScenes} safe scene${foundScenes===1?"":"s"} used`:"";
+          m.className="v-edit-msg ok"; m.textContent=`Done — downloaded (${(out.blob.size/1048576).toFixed(1)} MB${out.ext==="webm"?", webm — Chrome exports mp4":""})${sceneNote}.`;
           cap.style.display="block"; cap.value=buildCaptionClient();
         }catch(e){ m.className="v-edit-msg err"; m.textContent=e.message||"Failed"; }
         finally{ goB.disabled=false; }
