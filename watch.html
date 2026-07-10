@@ -546,6 +546,11 @@ async function load(){
               </div>
             </div>
           </div>
+          <div class="v-edit-row" style="margin-top:8px">
+            <div><label>Scenes</label><select id="veIgScenes" style="width:100%;height:36px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12.5px;padding:0 8px;font-family:inherit"><option value="1">1 scene</option><option value="2">2 scenes</option><option value="3">3 scenes</option></select></div>
+            <div><label>Framing</label><select id="veIgCrop" style="width:100%;height:36px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12.5px;padding:0 8px;font-family:inherit"><option value="fit">Fit (whole frame)</option><option value="fill">Fill (zoom to frame)</option><option value="top">Hide bottom (NSFW-cut)</option></select></div>
+            <div><label>Skip intro (sec)</label><input type="number" id="veIgSkip" min="0" value="0" /></div>
+          </div>
           <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px">
             <select id="veCharPreset" style="flex:1;min-width:120px;height:32px;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;padding:0 8px;font-family:inherit"><option value="">Character presets…</option></select>
             <button class="v-edit-cancel" id="veIgChar" type="button" style="height:32px;padding:0 10px;font-size:11px">⬆ Upload</button>
@@ -707,28 +712,56 @@ async function load(){
           const chunks=[]; rec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
           const stopped=new Promise(r=>rec.onstop=r);
           let raf;
+          // Draws the source into a target rect with a framing mode:
+          //  fit  = whole frame, letterboxed   fill = zoom to cover the rect
+          //  top  = show top ~66% (crops the bottom, where explicit content usually is)
+          function drawFrame(dx,dy,dw,dh){
+            const sw=src.videoWidth,sh=src.videoHeight; if(!sw||!sh) return;
+            const crop=opts.crop||"fit";
+            ctx.save(); if(opts.censor) ctx.filter="blur("+(opts.mode==="ig"?14:12)+"px)";
+            if(crop==="fit"){
+              let w=dw,h=dw*sh/sw; if(h>dh){ h=dh; w=dh*sw/sh; }
+              ctx.drawImage(src,dx+(dw-w)/2,dy+(dh-h)/2,w,h);
+            } else {
+              const tAR=dw/dh; let sx,sy,scw,sch;
+              if(crop==="top"){ const regH=sh*0.66, regAR=sw/regH;
+                if(regAR>tAR){ sch=regH; scw=regH*tAR; sx=(sw-scw)/2; } else { scw=sw; sch=sw/tAR; sx=0; } sy=0;
+              } else { const sAR=sw/sh;
+                if(sAR>tAR){ sch=sh; scw=sh*tAR; sx=(sw-scw)/2; sy=0; } else { scw=sw; sch=sw/tAR; sx=0; sy=(sh-sch)/2; }
+              }
+              ctx.drawImage(src,sx,sy,scw,sch,dx,dy,dw,dh);
+            }
+            ctx.restore();
+          }
+          const igBandW=W-80, igBandH=(opts.crop==="fill"||opts.crop==="top")?900:Math.round((W-80)*9/16), igBandY=Math.round((H-igBandH)/2);
           const draw=()=>{
             if(opts.mode==="ig"){
               ctx.fillStyle=opts.bgColor; ctx.fillRect(0,0,W,H);
-              const cw=W-80, ch=cw*(src.videoHeight/src.videoWidth||0.5625), cy=(H-ch)/2;
-              ctx.save(); if(opts.censor) ctx.filter="blur(14px)";
-              ctx.drawImage(src,40,cy,cw,ch); ctx.restore();
-              if(opts.charImg){ const chH=660, cW=opts.charImg.width*chH/opts.charImg.height; ctx.drawImage(opts.charImg,W-cW-24,H-chH-20,cW,chH); }
+              drawFrame(40,igBandY,igBandW,igBandH);
+              if(opts.charImg){ const bottomSpace=H-(igBandY+igBandH); const chH=Math.max(340,Math.min(660,bottomSpace-8)); const cW=opts.charImg.width*chH/opts.charImg.height; ctx.drawImage(opts.charImg,W-cW-24,H-chH-16,cW,chH); }
               ctx.fillStyle="#111"; ctx.textAlign="center"; ctx.textBaseline="alphabetic"; ctx.font="bold 72px "+CLIP_FONT_STACK;
-              (opts.topLines||[]).forEach((ln,i)=>ctx.fillText(ln,W/2,250+i*90));
+              (opts.topLines||[]).forEach((ln,i)=>ctx.fillText(ln,W/2,200+i*90));
             } else {
               ctx.fillStyle="#000"; ctx.fillRect(0,0,W,H);
-              const s=Math.min(W/src.videoWidth,H/src.videoHeight)||1, dw=src.videoWidth*s, dh=src.videoHeight*s;
-              ctx.save(); if(opts.censor) ctx.filter="blur(12px)";
-              ctx.drawImage(src,(W-dw)/2,(H-dh)/2,dw,dh); ctx.restore();
+              drawFrame(0,0,W,H);
               ctx.font="bold 34px "+CLIP_FONT_STACK; ctx.textAlign="center"; ctx.fillStyle="rgba(255,255,255,.92)";
               ctx.fillText("34VAULTVIDEO.COM",W/2,H-28);
             }
             raf=requestAnimationFrame(draw);
           };
-          rec.start(); await src.play().catch(()=>{}); draw();
-          const t0=Date.now();
-          await new Promise(res=>{ const iv=setInterval(()=>{ const el=(Date.now()-t0)/1000; if(opts.onTick)opts.onTick(el); if(el>=opts.duration){ clearInterval(iv); res(); } },200); });
+          // One or more scenes: play each segment back-to-back while recording the
+          // canvas continuously — the seeks between them read as clean cuts.
+          rec.start(); draw();
+          const segs=(opts.segments&&opts.segments.length)?opts.segments:[opts.start||0];
+          const segDur=Math.max(1,opts.duration/segs.length);
+          const gt0=Date.now();
+          for(const st of segs){
+            await new Promise(res=>{ const to=setTimeout(res,3500); src.addEventListener("seeked",()=>{clearTimeout(to);res();},{once:true}); try{ src.currentTime=Math.min(Math.max(0,st),(src.duration||1)-0.2); }catch(e){ clearTimeout(to); res(); } });
+            await src.play().catch(()=>{});
+            const st0=Date.now();
+            await new Promise(res=>{ const iv=setInterval(()=>{ if(opts.onTick)opts.onTick((Date.now()-gt0)/1000); if(Date.now()-st0>=segDur*1000){ clearInterval(iv); res(); } },150); });
+            src.pause();
+          }
           cancelAnimationFrame(raf); rec.stop(); src.pause();
           await stopped;
           const ext=mime.indexOf("mp4")>=0?"mp4":"webm";
@@ -840,7 +873,16 @@ async function load(){
         goB.disabled=true; m.className="v-edit-msg"; m.textContent="Recording the Reel in your browser…";
         try{
           const topLines=document.getElementById("veIgTop").value.split(/\s*\/\s*|\n/).map(s=>s.trim()).filter(Boolean).slice(0,3);
-          const out=await renderClip({mode:"ig",start:parseInt(document.getElementById("veClipStart").value,10)||0,duration:dur,censor:document.getElementById("veIgBlur").checked,bgColor:IG_BG[document.getElementById("veIgTpl").value]||IG_BG.cork,topLines,charImg:igCharImg,onTick:e=>{m.textContent=`Recording… ${e.toFixed(0)}/${dur}s`;}});
+          const scenes=Math.max(1,Math.min(3,parseInt(document.getElementById("veIgScenes").value,10)||1));
+          const skip=Math.max(0,parseInt(document.getElementById("veIgSkip").value,10)||0);
+          const crop=document.getElementById("veIgCrop").value||"fit";
+          const start=Math.max(parseInt(document.getElementById("veClipStart").value,10)||0, skip);
+          let segments=[start];
+          if(scenes>1){
+            const total=v.duration||0, segDur=dur/scenes, lo=skip, hi=Math.max(lo+segDur, total-segDur);
+            segments=[]; for(let i=0;i<scenes;i++) segments.push(Math.round(lo+(hi-lo)*(scenes>1?i/(scenes-1):0)));
+          }
+          const out=await renderClip({mode:"ig",start,segments,crop,duration:dur,censor:document.getElementById("veIgBlur").checked,bgColor:IG_BG[document.getElementById("veIgTpl").value]||IG_BG.cork,topLines,charImg:igCharImg,onTick:e=>{m.textContent=`Recording… ${e.toFixed(0)}/${dur}s`;}});
           download(out.blob,`34vault-reel-${v.sourceId}.${out.ext}`);
           m.className="v-edit-msg ok"; m.textContent=`Done — downloaded (${(out.blob.size/1048576).toFixed(1)} MB${out.ext==="webm"?", webm — Chrome exports mp4":""}).`;
           cap.style.display="block"; cap.value=buildCaptionClient();
