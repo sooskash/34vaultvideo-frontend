@@ -892,7 +892,7 @@ async function load(){
               let p=null; try{ p=await nsfwProbs(src); }catch(e){}
               // unsafe if: model flags it, OR lots of skin overall, OR a dense flesh cell
               // (genital/nudity close-up on dark fur), OR black/fade.
-              return { unsafe: !p || rs.bright<=24 || probUnsafe(p) || rs.skin>0.32 || rs.maxCell>0.55, risk: p?probRisk(p):rs.skin, p, skin:rs.skin, maxCell:rs.maxCell }; };
+              return { unsafe: !p || rs.bright<=24 || probUnsafe(p) || rs.skin>0.32 || rs.maxCell>0.75, risk: p?probRisk(p):rs.skin, p, skin:rs.skin, maxCell:rs.maxCell }; };
             // Credits/outro can be long — cut a generous tail so they're never picked.
             const endTrim=Math.min(60,Math.max(12,total*0.2));
             const span=Math.max(1,(total-endTrim)-introSkip);
