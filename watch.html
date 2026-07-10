@@ -865,13 +865,13 @@ async function load(){
             if(opts.onModel) opts.onModel("loading");
             await loadNsfwModel(); // throws → caught by caller → nothing is produced
             if(opts.onModel) opts.onModel("ready");
-            // A frame is unsafe if the model flags it, OR it's very skin-heavy (nudity
-            // the model may under-rate on furry), OR it's black/fade.
-            const frameUnsafe=async()=>{ const skin=skinRatioNow(src), bright=sampleFrame(src).bright;
-              if(bright<=24) return true;
-              let p; try{ p=await nsfwProbs(src); }catch(e){ return true; }
-              return probUnsafe(p) || skin>0.32; };
-            const frameScore=async()=>{ let p; try{ p=await nsfwProbs(src); }catch(e){ return 1; } return probRisk(p); };
+            // Analyse the current frame ONCE — model + skin + brightness — and derive
+            // both the unsafe verdict and the ranking score. Unsafe if the model flags
+            // it, OR it's very skin-heavy (nudity the model may under-rate on furry),
+            // OR it's black/fade.
+            const analyzeFrame=async()=>{ const skin=skinRatioNow(src), bright=sampleFrame(src).bright;
+              let p=null; try{ p=await nsfwProbs(src); }catch(e){}
+              return { unsafe: !p || bright<=24 || probUnsafe(p) || skin>0.32, risk: p?probRisk(p):1, p, skin }; };
             // Credits usually sit in the last 5–10s — never select from there.
             const endTrim=Math.min(10,Math.max(5,total*0.05));
             const span=Math.max(1,(total-endTrim)-introSkip);
@@ -880,9 +880,11 @@ async function load(){
             const samp=[];
             for(let i=0;i<N;i++){
               const t=introSkip+span*(i/(N-1||1)); await seekVid(src,t);
-              samp.push({t, unsafe:await frameUnsafe(), risk:await frameScore()});
+              const a=await analyzeFrame(); samp.push({t, unsafe:a.unsafe, risk:a.risk, p:a.p, skin:a.skin});
               if(opts.onScan) opts.onScan(i+1,N);
             }
+            // Diagnostics — if anything still slips, the console has the real numbers.
+            try{ console.log("[reel SFW] scan", samp.map(s=>({t:+s.t.toFixed(1), H:+(((s.p||{}).Hentai)||0).toFixed(2), P:+(((s.p||{}).Porn)||0).toFixed(2), Se:+(((s.p||{}).Sexy)||0).toFixed(2), Dr:+(((s.p||{}).Drawing)||0).toFixed(2), skin:+s.skin.toFixed(2), bad:s.unsafe}))); }catch(e){}
             // A window is a candidate only if EVERY sample inside it is safe.
             const wins=samp.map(s=>{ const w=samp.filter(x=>x.t>=s.t&&x.t<s.t+winDur);
               return { t:s.t, bad:w.some(x=>x.unsafe), avgRisk:w.reduce((a,x)=>a+x.risk,0)/(w.length||1) }; });
@@ -896,9 +898,10 @@ async function load(){
             for(let k=0;k<picked.length;k++){
               if(opts.onVerify) opts.onVerify(k+1,picked.length);
               let ok=true;
-              for(let t=picked[k]; t<picked[k]+winDur; t+=0.5){ await seekVid(src,t); if(await frameUnsafe()){ ok=false; break; } }
+              for(let t=picked[k]; t<picked[k]+winDur; t+=0.5){ await seekVid(src,t); if((await analyzeFrame()).unsafe){ ok=false; break; } }
               if(ok) verified.push(picked[k]);
             }
+            try{ console.log("[reel SFW] picked", picked.map(t=>+t.toFixed(1)), "→ verified", verified.map(t=>+t.toFixed(1))); }catch(e){}
             if(!verified.length) throw new Error("No clean scene found in this video — it's too explicit throughout. Try another video, or use Full frame + Blur.");
             verified.sort((a,b)=>a-b);
             segs=verified;
