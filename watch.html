@@ -896,7 +896,7 @@ async function load(){
             const N=Math.min(72, Math.max(12, Math.ceil(span/5)+1));
             const step=span/Math.max(1,(N-1)); // sample spacing (used to extend clean runs)
             const capCv=document.createElement("canvas"), capX=capCv.getContext("2d");
-            const grabURL=()=>{ const sw=src.videoWidth||16, sh=src.videoHeight||9, w=320, h=Math.max(1,Math.round(320*sh/sw)); capCv.width=w; capCv.height=h; capX.drawImage(src,0,0,w,h); return capCv.toDataURL("image/jpeg",0.6); };
+            const grabURL=()=>{ const sw=src.videoWidth||16, sh=src.videoHeight||9, w=448, h=Math.max(1,Math.round(448*sh/sw)); capCv.width=w; capCv.height=h; capX.drawImage(src,0,0,w,h); return capCv.toDataURL("image/jpeg",0.82); };
             const times=[], urls=[];
             for(let i=0;i<N;i++){ const t=introSkip+span*(i/(N-1||1)); await seekVid(src,t); times.push(t); urls.push(grabURL()); if(opts.onScan) opts.onScan(i+1,N); }
             // classify a list of frame data-URLs via backend → Z3D service
