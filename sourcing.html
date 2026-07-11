@@ -88,10 +88,11 @@
 <div class="wrap" id="gate" style="display:none">
   <div class="gate">
     <h1>Owner access</h1>
-    <div class="sub">Enter your admin key to continue.</div>
+    <div class="sub">Sign in with your <b>owner account</b> on 34vaultvideo.com — then this page just works, no key needed.<br><a href="auth.html" style="color:var(--accent);font-weight:800">Go to login →</a></div>
     <div class="card">
-      <input type="password" id="keyInput" placeholder="Admin key" />
-      <button class="btn" style="width:100%;margin-top:12px" onclick="saveKey()">Unlock</button>
+      <div class="hint" style="margin:0 0 10px;text-align:left">Already logged in and still seeing this? Reload the page. Or paste your admin key as a fallback:</div>
+      <input type="password" id="keyInput" placeholder="Admin key (optional fallback)" />
+      <button class="btn" style="width:100%;margin-top:12px" onclick="saveKey()">Unlock with key</button>
       <div class="msg" id="gateMsg"></div>
     </div>
   </div>
@@ -127,6 +128,20 @@
     </div>
     <div class="feed" id="feed"></div>
     <div class="empty" id="feedEmpty" style="display:none"></div>
+  </div>
+</div>
+
+<!-- Source finder modal -->
+<div id="finder" style="display:none;position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.7);backdrop-filter:blur(3px)">
+  <div style="max-width:640px;margin:6vh auto;background:var(--surface,#111318);border:1px solid var(--border,#1e222e);border-radius:16px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:10px;padding:16px 18px;border-bottom:1px solid var(--border,#1e222e)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:900">Find the source</div>
+        <div id="finderQ" style="font-size:12px;color:var(--sub,#8891a8);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+      </div>
+      <button class="btn ghost sm" onclick="closeFinder()">Close</button>
+    </div>
+    <div id="finderBody" style="padding:14px 18px;overflow:auto"></div>
   </div>
 </div>
 
@@ -190,10 +205,12 @@ function renderPages(pages){
 }
 
 function setFilter(f){ FILTER=f; document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("on",c.dataset.f===f)); renderFeed(); }
+let CUR=[];  // currently-rendered (filtered) feed items — buttons index into this
 function renderFeed(){
   let items=FEED;
-  if(FILTER==="miss") items=FEED.filter(x=>x.sourceName&&!x.onSite);
-  else if(FILTER==="have") items=FEED.filter(x=>x.onSite);
+  if(FILTER==="miss") items=FEED.filter(x=>x.sourceName&&!x.onSite&&!x._added);
+  else if(FILTER==="have") items=FEED.filter(x=>x.onSite||x._added);
+  CUR=items;
   $("feedCount").textContent=FEED.length;
   const el=$("feed"), emp=$("feedEmpty");
   if(!items.length){
@@ -202,17 +219,18 @@ function renderFeed(){
     return;
   }
   emp.style.display="none";
-  el.innerHTML=items.map(x=>{
+  el.innerHTML=items.map((x,i)=>{
     const badge=x.onSite?`<span class="badge have">✓ ON SITE</span>`
+      :x._added?`<span class="badge have">✓ ADDED</span>`
       :x.sourceName?`<span class="badge miss">⚠ ADD IT</span>`
       :`<span class="badge nosrc">no source</span>`;
     const title=x.sourceName?esc(x.sourceName):`<span style="color:var(--sub)">${esc((x.caption||"").slice(0,60))||"(no caption)"}</span>`;
     const reelUrl=/^https?:\/\//.test(x.reelUrl||"")?x.reelUrl:"";
-    const act=x.onSite
-      ? `<a class="btn sm" href="https://34vaultvideo.com/watch.html?slug=${encodeURIComponent(x.match.slug)}" target="_blank" rel="noopener">Open on site</a>`
-      : (x.sourceName
-          ? `<a class="btn sm" href="https://rule34video.com/search/${encodeURIComponent(x.sourceName)}/" target="_blank" rel="noopener">Find source</a>`
-          : "");
+    const artist=(x.mentions&&x.mentions.length)?`<span>by @${esc(x.mentions[0])}</span>`:"";
+    let act="";
+    if(x.onSite&&x.match) act=`<a class="btn sm" href="https://34vaultvideo.com/watch.html?slug=${encodeURIComponent(x.match.slug)}" target="_blank" rel="noopener">Open on site</a>`;
+    else if(x._added) act=`<span class="btn ghost sm" style="cursor:default;opacity:.8">Added ✓</span>`;
+    else if(x.sourceName) act=`<button class="btn sm find-src" data-i="${i}">Find source</button>`;
     const reelBtn=reelUrl?`<a class="btn ghost sm" href="${esc(reelUrl)}" target="_blank" rel="noopener">Reel</a>`:"";
     const thumb=/^https?:\/\//.test(x.thumb||"")
       ? `<img src="${esc(x.thumb)}" referrerpolicy="no-referrer" loading="lazy" onerror="this.parentNode.classList.add('noimg');this.remove()" alt="">`
@@ -221,11 +239,57 @@ function renderFeed(){
       <div class="thumb">${thumb}${badge}<span class="plays">▶ ${nfmt(x.plays)}</span></div>
       <div class="body">
         <div class="src">${title}</div>
-        <div class="meta"><span>♥ ${nfmt(x.likes)}</span>${x.durationSec?`<span>${Math.round(x.durationSec)}s</span>`:""}<span>@${esc(x.user)}</span></div>
+        <div class="meta"><span>♥ ${nfmt(x.likes)}</span>${x.durationSec?`<span>${Math.round(x.durationSec)}s</span>`:""}${artist||`<span>@${esc(x.user)}</span>`}</div>
         <div class="acts">${act}${reelBtn}</div>
       </div>
     </div>`;
   }).join("");
+  el.querySelectorAll(".find-src").forEach(b=>b.addEventListener("click",()=>findSource(CUR[Number(b.dataset.i)])));
+}
+
+// ── source finder: search rule34video for a missing reel, one-click add ──
+function closeFinder(){ $("finder").style.display="none"; }
+async function findSource(x){
+  if(!x||!x.sourceName) return;
+  $("finder").style.display="";
+  $("finderQ").textContent=x.sourceName+(x.mentions&&x.mentions.length?"  · artist @"+x.mentions[0]:"");
+  const body=$("finderBody");
+  body.innerHTML=`<div class="hint" style="margin:0"><span class="spin"></span> Searching rule34video…</div>`;
+  try{
+    const d=await api("/api/admin/sourcing/find",{method:"POST",body:JSON.stringify({query:x.sourceName})});
+    renderCandidates(x, d.candidates||[], d.matchedQuery);
+  }catch(e){ body.innerHTML=`<div class="msg err" style="display:block;margin:0">${esc(e.message||"Search failed")}</div>`; }
+}
+function renderCandidates(x, cands, matchedQuery){
+  const body=$("finderBody");
+  const manual=`<div class="hint" style="margin-top:14px">Not it? <a href="https://rule34video.com/search/${encodeURIComponent(x.sourceName)}/" target="_blank" rel="noopener" style="color:var(--accent);font-weight:800">Search rule34video manually →</a>${(x.mentions&&x.mentions.length)?` · or <a href="https://rule34video.com/search/${encodeURIComponent(x.mentions[0])}/" target="_blank" rel="noopener" style="color:var(--accent);font-weight:800">by artist @${esc(x.mentions[0])} →</a>`:""}</div>`;
+  if(!cands.length){
+    body.innerHTML=`<div class="hint" style="margin:0">No rule34video results for “${esc(x.sourceName)}”. It may be on another site, or titled differently.</div>${manual}`;
+    return;
+  }
+  body.innerHTML=cands.map((c,i)=>`
+    <div style="display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border,#1e222e)">
+      <a href="${esc(c.url)}" target="_blank" rel="noopener" style="width:120px;flex:none;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#0d1018;display:block">
+        ${/^https?:\/\//.test(c.thumb||"")?`<img src="${esc(c.thumb)}" referrerpolicy="no-referrer" loading="lazy" style="width:100%;height:100%;object-fit:cover" onerror="this.remove()" alt="">`:""}
+      </a>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:800;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(c.title)}</div>
+        <div style="font-size:11px;color:var(--sub,#8891a8);margin-top:3px">${c.duration?Math.round(c.duration)+"s · ":""}<a href="${esc(c.url)}" target="_blank" rel="noopener" style="color:var(--accent)">preview</a></div>
+      </div>
+      <button class="btn sm cand-add" data-i="${i}">Add to site</button>
+    </div>`).join("")+manual;
+  body.querySelectorAll(".cand-add").forEach(b=>b.addEventListener("click",()=>addFromCandidate(x, cands[Number(b.dataset.i)], b)));
+}
+async function addFromCandidate(x, c, btn){
+  if(!c||!c.url) return;
+  btn.disabled=true; const old=btn.textContent; btn.innerHTML='<span class="spin"></span>';
+  try{
+    const d=await api("/api/admin/scrape",{method:"POST",body:JSON.stringify({url:c.url,pages:1})});
+    btn.textContent=(d.added?"Added ✓":"Already had ✓");
+    // optimistically flip every feed row with this source name
+    FEED.forEach(f=>{ if(f.sourceName===x.sourceName){ f._added=true; } });
+    renderFeed();
+  }catch(e){ btn.disabled=false; btn.textContent=old; show($("pgMsg"),"err",e.message||"Add failed"); }
 }
 
 async function addPage(){
@@ -262,9 +326,12 @@ async function doRefresh(body,label){
   }
 }
 
-// boot
-if(KEY){ api("/api/admin/sourcing").then(main).catch(gate); } else { gate(); }
+// boot — try the OWNER/ADMIN session cookie first (requireAdminOrOwner accepts it),
+// so a logged-in owner needs no key at all. A stored key still works as a fallback,
+// and the key gate only shows if neither authenticates.
+api("/api/admin/sourcing").then(main).catch(gate);
 $("keyInput")&&$("keyInput").addEventListener("keydown",e=>{ if(e.key==="Enter") saveKey(); });
+document.getElementById("finder")&&document.getElementById("finder").addEventListener("click",e=>{ if(e.target.id==="finder") closeFinder(); });
 $("uname")&&$("uname").addEventListener("keydown",e=>{ if(e.key==="Enter") addPage(); });
 </script>
 </body>
