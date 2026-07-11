@@ -899,16 +899,21 @@ async function load(){
             const grabURL=()=>{ const sw=src.videoWidth||16, sh=src.videoHeight||9, w=320, h=Math.max(1,Math.round(320*sh/sw)); capCv.width=w; capCv.height=h; capX.drawImage(src,0,0,w,h); return capCv.toDataURL("image/jpeg",0.6); };
             const times=[], urls=[];
             for(let i=0;i<N;i++){ const t=introSkip+span*(i/(N-1||1)); await seekVid(src,t); times.push(t); urls.push(grabURL()); if(opts.onScan) opts.onScan(i+1,N); }
-            // classify in batches through our backend → Z3D service
-            const verdicts=new Array(N);
-            for(let s=0;s<N;s+=16){
-              const batch=urls.slice(s,s+16);
-              const r=await fetch(`${API}/api/reel/nsfw`,{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({images:batch})});
-              if(!r.ok) throw new Error("AI check failed ("+r.status+") — the detector service may be starting up, try again in a minute.");
-              const j=await r.json(); (j.results||[]).forEach((v,k)=>{ verdicts[s+k]=v; });
-              if(opts.onVerify) opts.onVerify(Math.min(s+16,N),N);
+            // classify a list of frame data-URLs via backend → Z3D service
+            let _aiDone=0, _aiTotal=N;
+            async function aiClassify(list){
+              const res=[];
+              for(let s=0;s<list.length;s+=16){
+                const batch=list.slice(s,s+16);
+                const r=await fetch(`${API}/api/reel/nsfw`,{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({images:batch})});
+                if(!r.ok) throw new Error("AI check failed ("+r.status+") — the detector service may be starting up, try again in a minute.");
+                const j=await r.json(); (j.results||[]).forEach(v=>res.push({explicit:!!(v&&v.explicit), tags:v&&v.tags}));
+                _aiDone+=batch.length; if(opts.onVerify) opts.onVerify(Math.min(_aiDone,_aiTotal),_aiTotal);
+              }
+              return res;
             }
-            const samp=times.map((t,i)=>{ const v=verdicts[i]||{}; return { t, unsafe: !!v.explicit, risk: v.explicit?1:0, tags:v.tags }; });
+            const verd=await aiClassify(urls);
+            const samp=times.map((t,i)=>{ const v=verd[i]||{}; return { t, unsafe: !!v.explicit, risk: v.explicit?1:0, tags:v.tags }; });
             scanSamp=samp; // draw() reads this to crop only flagged moments (cropnsfw)
             try{ console.log("[reel SFW] AI scan", samp.map(s=>({t:+s.t.toFixed(1), bad:s.unsafe, tags:(s.tags||[]).slice(0,3)}))); }catch(e){}
             const requireClean = opts.crop!=="cropnsfw";
@@ -940,9 +945,18 @@ async function load(){
               const slots=[];
               for(const r of usable){ const c=cnt.get(r)||0; if(!c) continue; const spacing=r.len/c, sub=Math.min(segDur,spacing); for(let j=0;j<c;j++) slots.push({start:r.start+j*spacing, len:sub}); }
               slots.sort((a,b)=>a.start-b.start);
-              // slots already sit inside AI-verified clean runs (every sample in the run
-              // was rated clean by Z3D), so accept them directly.
-              for(const sl of slots) if(sl.len>=0.8) final.push({t:sl.start, len:sl.len});
+              // FINE AI-verify — the coarse scan (every ~5s) misses explicit content
+              // that appears BETWEEN samples inside a played scene. Re-check each slot
+              // every ~0.8s and truncate at the first explicit frame (drop if <0.8s
+              // survives). This is what actually keeps mid-scene drift out of the reel.
+              _aiTotal += slots.reduce((a,sl)=>a+Math.ceil(sl.len/0.8),0);
+              for(const sl of slots){
+                const vt=[], vurls=[];
+                for(let t=sl.start; t<sl.start+sl.len+0.001; t+=0.8){ await seekVid(src,t); vt.push(t); vurls.push(grabURL()); }
+                const vv=await aiClassify(vurls);
+                let safeLen=0; for(let i=0;i<vt.length;i++){ if(vv[i]&&vv[i].explicit) break; safeLen=Math.min(sl.len,(vt[i]-sl.start)+0.8); }
+                if(safeLen>=0.8) final.push({t:sl.start, len:safeLen});
+              }
             }
             final.sort((a,b)=>a.t-b.t);
             try{ console.log("[reel SFW] final", final.map(c=>({t:+c.t.toFixed(1),len:+c.len.toFixed(1)}))); }catch(e){}
