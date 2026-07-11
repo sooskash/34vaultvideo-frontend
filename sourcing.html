@@ -116,7 +116,7 @@
       <button class="btn ghost" onclick="load()">Reload feed</button>
     </div>
     <div class="msg" id="pgMsg"></div>
-    <div class="hint">Instagram age-gates these pages, so we use the one scraper that gets through — and its free tier allows <b>one refresh per day</b>. Each refresh pulls the freshest page's top reels and re-checks your catalog; the feed below is cached and always instant. Resets at midnight UTC. <b>To refresh more often / more pages, upgrade the Apify plan.</b></div>
+    <div class="hint">Scrapes Instagram directly through your residential proxies + a burner IG session — <b>no daily limit, no fees</b>. Each refresh pulls a page's top reels and re-checks your catalog; the feed below is cached and instant. If a refresh errors with “session expired / login required”, the burner account needs a fresh <code>IG_SESSIONID</code> in Render.</div>
   </div>
 
   <div class="card">
@@ -179,6 +179,8 @@ async function load(){
     renderPages(d.pages||[]);
     FEED=d.feed||[];
     renderFeed();
+    if(d.sessionReady===false) show($("pgMsg"),"warn","⚠ No Instagram session set. Add a burner account's <code>IG_SESSIONID</code> in Render, then Refresh. Scraping won't work until then.");
+    else if(d.proxyReady===false) show($("pgMsg"),"warn","⚠ No residential proxy configured (PROXY_URLS) — required to reach Instagram.");
   }catch(e){ if(e.status===401) gate(); else show($("pgMsg"),"err",e.message||"Failed to load"); }
 }
 
@@ -188,7 +190,7 @@ function renderPages(pages){
   if(!pages.length){ el.innerHTML=`<div class="hint">No pages yet. Add a competitor's Instagram username below.</div>`; return; }
   el.innerHTML=pages.map(p=>{
     let pill=`<span class="pill fresh">fresh · ${ago(p.fetchedAt)}</span>`;
-    if(p.error) pill=`<span class="pill err">${p.error==="daily_limit_reached"?"daily limit — try after midnight UTC":esc(p.error)}</span>`;
+    if(p.error) pill=`<span class="pill err">${esc(p.error)}</span>`;
     else if(p.stale) pill=`<span class="pill stale">${p.fetchedAt?"stale · "+ago(p.fetchedAt):"never refreshed"}</span>`;
     return `<div class="pg">
       <div style="flex:1;min-width:0">
@@ -215,7 +217,7 @@ function renderFeed(){
   const el=$("feed"), emp=$("feedEmpty");
   if(!items.length){
     el.innerHTML=""; emp.style.display="";
-    emp.textContent=FEED.length? "Nothing matches this filter." : "No cached reels yet — add a page and hit Refresh (uses the one daily run).";
+    emp.textContent=FEED.length? "Nothing matches this filter." : "No cached reels yet — add a page and hit Refresh.";
     return;
   }
   emp.style.display="none";
@@ -299,7 +301,7 @@ async function addPage(){
   $("addBtn").disabled=true;
   try{ await api("/api/admin/sourcing/pages",{method:"POST",body:JSON.stringify({username,label})});
     $("uname").value=""; $("ulabel").value="";
-    show($("pgMsg"),"ok","Page added. Hit its Refresh to pull reels (uses the daily run).");
+    show($("pgMsg"),"ok","Page added. Hit its Refresh to pull reels.");
     await load();
   }catch(e){ show($("pgMsg"),"err",e.message||"Failed"); }
   finally{ $("addBtn").disabled=false; }
@@ -319,8 +321,7 @@ async function doRefresh(body,label){
     show($("pgMsg"),"ok",`Refreshed @${esc(d.username)} — ${d.count} reels pulled.`);
     await load();
   }catch(e){
-    if(e.status===429){ show($("pgMsg"),"warn","⏳ "+(e.data&&e.data.message||"Daily scrape limit reached. Try again after midnight UTC.")); await load(); }
-    else show($("pgMsg"),"err",e.message||"Failed");
+    show($("pgMsg"),"err",e.message||"Failed"); await load();
   }finally{
     $("refreshBtn").disabled=false;
     document.querySelectorAll(".pg-ref").forEach(b=>b.disabled=false);
