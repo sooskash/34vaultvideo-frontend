@@ -232,6 +232,7 @@ function renderFeed(){
     if(x.onSite&&x.match) act=`<a class="btn sm" href="https://34vaultvideo.com/watch.html?slug=${encodeURIComponent(x.match.slug)}" target="_blank" rel="noopener">Open on site</a>`;
     else if(x._added) act=`<span class="btn ghost sm" style="cursor:default;opacity:.8">Added ✓</span>`;
     else if(x.sourceName) act=`<button class="btn sm find-src" data-i="${i}">Find source</button>`;
+    else act=`<button class="btn sm find-src" data-i="${i}">🔍 Find sauce</button>`;
     const reelBtn=reelUrl?`<a class="btn ghost sm" href="${esc(reelUrl)}" target="_blank" rel="noopener">Reel</a>`:"";
     const thumb=/^https?:\/\//.test(x.thumb||"")
       ? `<img src="${esc(x.thumb)}" referrerpolicy="no-referrer" loading="lazy" onerror="this.parentNode.classList.add('noimg');this.remove()" alt="">`
@@ -248,17 +249,72 @@ function renderFeed(){
   el.querySelectorAll(".find-src").forEach(b=>b.addEventListener("click",()=>findSource(CUR[Number(b.dataset.i)])));
 }
 
-// ── source finder: search rule34video for a missing reel, one-click add ──
+// ── source finder: rule34video search (captioned reels) or reverse-image sauce (no caption) ──
 function closeFinder(){ $("finder").style.display="none"; }
 async function findSource(x){
-  if(!x||!x.sourceName) return;
+  if(!x) return;
   $("finder").style.display="";
-  $("finderQ").textContent=x.sourceName+(x.mentions&&x.mentions.length?"  · artist @"+x.mentions[0]:"");
   const body=$("finderBody");
-  body.innerHTML=`<div class="hint" style="margin:0"><span class="spin"></span> Searching rule34video…</div>`;
+  if(x.sourceName){
+    $("finderQ").textContent=x.sourceName+(x.mentions&&x.mentions.length?"  · artist @"+x.mentions[0]:"");
+    body.innerHTML=`<div class="hint" style="margin:0"><span class="spin"></span> Searching rule34video…</div>`;
+    try{
+      const d=await api("/api/admin/sourcing/find",{method:"POST",body:JSON.stringify({query:x.sourceName})});
+      renderCandidates(x, d.candidates||[], d.matchedQuery);
+    }catch(e){ body.innerHTML=`<div class="msg err" style="display:block;margin:0">${esc(e.message||"Search failed")}</div>`; }
+  } else {
+    // no caption source → reverse-image search the thumbnail (SauceNAO)
+    $("finderQ").textContent="No caption source — reverse-image searching the frame…";
+    body.innerHTML=`<div class="hint" style="margin:0"><span class="spin"></span> Reverse-image searching (SauceNAO)…</div>`;
+    try{
+      const d=await api("/api/admin/sourcing/sauce",{method:"POST",body:JSON.stringify({thumb:x.thumb})});
+      renderSauce(x, d.results||[], null);
+    }catch(e){ renderSauce(x, [], e.message||"Reverse search failed"); }
+  }
+}
+// Reverse-image matches + a manual box; anything found can be searched on rule34video → added.
+function renderSauce(x, results, msg){
+  const body=$("finderBody");
+  let html="";
+  if(msg) html+=`<div class="msg warn" style="display:block;margin:0 0 12px">${esc(msg)}</div>`;
+  if(results && results.length){
+    html+=`<div class="hint" style="margin:0 0 8px">Reverse-image matches (higher % = closer):</div>`;
+    html+=results.map((c,i)=>{
+      const label=[c.title,c.artist].filter(Boolean).join(" · ")||c.site||"(match)";
+      const q=c.title||c.artist||"";
+      return `<div style="display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border,#1e222e)">
+        <div style="width:64px;flex:none;aspect-ratio:1;border-radius:8px;overflow:hidden;background:#0d1018">
+          ${/^https?:\/\//.test(c.thumb||"")?`<img src="${esc(c.thumb)}" referrerpolicy="no-referrer" loading="lazy" style="width:100%;height:100%;object-fit:cover" onerror="this.remove()" alt="">`:""}
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(label)}</div>
+          <div style="font-size:11px;color:var(--sub,#8891a8);margin-top:2px">${c.similarity.toFixed(0)}% · ${esc(c.site||"")} ${c.url?`· <a href="${esc(c.url)}" target="_blank" rel="noopener" style="color:var(--accent)">open source</a>`:""}</div>
+        </div>
+        ${q?`<button class="btn sm sauce-r34" data-q="${esc(q)}">rule34video →</button>`:""}
+      </div>`;
+    }).join("");
+  } else if(!msg){
+    html+=`<div class="hint" style="margin:0">No reverse-image matches for this frame — common for 3D/SFM. Eyeball the reel, then type what it is:</div>`;
+  }
+  html+=`<div style="display:flex;gap:8px;margin-top:14px">
+    <input id="sauceQ" placeholder="animation / character / artist…" style="flex:1;height:38px;background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);border-radius:9px;color:var(--text);padding:0 12px;font-size:13px;outline:none">
+    <button class="btn sm" id="sauceGo">Search rule34video</button>
+  </div>
+  <div class="hint" style="margin-top:8px"><a href="${esc(x.reelUrl||'#')}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:800">▶ Open the reel</a> to see what it is.</div>`;
+  body.innerHTML=html;
+  body.querySelectorAll(".sauce-r34").forEach(b=>b.addEventListener("click",()=>findByQuery(x,b.dataset.q)));
+  const go=$("sauceGo"), inp=$("sauceQ");
+  if(go) go.addEventListener("click",()=>{ const q=inp.value.trim(); if(q) findByQuery(x,q); });
+  if(inp) inp.addEventListener("keydown",e=>{ if(e.key==="Enter"){ const q=inp.value.trim(); if(q) findByQuery(x,q); } });
+}
+// Search rule34video for a typed/derived name, then show add-able candidates for this reel.
+async function findByQuery(x, q){
+  const body=$("finderBody");
+  $("finderQ").textContent=q;
+  body.innerHTML=`<div class="hint" style="margin:0"><span class="spin"></span> Searching rule34video for “${esc(q)}”…</div>`;
   try{
-    const d=await api("/api/admin/sourcing/find",{method:"POST",body:JSON.stringify({query:x.sourceName})});
-    renderCandidates(x, d.candidates||[], d.matchedQuery);
+    const d=await api("/api/admin/sourcing/find",{method:"POST",body:JSON.stringify({query:q})});
+    renderCandidates({...x, sourceName:q}, d.candidates||[], d.matchedQuery);
   }catch(e){ body.innerHTML=`<div class="msg err" style="display:block;margin:0">${esc(e.message||"Search failed")}</div>`; }
 }
 const r34search=s=>String(s||"").replace(/[^\w\s]/g," ").split(/\s+/).filter(Boolean).map(encodeURIComponent).join("+");
@@ -288,8 +344,8 @@ async function addFromCandidate(x, c, btn){
   try{
     const d=await api("/api/admin/scrape",{method:"POST",body:JSON.stringify({url:c.url,pages:1})});
     btn.textContent=(d.added?"Added ✓":"Already had ✓");
-    // optimistically flip every feed row with this source name
-    FEED.forEach(f=>{ if(f.sourceName===x.sourceName){ f._added=true; } });
+    // optimistically flip this reel (by url) + any sharing the same caption source name
+    FEED.forEach(f=>{ if((x.reelUrl&&f.reelUrl===x.reelUrl)||(x.sourceName&&f.sourceName===x.sourceName)){ f._added=true; } });
     renderFeed();
   }catch(e){ btn.disabled=false; btn.textContent=old; show($("pgMsg"),"err",e.message||"Add failed"); }
 }
