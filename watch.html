@@ -949,12 +949,16 @@ async function load(){
               // that appears BETWEEN samples inside a played scene. Re-check each slot
               // every ~0.8s and truncate at the first explicit frame (drop if <0.8s
               // survives). This is what actually keeps mid-scene drift out of the reel.
-              _aiTotal += slots.reduce((a,sl)=>a+Math.ceil(sl.len/0.8),0);
+              const VSTEP=0.5;
+              _aiTotal += slots.reduce((a,sl)=>a+Math.ceil(sl.len/VSTEP)+1,0);
               for(const sl of slots){
                 const vt=[], vurls=[];
-                for(let t=sl.start; t<sl.start+sl.len+0.001; t+=0.8){ await seekVid(src,t); vt.push(t); vurls.push(grabURL()); }
+                for(let t=sl.start; t<sl.start+sl.len+0.001; t+=VSTEP){ await seekVid(src,t); vt.push(t); vurls.push(grabURL()); }
                 const vv=await aiClassify(vurls);
-                let safeLen=0; for(let i=0;i<vt.length;i++){ if(vv[i]&&vv[i].explicit) break; safeLen=Math.min(sl.len,(vt[i]-sl.start)+0.8); }
+                // end the scene AT the last consecutive clean sample — do NOT extend past
+                // it (that's what leaked an explicit frame at the tail).
+                let lastClean=-1; for(let i=0;i<vt.length;i++){ if(vv[i]&&vv[i].explicit) break; lastClean=i; }
+                const safeLen = lastClean>=0 ? Math.min(sl.len, vt[lastClean]-sl.start) : 0;
                 if(safeLen>=0.8) final.push({t:sl.start, len:safeLen});
               }
             }
