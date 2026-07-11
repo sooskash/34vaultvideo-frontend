@@ -263,22 +263,22 @@ async function findSource(x){
       renderCandidates(x, d.candidates||[], d.matchedQuery);
     }catch(e){ body.innerHTML=`<div class="msg err" style="display:block;margin:0">${esc(e.message||"Search failed")}</div>`; }
   } else {
-    // no caption source → reverse-image search the thumbnail (SauceNAO)
-    $("finderQ").textContent="No caption source — reverse-image searching the frame…";
-    body.innerHTML=`<div class="hint" style="margin:0"><span class="spin"></span> Reverse-image searching (SauceNAO)…</div>`;
+    // no caption source → reverse-image search several video frames (SauceNAO)
+    $("finderQ").textContent="No caption source — reverse-image searching video frames…";
+    body.innerHTML=`<div class="hint" style="margin:0"><span class="spin"></span> Sampling frames &amp; reverse-image searching (SauceNAO)… this takes ~20–40s.</div>`;
     try{
-      const d=await api("/api/admin/sourcing/sauce",{method:"POST",body:JSON.stringify({thumb:x.thumb})});
-      renderSauce(x, d.results||[], null);
+      const d=await api("/api/admin/sourcing/sauce",{method:"POST",body:JSON.stringify({thumb:x.thumb,videoUrl:x.videoUrl,duration:x.durationSec})});
+      renderSauce(x, d.results||[], null, d.framesSearched);
     }catch(e){ renderSauce(x, [], e.message||"Reverse search failed"); }
   }
 }
 // Reverse-image matches + a manual box; anything found can be searched on rule34video → added.
-function renderSauce(x, results, msg){
+function renderSauce(x, results, msg, framesSearched){
   const body=$("finderBody");
   let html="";
   if(msg) html+=`<div class="msg warn" style="display:block;margin:0 0 12px">${esc(msg)}</div>`;
   if(results && results.length){
-    html+=`<div class="hint" style="margin:0 0 8px">Reverse-image matches (higher % = closer):</div>`;
+    html+=`<div class="hint" style="margin:0 0 8px">Reverse-image matches${framesSearched?` (across ${framesSearched} frame${framesSearched>1?"s":""})`:""} — higher % = closer, ✕N = matched on N frames:</div>`;
     html+=results.map((c,i)=>{
       const label=[c.title,c.artist].filter(Boolean).join(" · ")||c.site||"(match)";
       const q=c.title||c.artist||"";
@@ -288,7 +288,7 @@ function renderSauce(x, results, msg){
         </div>
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(label)}</div>
-          <div style="font-size:11px;color:var(--sub,#8891a8);margin-top:2px">${c.similarity.toFixed(0)}% · ${esc(c.site||"")} ${c.url?`· <a href="${esc(c.url)}" target="_blank" rel="noopener" style="color:var(--accent)">open source</a>`:""}</div>
+          <div style="font-size:11px;color:var(--sub,#8891a8);margin-top:2px">${c.similarity.toFixed(0)}%${c.hits>1?` · <b style="color:#86efac">✕${c.hits} frames</b>`:""} · ${esc(c.site||"")} ${c.url?`· <a href="${esc(c.url)}" target="_blank" rel="noopener" style="color:var(--accent)">open source</a>`:""}</div>
         </div>
         ${q?`<button class="btn sm sauce-r34" data-q="${esc(q)}">rule34video →</button>`:""}
       </div>`;
