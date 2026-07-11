@@ -116,7 +116,7 @@
       <button class="btn ghost" onclick="load()">Reload feed</button>
     </div>
     <div class="msg" id="pgMsg"></div>
-    <div class="hint">Scrapes Instagram directly through <b>IG-grade proxies</b> (<code>IG_PROXY_URLS</code>) + a burner IG session (<code>IG_SESSIONID</code>) — <b>no daily limit, no fees</b>. Each refresh pulls a page's top reels and re-checks your catalog; the feed is cached and instant. Instagram blocks datacenter IPs, so this needs mobile/residential proxies that work with IG. If a refresh says “session expired / login required”, the burner needs a fresh cookie; if “every proxy IP was rate-limited”, the proxies aren't IG-grade.</div>
+    <div class="hint">Each refresh pulls a page's top reels and re-checks your catalog; the feed is cached and instant. Runs via Apify by default (free tier = 1 refresh/day). Add IG-grade mobile/residential proxies as <code>IG_PROXY_URLS</code> in Render to switch to unlimited, free self-scraping (Instagram blocks datacenter IPs, so it must be IG-capable proxies).</div>
   </div>
 
   <div class="card">
@@ -179,8 +179,7 @@ async function load(){
     renderPages(d.pages||[]);
     FEED=d.feed||[];
     renderFeed();
-    if(d.sessionReady===false) show($("pgMsg"),"warn","⚠ No Instagram session set. Add a burner account's <code>IG_SESSIONID</code> in Render, then Refresh.");
-    else if(d.igProxyDedicated===false) show($("pgMsg"),"warn","⚠ No IG-grade proxies yet. Instagram blocks the shared proxy pool — add mobile/residential IG proxies as <code>IG_PROXY_URLS</code> in Render, then Refresh.");
+    if(d.mode==="apify") show($("pgMsg"),"warn","Using Apify (free tier = <b>1 refresh/day</b>, resets midnight UTC). To go unlimited, add IG-grade proxies as <code>IG_PROXY_URLS</code> in Render — it auto-switches to free self-scraping.");
   }catch(e){ if(e.status===401) gate(); else show($("pgMsg"),"err",e.message||"Failed to load"); }
 }
 
