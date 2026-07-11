@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script src="/config.js?v=2"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="dark" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="stylesheet" href="/shared.css" />
+<title>Sourcing — Proven content | 34VaultVideo</title>
+<meta name="robots" content="noindex, nofollow" />
+<style>
+  *{box-sizing:border-box}
+  body{background:var(--bg,#0a0b0e);color:var(--text,#eef1f8);margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  .topbar{position:static;background:var(--bg,#0a0b0e);height:58px;display:flex;align-items:center;gap:12px;padding:0 20px;border-bottom:1px solid var(--border,#1e222e)}
+  .brand{font-size:19px;font-weight:900;letter-spacing:-.5px;cursor:pointer}
+  .brand i{font-style:normal;background:var(--grad-accent,linear-gradient(120deg,#ffcb45,#f59e0b));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .tag{font-size:11px;font-weight:800;color:var(--sub,#8891a8);border:1px solid var(--border2,#262b3a);border-radius:999px;padding:3px 10px}
+  .navlink{font-size:12.5px;font-weight:800;color:var(--sub,#8891a8);text-decoration:none;padding:6px 10px;border-radius:8px}
+  .navlink:hover{color:var(--text);background:var(--surface2,#181b22)}
+  .wrap{max-width:1040px;margin:0 auto;padding:24px 18px 60px}
+  h1{font-size:20px;font-weight:900;margin:6px 0 2px}
+  .sub{font-size:13px;color:var(--sub,#8891a8);margin-bottom:20px;line-height:1.55}
+  .card{background:var(--surface,#111318);border:1px solid var(--border,#1e222e);border-radius:14px;padding:18px;margin-bottom:16px}
+  .card h2{font-size:14px;font-weight:900;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  label{display:block;font-size:12px;font-weight:700;color:var(--sub,#8891a8);margin:0 0 6px}
+  input{width:100%;height:42px;background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);border-radius:10px;color:var(--text);font-size:14px;padding:0 14px;outline:none}
+  input:focus{border-color:var(--accent)}
+  .row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+  .row .f{flex:1;min-width:160px}
+  .btn{height:42px;padding:0 20px;border-radius:10px;border:none;cursor:pointer;font-size:13.5px;font-weight:800;
+    background:var(--grad-accent,linear-gradient(135deg,#ffce54,#f59e0b));color:#2a1500;transition:transform .12s,opacity .15s;white-space:nowrap}
+  .btn:hover{transform:translateY(-1px)}
+  .btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+  .btn.ghost{background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);color:var(--text)}
+  .btn.sm{height:32px;padding:0 12px;font-size:12px;border-radius:8px}
+  .hint{font-size:11.5px;color:var(--sub,#8891a8);line-height:1.6;margin-top:10px}
+  .hint code{background:var(--surface2,#181b22);padding:1px 6px;border-radius:5px;color:#dfe3ee;font-size:11px}
+  .msg{margin-top:12px;font-size:13px;font-weight:700;padding:10px 14px;border-radius:10px;display:none}
+  .msg.ok{display:block;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac}
+  .msg.err{display:block;background:rgba(225,29,72,.1);border:1px solid rgba(225,29,72,.3);color:#fca5a5}
+  .msg.busy{display:block;background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);color:var(--sub)}
+  .msg.warn{display:block;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);color:#fcd34d}
+  /* watched pages */
+  .pglist{display:flex;flex-direction:column;gap:8px}
+  .pg{display:flex;align-items:center;gap:10px;background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);border-radius:10px;padding:10px 12px}
+  .pg .u{font-weight:800;font-size:13.5px}
+  .pg .lb{font-size:11.5px;color:var(--sub,#8891a8)}
+  .pill{font-size:10.5px;font-weight:800;border-radius:999px;padding:2px 9px;white-space:nowrap}
+  .pill.fresh{background:rgba(34,197,94,.13);color:#86efac;border:1px solid rgba(34,197,94,.3)}
+  .pill.stale{background:rgba(245,158,11,.13);color:#fcd34d;border:1px solid rgba(245,158,11,.3)}
+  .pill.err{background:rgba(225,29,72,.13);color:#fca5a5;border:1px solid rgba(225,29,72,.3)}
+  /* feed */
+  .filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  .chip{font-size:12px;font-weight:800;padding:7px 14px;border-radius:999px;cursor:pointer;background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);color:var(--sub,#8891a8)}
+  .chip.on{background:var(--grad-accent,linear-gradient(135deg,#ffce54,#f59e0b));color:#2a1500;border-color:transparent}
+  .feed{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+  .reel{background:var(--surface,#111318);border:1px solid var(--border,#1e222e);border-radius:13px;overflow:hidden;display:flex;flex-direction:column}
+  .reel .thumb{position:relative;aspect-ratio:9/16;background:#0d1018;display:block;overflow:hidden}
+  .reel .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .reel .badge{position:absolute;top:8px;left:8px;font-size:10.5px;font-weight:900;padding:3px 9px;border-radius:999px}
+  .badge.have{background:rgba(34,197,94,.9);color:#04240f}
+  .badge.miss{background:rgba(245,158,11,.95);color:#2a1500}
+  .badge.nosrc{background:rgba(120,130,150,.9);color:#0a0b0e}
+  .reel .plays{position:absolute;bottom:8px;right:8px;font-size:11px;font-weight:800;color:#fff;background:rgba(0,0,0,.6);padding:3px 8px;border-radius:999px;backdrop-filter:blur(4px)}
+  .reel .body{padding:11px 12px 13px;display:flex;flex-direction:column;gap:8px;flex:1}
+  .reel .src{font-size:13px;font-weight:800;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .reel .meta{font-size:11px;color:var(--sub,#8891a8);display:flex;gap:10px;flex-wrap:wrap}
+  .reel .acts{margin-top:auto;display:flex;gap:8px}
+  .reel .acts a{flex:1;text-align:center;text-decoration:none}
+  .empty{text-align:center;color:var(--sub,#8891a8);font-size:13px;padding:40px 10px}
+  .gate{max-width:380px;margin:80px auto;text-align:center}
+  .gate h1{font-size:22px}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand" onclick="location.href='index.html'">34<i>Vault</i><i>Video</i></div>
+  <span class="tag">SOURCING</span>
+  <div style="flex:1"></div>
+  <a class="navlink" href="admin.html">Scrape</a>
+  <button class="btn ghost sm" onclick="logout()">Lock</button>
+</header>
+
+<!-- Key gate -->
+<div class="wrap" id="gate" style="display:none">
+  <div class="gate">
+    <h1>Owner access</h1>
+    <div class="sub">Enter your admin key to continue.</div>
+    <div class="card">
+      <input type="password" id="keyInput" placeholder="Admin key" />
+      <button class="btn" style="width:100%;margin-top:12px" onclick="saveKey()">Unlock</button>
+      <div class="msg" id="gateMsg"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="wrap" id="main" style="display:none">
+  <h1>Proven content sourcing</h1>
+  <div class="sub">Watches competitor Instagram pages, reads their best-performing reels, pulls the source (<b>Animation Name</b> in the caption) and checks it against your catalog. Green = you have it. Amber = worth adding.</div>
+
+  <div class="card">
+    <h2>Watched pages <span class="tag" id="pgCount">0</span></h2>
+    <div class="pglist" id="pglist"><div class="hint">No pages yet. Add a competitor's Instagram username below.</div></div>
+    <div class="row" style="margin-top:14px">
+      <div class="f"><label>Instagram username or profile URL</label><input id="uname" placeholder="behurupill  or  instagram.com/behurupill" autocomplete="off" /></div>
+      <div class="f" style="max-width:220px"><label>Label (optional)</label><input id="ulabel" placeholder="e.g. 3D game reels" autocomplete="off" /></div>
+      <button class="btn" id="addBtn" onclick="addPage()">Add page</button>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn ghost" id="refreshBtn" onclick="refreshStalest()">↻ Refresh stalest page</button>
+      <button class="btn ghost" onclick="load()">Reload feed</button>
+    </div>
+    <div class="msg" id="pgMsg"></div>
+    <div class="hint">Instagram age-gates these pages, so we use the one scraper that gets through — and its free tier allows <b>one refresh per day</b>. Each refresh pulls the freshest page's top reels and re-checks your catalog; the feed below is cached and always instant. Resets at midnight UTC. <b>To refresh more often / more pages, upgrade the Apify plan.</b></div>
+  </div>
+
+  <div class="card">
+    <h2>Feed <span class="tag" id="feedCount">0</span></h2>
+    <div class="filters">
+      <span class="chip on" data-f="all" onclick="setFilter('all')">All</span>
+      <span class="chip" data-f="miss" onclick="setFilter('miss')">⚠ Missing (add these)</span>
+      <span class="chip" data-f="have" onclick="setFilter('have')">✓ On site</span>
+    </div>
+    <div class="feed" id="feed"></div>
+    <div class="empty" id="feedEmpty" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+const API=window.__API__||"https://api.34vault.com";
+const $=id=>document.getElementById(id);
+let KEY=localStorage.getItem("_vadminKey")||"";
+let FEED=[], FILTER="all";
+
+function show(el,cls,txt){ el.className="msg "+cls; el.innerHTML=txt; }
+async function api(path,opts={}){
+  const r=await fetch(API+path,{...opts,credentials:"include",headers:{...(opts.headers||{}),"x-admin-key":KEY,"Content-Type":"application/json"}});
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok){ const e=new Error(d.error||("HTTP "+r.status)); e.status=r.status; e.data=d; throw e; }
+  return d;
+}
+function gate(){ $("gate").style.display=""; $("main").style.display="none"; }
+function main(){ $("gate").style.display="none"; $("main").style.display=""; load(); }
+
+async function saveKey(){
+  const k=$("keyInput").value.trim(); if(!k) return; KEY=k;
+  try{ await api("/api/admin/sourcing"); localStorage.setItem("_vadminKey",k); main(); }
+  catch(e){ show($("gateMsg"),"err","Invalid key."); }
+}
+function logout(){ localStorage.removeItem("_vadminKey"); KEY=""; gate(); }
+
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const nfmt=n=>{ n=Number(n)||0; return n>=1e6?(n/1e6).toFixed(1).replace(/\.0$/,"")+"M":n>=1e3?(n/1e3).toFixed(1).replace(/\.0$/,"")+"K":String(n); };
+function ago(iso){ if(!iso) return "never"; const s=(Date.now()-new Date(iso).getTime())/1000;
+  if(s<3600) return Math.max(1,Math.round(s/60))+"m ago"; if(s<86400) return Math.round(s/3600)+"h ago"; return Math.round(s/86400)+"d ago"; }
+
+async function load(){
+  try{
+    const d=await api("/api/admin/sourcing");
+    renderPages(d.pages||[]);
+    FEED=d.feed||[];
+    renderFeed();
+  }catch(e){ if(e.status===401) gate(); else show($("pgMsg"),"err",e.message||"Failed to load"); }
+}
+
+function renderPages(pages){
+  $("pgCount").textContent=pages.length;
+  const el=$("pglist");
+  if(!pages.length){ el.innerHTML=`<div class="hint">No pages yet. Add a competitor's Instagram username below.</div>`; return; }
+  el.innerHTML=pages.map(p=>{
+    let pill=`<span class="pill fresh">fresh · ${ago(p.fetchedAt)}</span>`;
+    if(p.error) pill=`<span class="pill err">${p.error==="daily_limit_reached"?"daily limit — try after midnight UTC":esc(p.error)}</span>`;
+    else if(p.stale) pill=`<span class="pill stale">${p.fetchedAt?"stale · "+ago(p.fetchedAt):"never refreshed"}</span>`;
+    return `<div class="pg">
+      <div style="flex:1;min-width:0">
+        <div class="u">@${esc(p.username)} ${p.label?`<span class="lb">· ${esc(p.label)}</span>`:""}</div>
+        <div class="lb">${Number(p.count)||0} reels cached</div>
+      </div>
+      ${pill}
+      <button class="btn ghost sm pg-ref" data-u="${esc(p.username)}">Refresh</button>
+      <button class="btn ghost sm pg-del" data-u="${esc(p.username)}" title="Remove">✕</button>
+    </div>`;
+  }).join("");
+  el.querySelectorAll(".pg-ref").forEach(b=>b.addEventListener("click",()=>refreshPage(b.dataset.u)));
+  el.querySelectorAll(".pg-del").forEach(b=>b.addEventListener("click",()=>delPage(b.dataset.u)));
+}
+
+function setFilter(f){ FILTER=f; document.querySelectorAll(".chip").forEach(c=>c.classList.toggle("on",c.dataset.f===f)); renderFeed(); }
+function renderFeed(){
+  let items=FEED;
+  if(FILTER==="miss") items=FEED.filter(x=>x.sourceName&&!x.onSite);
+  else if(FILTER==="have") items=FEED.filter(x=>x.onSite);
+  $("feedCount").textContent=FEED.length;
+  const el=$("feed"), emp=$("feedEmpty");
+  if(!items.length){
+    el.innerHTML=""; emp.style.display="";
+    emp.textContent=FEED.length? "Nothing matches this filter." : "No cached reels yet — add a page and hit Refresh (uses the one daily run).";
+    return;
+  }
+  emp.style.display="none";
+  el.innerHTML=items.map(x=>{
+    const badge=x.onSite?`<span class="badge have">✓ ON SITE</span>`
+      :x.sourceName?`<span class="badge miss">⚠ ADD IT</span>`
+      :`<span class="badge nosrc">no source</span>`;
+    const title=x.sourceName?esc(x.sourceName):`<span style="color:var(--sub)">${esc((x.caption||"").slice(0,60))||"(no caption)"}</span>`;
+    const reelUrl=/^https?:\/\//.test(x.reelUrl||"")?x.reelUrl:"";
+    const act=x.onSite
+      ? `<a class="btn sm" href="https://34vaultvideo.com/watch.html?slug=${encodeURIComponent(x.match.slug)}" target="_blank" rel="noopener">Open on site</a>`
+      : (x.sourceName
+          ? `<a class="btn sm" href="https://rule34video.com/search/${encodeURIComponent(x.sourceName)}/" target="_blank" rel="noopener">Find source</a>`
+          : "");
+    const reelBtn=reelUrl?`<a class="btn ghost sm" href="${esc(reelUrl)}" target="_blank" rel="noopener">Reel</a>`:"";
+    const thumb=/^https?:\/\//.test(x.thumb||"")
+      ? `<img src="${esc(x.thumb)}" referrerpolicy="no-referrer" loading="lazy" onerror="this.parentNode.classList.add('noimg');this.remove()" alt="">`
+      : "";
+    return `<div class="reel">
+      <div class="thumb">${thumb}${badge}<span class="plays">▶ ${nfmt(x.plays)}</span></div>
+      <div class="body">
+        <div class="src">${title}</div>
+        <div class="meta"><span>♥ ${nfmt(x.likes)}</span>${x.durationSec?`<span>${Math.round(x.durationSec)}s</span>`:""}<span>@${esc(x.user)}</span></div>
+        <div class="acts">${act}${reelBtn}</div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function addPage(){
+  const username=$("uname").value.trim(); if(!username){ show($("pgMsg"),"err","Enter a username."); return; }
+  const label=$("ulabel").value.trim();
+  $("addBtn").disabled=true;
+  try{ await api("/api/admin/sourcing/pages",{method:"POST",body:JSON.stringify({username,label})});
+    $("uname").value=""; $("ulabel").value="";
+    show($("pgMsg"),"ok","Page added. Hit its Refresh to pull reels (uses the daily run).");
+    await load();
+  }catch(e){ show($("pgMsg"),"err",e.message||"Failed"); }
+  finally{ $("addBtn").disabled=false; }
+}
+async function delPage(u){
+  try{ await api("/api/admin/sourcing/pages/"+encodeURIComponent(u),{method:"DELETE"}); await load(); }
+  catch(e){ show($("pgMsg"),"err",e.message||"Failed"); }
+}
+async function refreshPage(u){ return doRefresh({username:u},"@"+u); }
+async function refreshStalest(){ return doRefresh({},"the stalest page"); }
+async function doRefresh(body,label){
+  $("refreshBtn").disabled=true;
+  document.querySelectorAll(".pg-ref").forEach(b=>b.disabled=true);
+  show($("pgMsg"),"busy",`<span class="spin"></span> Refreshing ${label}… (up to ~90s)`);
+  try{
+    const d=await api("/api/admin/sourcing/refresh",{method:"POST",body:JSON.stringify(body)});
+    show($("pgMsg"),"ok",`Refreshed @${esc(d.username)} — ${d.count} reels pulled.`);
+    await load();
+  }catch(e){
+    if(e.status===429){ show($("pgMsg"),"warn","⏳ "+(e.data&&e.data.message||"Daily scrape limit reached. Try again after midnight UTC.")); await load(); }
+    else show($("pgMsg"),"err",e.message||"Failed");
+  }finally{
+    $("refreshBtn").disabled=false;
+    document.querySelectorAll(".pg-ref").forEach(b=>b.disabled=false);
+  }
+}
+
+// boot
+if(KEY){ api("/api/admin/sourcing").then(main).catch(gate); } else { gate(); }
+$("keyInput")&&$("keyInput").addEventListener("keydown",e=>{ if(e.key==="Enter") saveKey(); });
+$("uname")&&$("uname").addEventListener("keydown",e=>{ if(e.key==="Enter") addPage(); });
+</script>
+</body>
+</html>
