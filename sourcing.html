@@ -107,16 +107,16 @@
     <h2>Watched pages <span class="tag" id="pgCount">0</span></h2>
     <div class="pglist" id="pglist"><div class="hint">No pages yet. Add a competitor's Instagram username below.</div></div>
     <div class="row" style="margin-top:14px">
-      <div class="f"><label>Instagram username or profile URL</label><input id="uname" placeholder="behurupill  or  instagram.com/behurupill" autocomplete="off" /></div>
-      <div class="f" style="max-width:220px"><label>Label (optional)</label><input id="ulabel" placeholder="e.g. 3D game reels" autocomplete="off" /></div>
-      <button class="btn" id="addBtn" onclick="addPage()">Add page</button>
+      <div class="f"><label>Instagram usernames or profile URLs — add several at once</label><input id="uname" placeholder="behurupill, artist2, artist3   (space, comma, or newline separated)" autocomplete="off" /></div>
+      <div class="f" style="max-width:200px"><label>Label (optional)</label><input id="ulabel" placeholder="e.g. 3D game reels" autocomplete="off" /></div>
+      <button class="btn" id="addBtn" onclick="addPage()">Add</button>
     </div>
     <div class="row" style="margin-top:12px">
-      <button class="btn ghost" id="refreshBtn" onclick="refreshStalest()">↻ Refresh stalest page</button>
+      <button class="btn" id="refreshAllBtn" onclick="refreshAll()">↻ Refresh all pages</button>
       <button class="btn ghost" onclick="load()">Reload feed</button>
     </div>
     <div class="msg" id="pgMsg"></div>
-    <div class="hint">Each refresh pulls a page's top reels and re-checks your catalog; the feed is cached and instant. Runs via Apify by default (free tier = 1 refresh/day). Add IG-grade mobile/residential proxies as <code>IG_PROXY_URLS</code> in Render to switch to unlimited, free self-scraping (Instagram blocks datacenter IPs, so it must be IG-capable proxies).</div>
+    <div class="hint">“Refresh all” pulls every watched page's top reels and re-checks your catalog (runs in the background, updates as each finishes). A daily auto-refresh (~06:00 UTC) keeps them current on its own. Add IG-grade proxies as <code>IG_PROXY_URLS</code> in Render to switch from Apify to free self-scraping.</div>
   </div>
 
   <div class="card">
@@ -179,7 +179,6 @@ async function load(){
     renderPages(d.pages||[]);
     FEED=d.feed||[];
     renderFeed();
-    if(d.mode==="apify") show($("pgMsg"),"warn","Using Apify (free tier = <b>1 refresh/day</b>, resets midnight UTC). To go unlimited, add IG-grade proxies as <code>IG_PROXY_URLS</code> in Render — it auto-switches to free self-scraping.");
   }catch(e){ if(e.status===401) gate(); else show($("pgMsg"),"err",e.message||"Failed to load"); }
 }
 
@@ -351,12 +350,12 @@ async function addFromCandidate(x, c, btn){
 }
 
 async function addPage(){
-  const username=$("uname").value.trim(); if(!username){ show($("pgMsg"),"err","Enter a username."); return; }
+  const username=$("uname").value.trim(); if(!username){ show($("pgMsg"),"err","Enter at least one username."); return; }
   const label=$("ulabel").value.trim();
   $("addBtn").disabled=true;
-  try{ await api("/api/admin/sourcing/pages",{method:"POST",body:JSON.stringify({username,label})});
+  try{ const d=await api("/api/admin/sourcing/pages",{method:"POST",body:JSON.stringify({username,label})});
     $("uname").value=""; $("ulabel").value="";
-    show($("pgMsg"),"ok","Page added. Hit its Refresh to pull reels.");
+    show($("pgMsg"),"ok",`Added ${d.count} page${d.count===1?"":"s"}. Hit “Refresh all” to pull their reels.`);
     await load();
   }catch(e){ show($("pgMsg"),"err",e.message||"Failed"); }
   finally{ $("addBtn").disabled=false; }
@@ -366,9 +365,35 @@ async function delPage(u){
   catch(e){ show($("pgMsg"),"err",e.message||"Failed"); }
 }
 async function refreshPage(u){ return doRefresh({username:u},"@"+u); }
-async function refreshStalest(){ return doRefresh({},"the stalest page"); }
+// Refresh every page (background on the server); poll the feed so pages fill in live.
+let _pollTimer=null;
+async function refreshAll(){
+  $("refreshAllBtn").disabled=true;
+  document.querySelectorAll(".pg-ref").forEach(b=>b.disabled=true);
+  show($("pgMsg"),"busy",`<span class="spin"></span> Refreshing all pages…`);
+  try{
+    const d=await api("/api/admin/sourcing/refresh-all",{method:"POST",body:"{}"});
+    if(d.started===false){ show($("pgMsg"),"warn","A refresh is already running — watching for updates…"); }
+    else show($("pgMsg"),"busy",`<span class="spin"></span> Refreshing ${d.pages} page(s) in the background — they update below as each finishes.`);
+    startPolling(d.pages||6);
+  }catch(e){ show($("pgMsg"),"err",e.message||"Failed"); $("refreshAllBtn").disabled=false; }
+}
+function startPolling(pages){
+  if(_pollTimer) clearInterval(_pollTimer);
+  const maxTicks=Math.min(24,Math.max(8,Math.ceil(pages*20/8))); // ~20s/page, capped ~3min
+  let n=0;
+  _pollTimer=setInterval(async()=>{
+    n++;
+    try{ await load(); }catch(e){}
+    if(n>=maxTicks){ clearInterval(_pollTimer); _pollTimer=null;
+      $("refreshAllBtn").disabled=false;
+      document.querySelectorAll(".pg-ref").forEach(b=>b.disabled=false);
+      show($("pgMsg"),"ok","Feed updated.");
+    }
+  },8000);
+}
 async function doRefresh(body,label){
-  $("refreshBtn").disabled=true;
+  const allBtn=$("refreshAllBtn"); if(allBtn) allBtn.disabled=true;
   document.querySelectorAll(".pg-ref").forEach(b=>b.disabled=true);
   show($("pgMsg"),"busy",`<span class="spin"></span> Refreshing ${label}… (up to ~90s)`);
   try{
@@ -378,7 +403,7 @@ async function doRefresh(body,label){
   }catch(e){
     show($("pgMsg"),"err",e.message||"Failed"); await load();
   }finally{
-    $("refreshBtn").disabled=false;
+    if(allBtn) allBtn.disabled=false;
     document.querySelectorAll(".pg-ref").forEach(b=>b.disabled=false);
   }
 }
