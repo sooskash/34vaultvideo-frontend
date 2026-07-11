@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<script src="/config.js?v=2"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="dark" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="stylesheet" href="/shared.css" />
+<title>Reel Studio | 34VaultVideo</title>
+<meta name="robots" content="noindex, nofollow" />
+<style>
+  *{box-sizing:border-box}
+  body{background:var(--bg,#0a0b0e);color:var(--text,#eef1f8);margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  .topbar{position:static;background:var(--bg,#0a0b0e);height:58px;display:flex;align-items:center;gap:12px;padding:0 20px;border-bottom:1px solid var(--border,#1e222e)}
+  .brand{font-size:19px;font-weight:900;letter-spacing:-.5px;cursor:pointer}
+  .brand i{font-style:normal;background:var(--grad-accent,linear-gradient(120deg,#ffcb45,#f59e0b));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .tag{font-size:11px;font-weight:800;color:var(--sub,#8891a8);border:1px solid var(--border2,#262b3a);border-radius:999px;padding:3px 10px}
+  .navlink{font-size:12.5px;font-weight:800;color:var(--sub,#8891a8);text-decoration:none;padding:6px 10px;border-radius:8px}
+  .navlink:hover{color:var(--text);background:var(--surface2,#181b22)}
+  .wrap{max-width:1080px;margin:0 auto;padding:22px 18px 80px}
+  h1{font-size:20px;font-weight:900;margin:4px 0 2px}
+  .sub{font-size:13px;color:var(--sub,#8891a8);margin-bottom:18px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+  @media(max-width:860px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--surface,#111318);border:1px solid var(--border,#1e222e);border-radius:14px;padding:16px;margin-bottom:16px}
+  .card h2{font-size:13px;font-weight:900;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  .step{width:20px;height:20px;border-radius:50%;background:var(--grad-accent,linear-gradient(135deg,#ffce54,#f59e0b));color:#241a08;font-size:11px;font-weight:900;display:grid;place-items:center;flex:none}
+  label{display:block;font-size:11.5px;font-weight:700;color:var(--sub,#8891a8);margin:0 0 5px}
+  input,select{width:100%;height:38px;background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);border-radius:9px;color:var(--text);font-size:13px;padding:0 11px;outline:none}
+  input:focus,select:focus{border-color:var(--accent)}
+  input[type=color]{padding:2px;height:38px;cursor:pointer}
+  input[type=range]{height:auto;padding:0}
+  .row{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+  .row .f{flex:1;min-width:120px}
+  .btn{height:38px;padding:0 16px;border-radius:9px;border:none;cursor:pointer;font-size:13px;font-weight:800;background:var(--grad-accent,linear-gradient(135deg,#ffce54,#f59e0b));color:#2a1500;transition:transform .12s,opacity .15s;white-space:nowrap}
+  .btn:hover{transform:translateY(-1px)} .btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+  .btn.ghost{background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);color:var(--text)}
+  .btn.sm{height:30px;padding:0 10px;font-size:12px;border-radius:7px}
+  .btn.big{height:46px;font-size:15px;width:100%}
+  .hint{font-size:11px;color:var(--sub,#8891a8);line-height:1.55;margin-top:9px}
+  .hint code{background:var(--surface2,#181b22);padding:1px 5px;border-radius:5px;font-size:10.5px}
+  .msg{margin-top:11px;font-size:12.5px;font-weight:700;padding:9px 12px;border-radius:9px;display:none}
+  .msg.ok{display:block;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac}
+  .msg.err{display:block;background:rgba(225,29,72,.1);border:1px solid rgba(225,29,72,.3);color:#fca5a5}
+  .msg.busy{display:block;background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);color:var(--sub)}
+  .msg.warn{display:block;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);color:#fcd34d}
+  video{width:100%;border-radius:10px;background:#000;display:block}
+  .res{display:grid;grid-template-columns:auto auto;gap:8px}
+  .res .th{width:100%;aspect-ratio:16/9;border-radius:8px;overflow:hidden;background:#0d1018;position:relative}
+  .res .th img{width:100%;height:100%;object-fit:cover}
+  .res .th .pill{position:absolute;top:6px;right:6px;font-size:10px;font-weight:900;padding:2px 7px;border-radius:999px}
+  .pill.host{background:rgba(34,197,94,.9);color:#04240f} .pill.nohost{background:rgba(245,158,11,.95);color:#2a1500}
+  .rlist{display:flex;flex-direction:column;gap:7px;max-height:280px;overflow:auto;padding-right:2px}
+  .rrow{display:flex;gap:8px;align-items:center;background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);border-radius:9px;padding:7px 9px}
+  .rrow .n{width:20px;text-align:center;font-weight:900;color:var(--sub);flex:none;font-size:12px}
+  .rrow input{height:30px;font-size:12px}
+  .rrow .num{width:74px;flex:none}
+  .scene-empty{font-size:12px;color:var(--sub);text-align:center;padding:18px 6px}
+  .cap-line{display:flex;gap:8px;margin-bottom:7px}
+  .lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:11px}
+  .lib .item{background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);border-radius:11px;overflow:hidden}
+  .lib video{aspect-ratio:9/16;object-fit:cover}
+  .lib .meta{padding:8px 9px;font-size:11px}
+  .lib .meta .t{font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lib .meta .s{color:var(--sub);margin-top:2px}
+  .lib .acts{display:flex;gap:6px;padding:0 9px 9px}
+  .lib .acts a,.lib .acts button{flex:1;text-align:center}
+  .gate{max-width:380px;margin:80px auto;text-align:center}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .sr{display:flex;gap:9px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border,#1e222e);cursor:pointer}
+  .sr:hover{background:var(--surface2,#181b22)} .sr img{width:74px;aspect-ratio:16/9;object-fit:cover;border-radius:6px;background:#0d1018;flex:none}
+  .sr .t{font-size:12.5px;font-weight:700;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand" onclick="location.href='index.html'">34<i>Vault</i><i>Video</i></div>
+  <span class="tag">STUDIO</span>
+  <div style="flex:1"></div>
+  <a class="navlink" href="profile.html">Profile</a>
+  <a class="navlink" href="sourcing.html">Sourcing</a>
+  <button class="btn ghost sm" onclick="logout()">Lock</button>
+</header>
+
+<!-- gate -->
+<div class="wrap" id="gate" style="display:none">
+  <div class="gate">
+    <h1>Owner access</h1>
+    <div class="sub">Sign in with your owner account on 34vaultvideo.com — then this page just works.<br><a href="auth.html" style="color:var(--accent);font-weight:800">Go to login →</a></div>
+    <div class="card"><input type="password" id="keyInput" placeholder="Admin key (fallback)" /><button class="btn" style="width:100%;margin-top:10px" onclick="saveKey()">Unlock with key</button><div class="msg" id="gateMsg"></div></div>
+  </div>
+</div>
+
+<!-- main -->
+<div class="wrap" id="main" style="display:none">
+  <h1>Reel Studio</h1>
+  <div class="sub">Pick a video, mark the scenes you want, drop them on a template, and assemble a ready-to-post reel.</div>
+
+  <div class="grid">
+    <div>
+      <!-- 1 source -->
+      <div class="card">
+        <h2><span class="step">1</span> Source video</h2>
+        <div class="row">
+          <div class="f"><input id="search" placeholder="Search your catalog… (or paste a slug)" autocomplete="off" /></div>
+          <button class="btn ghost" id="searchBtn" onclick="doSearch()">Search</button>
+        </div>
+        <div id="results" style="margin-top:8px"></div>
+        <div id="loaded" style="display:none;margin-top:10px">
+          <video id="srcVideo" controls preload="metadata" playsinline></video>
+          <div class="hint" id="srcInfo"></div>
+          <div class="msg" id="srcMsg"></div>
+        </div>
+      </div>
+
+      <!-- 2 scenes -->
+      <div class="card">
+        <h2><span class="step">2</span> Scenes <span class="tag" id="sceneTotal" style="margin-left:auto">0.0s</span></h2>
+        <div class="row" style="margin-bottom:10px">
+          <button class="btn sm" id="addSceneBtn" onclick="addSceneAtPlayhead()" disabled>＋ Add scene at playhead</button>
+          <button class="btn ghost sm" onclick="renderScenes()">Refresh</button>
+        </div>
+        <div class="rlist" id="sceneList"><div class="scene-empty">Load a video, scrub to a moment, then “Add scene at playhead”. Adjust start/length per row. No limit on scenes.</div></div>
+      </div>
+    </div>
+
+    <div>
+      <!-- 3 template -->
+      <div class="card">
+        <h2><span class="step">3</span> Template</h2>
+        <div class="row">
+          <div class="f"><label>Saved template</label>
+            <select id="tplSelect" onchange="onTplSelect()"><option value="">Custom</option></select>
+          </div>
+        </div>
+        <div class="cap-line" style="margin-top:10px"><input id="cap1" placeholder="Top caption line" /></div>
+        <div class="cap-line"><input id="cap2" placeholder="Second caption line (optional)" /></div>
+        <div class="row" style="margin-top:4px">
+          <div class="f" style="max-width:120px"><label>Background</label><input type="color" id="bg" value="#C7A876" /></div>
+          <div class="f"><label>Band size</label><select id="band"><option value="820">Small</option><option value="1000" selected>Medium</option><option value="1180">Large</option></select></div>
+          <div class="f"><label>Band Y (<span id="bandYv">560</span>)</label><input type="range" id="bandY" min="120" max="1400" value="560" oninput="document.getElementById('bandYv').textContent=this.value" /></div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div class="f"><input id="tplName" placeholder="Template name to save" /></div>
+          <button class="btn ghost sm" id="saveTplBtn" onclick="saveTemplate()">💾 Save template</button>
+        </div>
+        <div class="msg" id="tplMsg"></div>
+      </div>
+
+      <!-- 4 create -->
+      <div class="card">
+        <h2><span class="step">4</span> Create reel</h2>
+        <label>Instagram caption (optional — saved with the reel)</label>
+        <input id="igCaption" placeholder="▶ Full video — link in bio 🔗" />
+        <button class="btn big" id="assembleBtn" style="margin-top:12px" onclick="assemble()" disabled>🎬 Assemble reel</button>
+        <div class="msg" id="asmMsg"></div>
+        <div id="result" style="display:none;margin-top:12px">
+          <video id="resVideo" controls preload="metadata" playsinline style="max-width:280px;margin:0 auto"></video>
+          <div class="row" style="margin-top:10px;justify-content:center">
+            <a class="btn sm" id="dlBtn" href="#" download target="_blank" rel="noopener">⬇ Download</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- library -->
+  <div class="card">
+    <h2>Reel library <span class="tag" id="libCount" style="margin-left:8px">0</span></h2>
+    <div class="lib" id="libList"></div>
+    <div class="hint" id="libEmpty">No reels yet — assemble one above and it lands here, ready to schedule/post (Instagram push coming next).</div>
+  </div>
+</div>
+
+<script>
+const API=window.__API__||"https://api.34vault.com";
+const CLIPSRC=(location.origin.includes("localhost")?"https://34vaultvideo.com":location.origin)+"/clipsrc";
+const $=id=>document.getElementById(id);
+let KEY=localStorage.getItem("_vadminKey")||"";
+let SRC=null;      // {slug,title,r2Key,duration}
+let SCENES=[];     // [{start,len}]
+let TEMPLATES=[];
+
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function show(el,cls,txt){ el.className="msg "+cls; el.innerHTML=txt; }
+async function api(path,opts={}){
+  const r=await fetch(API+path,{...opts,credentials:"include",headers:{...(opts.headers||{}),"x-admin-key":KEY,"Content-Type":"application/json"}});
+  const d=await r.json().catch(()=>({})); if(!r.ok){ const e=new Error(d.error||("HTTP "+r.status)); e.status=r.status; throw e; } return d;
+}
+function gate(){ $("gate").style.display=""; $("main").style.display="none"; }
+function main(){ $("gate").style.display="none"; $("main").style.display=""; loadTemplates(); loadLibrary(); }
+async function saveKey(){ const k=$("keyInput").value.trim(); if(!k) return; KEY=k;
+  try{ await api("/api/admin/templates?kind=reel"); localStorage.setItem("_vadminKey",k); main(); }catch(e){ show($("gateMsg"),"err","Invalid key."); } }
+function logout(){ localStorage.removeItem("_vadminKey"); KEY=""; gate(); }
+
+// ── 1 · source ──
+async function doSearch(){
+  const q=$("search").value.trim(); if(!q) return;
+  // a slug looks like words-with-dashes-and-an-id; try direct load first if it has no spaces
+  $("searchBtn").disabled=true;
+  try{
+    const d=await fetch(`${API}/api/videos?all=1&limit=24&sort=views&q=${encodeURIComponent(q)}`).then(r=>r.json());
+    const vids=(d.videos||d||[]);
+    $("results").innerHTML = vids.length ? vids.slice(0,10).map(v=>`
+      <div class="sr" data-slug="${esc(v.slug)}" data-hosted="${v.r2Key?1:0}">
+        <img src="${esc(v.thumbUrl||"")}" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'" alt=""/>
+        <div style="flex:1;min-width:0"><div class="t">${esc(v.title)}</div>
+          <div class="hint" style="margin:2px 0 0">${Math.round(v.duration||0)}s · ${v.r2Key?'<span style="color:#86efac">hosted ✓</span>':'<span style="color:#fcd34d">not hosted</span>'}</div></div>
+      </div>`).join("") : `<div class="hint">No matches. Try another term, or paste an exact slug.</div>`;
+    $("results").querySelectorAll(".sr").forEach(el=>el.addEventListener("click",()=>loadSource(el.dataset.slug)));
+  }catch(e){ show($("srcMsg"),"err",e.message||"Search failed"); }
+  finally{ $("searchBtn").disabled=false; }
+}
+async function loadSource(slug){
+  try{
+    const d=await fetch(`${API}/api/videos?all=1&limit=1&q=${encodeURIComponent(slug)}`).then(r=>r.json());
+    let v=(d.videos||d||[]).find(x=>x.slug===slug) || (d.videos||d||[])[0];
+    if(!v){ show($("srcMsg"),"err","Couldn't load that video."); return; }
+    SRC={slug:v.slug,title:v.title,r2Key:v.r2Key,duration:v.duration};
+    $("results").innerHTML="";
+    $("search").value=v.slug;
+    $("loaded").style.display="";
+    $("srcVideo").src=`${CLIPSRC}?slug=${encodeURIComponent(v.slug)}`;
+    $("srcInfo").innerHTML=`<b>${esc(v.title)}</b> · ${Math.round(v.duration||0)}s`;
+    $("addSceneBtn").disabled=false; updateAssembleBtn();
+    if(!v.r2Key) show($("srcMsg"),"warn",`This video isn’t hosted yet — <a href="watch.html?slug=${encodeURIComponent(v.slug)}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:800">open it once to host it</a>, then reload here. (Assembly needs a hosted copy.)`);
+    else show($("srcMsg"),"ok","Hosted ✓ — scrub and add scenes.");
+  }catch(e){ show($("srcMsg"),"err",e.message||"Failed"); }
+}
+
+// ── 2 · scenes ──
+function addSceneAtPlayhead(){
+  const t=$("srcVideo").currentTime||0;
+  SCENES.push({start:Math.max(0,+t.toFixed(2)),len:2}); renderScenes();
+}
+function renderScenes(){
+  const total=SCENES.reduce((a,s)=>a+(+s.len||0),0);
+  $("sceneTotal").textContent=total.toFixed(1)+"s";
+  const el=$("sceneList");
+  if(!SCENES.length){ el.innerHTML=`<div class="scene-empty">Load a video, scrub to a moment, then “Add scene at playhead”.</div>`; updateAssembleBtn(); return; }
+  el.innerHTML=SCENES.map((s,i)=>`
+    <div class="rrow">
+      <span class="n">${i+1}</span>
+      <div class="num"><label style="margin:0 0 2px">start</label><input type="number" step="0.1" min="0" value="${s.start}" data-i="${i}" data-k="start"></div>
+      <div class="num"><label style="margin:0 0 2px">len</label><input type="number" step="0.1" min="0.3" value="${s.len}" data-i="${i}" data-k="len"></div>
+      <button class="btn ghost sm sc-prev" data-i="${i}" title="Preview">▶</button>
+      <button class="btn ghost sm sc-up" data-i="${i}" title="Up">↑</button>
+      <button class="btn ghost sm sc-dn" data-i="${i}" title="Down">↓</button>
+      <button class="btn ghost sm sc-rm" data-i="${i}" title="Remove">✕</button>
+    </div>`).join("");
+  el.querySelectorAll("input").forEach(inp=>inp.addEventListener("change",()=>{ SCENES[+inp.dataset.i][inp.dataset.k]=Math.max(inp.dataset.k==="len"?0.3:0,+inp.value||0); renderScenes(); }));
+  el.querySelectorAll(".sc-prev").forEach(b=>b.addEventListener("click",()=>previewScene(+b.dataset.i)));
+  el.querySelectorAll(".sc-up").forEach(b=>b.addEventListener("click",()=>{const i=+b.dataset.i; if(i>0){[SCENES[i-1],SCENES[i]]=[SCENES[i],SCENES[i-1]];renderScenes();}}));
+  el.querySelectorAll(".sc-dn").forEach(b=>b.addEventListener("click",()=>{const i=+b.dataset.i; if(i<SCENES.length-1){[SCENES[i+1],SCENES[i]]=[SCENES[i],SCENES[i+1]];renderScenes();}}));
+  el.querySelectorAll(".sc-rm").forEach(b=>b.addEventListener("click",()=>{SCENES.splice(+b.dataset.i,1);renderScenes();}));
+  updateAssembleBtn();
+}
+let _prevTimer=null;
+function previewScene(i){
+  const v=$("srcVideo"), s=SCENES[i]; if(!v||!s) return;
+  v.currentTime=s.start; v.play().catch(()=>{});
+  if(_prevTimer) clearTimeout(_prevTimer);
+  _prevTimer=setTimeout(()=>v.pause(), s.len*1000);
+}
+function updateAssembleBtn(){ $("assembleBtn").disabled=!(SRC&&SRC.r2Key&&SCENES.length); }
+
+// ── 3 · template ──
+const DEFAULT_TPL={size:"1080x1920",bg:"#C7A876",band:{scale:1000,y:560},caption:[{text:"Nothing is Perfect-",y:150},{text:"Me: -",y:245}],fontSize:72,fontColor:"black"};
+function applyTpl(cfg){
+  cfg=cfg||DEFAULT_TPL;
+  $("cap1").value=(cfg.caption&&cfg.caption[0]&&cfg.caption[0].text)||"";
+  $("cap2").value=(cfg.caption&&cfg.caption[1]&&cfg.caption[1].text)||"";
+  $("bg").value=cfg.bg||"#C7A876";
+  $("band").value=String((cfg.band&&cfg.band.scale)||1000);
+  const by=(cfg.band&&cfg.band.y)!=null?cfg.band.y:560; $("bandY").value=by; $("bandYv").textContent=by;
+}
+function currentTpl(){
+  const cap=[]; const y1=150,y2=245;
+  if($("cap1").value.trim()) cap.push({text:$("cap1").value.trim(),y:y1});
+  if($("cap2").value.trim()) cap.push({text:$("cap2").value.trim(),y:y2});
+  return {size:"1080x1920",bg:$("bg").value,band:{scale:+$("band").value,y:+$("bandY").value},caption:cap,fontSize:72,fontColor:"black"};
+}
+async function loadTemplates(){
+  try{
+    const d=await api("/api/admin/templates?kind=reel"); TEMPLATES=d.templates||[];
+    $("tplSelect").innerHTML=`<option value="">Custom</option>`+TEMPLATES.map(t=>`<option value="${esc(t.id)}">${esc(t.name)}</option>`).join("");
+    if(!$("cap1").value && !$("cap2").value) applyTpl(DEFAULT_TPL);
+  }catch(e){ if(e.status===401) gate(); }
+}
+function onTplSelect(){
+  const id=$("tplSelect").value;
+  if(!id){ return; }
+  const t=TEMPLATES.find(x=>x.id===id); if(t){ applyTpl(t.config||{}); $("tplName").value=t.name; }
+}
+async function saveTemplate(){
+  const name=$("tplName").value.trim(); if(!name){ show($("tplMsg"),"err","Enter a template name."); return; }
+  $("saveTplBtn").disabled=true;
+  try{ await api("/api/admin/templates",{method:"POST",body:JSON.stringify({name,kind:"reel",config:currentTpl()})});
+    show($("tplMsg"),"ok","Template saved."); await loadTemplates();
+  }catch(e){ show($("tplMsg"),"err",e.message||"Failed"); }
+  finally{ $("saveTplBtn").disabled=false; }
+}
+
+// ── 4 · assemble ──
+async function assemble(){
+  if(!(SRC&&SRC.r2Key&&SCENES.length)) return;
+  $("assembleBtn").disabled=true;
+  show($("asmMsg"),"busy",`<span class="spin"></span> Assembling on the render worker… (~10–40s)`);
+  $("result").style.display="none";
+  try{
+    const d=await api("/api/admin/reel/assemble",{method:"POST",body:JSON.stringify({
+      sourceSlug:SRC.slug, scenes:SCENES, template:currentTpl(), caption:$("igCaption").value.trim()
+    })});
+    const url=d.reel&&d.reel.url;
+    show($("asmMsg"),"ok",`Done — ${d.reel.sceneCount} scenes, ${(+d.reel.durationSec).toFixed(1)}s. Saved to your library.`);
+    if(url){ $("resVideo").src=url; $("dlBtn").href=url; $("result").style.display=""; }
+    loadLibrary();
+  }catch(e){ show($("asmMsg"),"err",e.message||"Assembly failed"); }
+  finally{ $("assembleBtn").disabled=false; }
+}
+
+// ── library ──
+async function loadLibrary(){
+  try{
+    const d=await api("/api/admin/reel/library"); const reels=d.reels||[];
+    $("libCount").textContent=reels.length;
+    $("libEmpty").style.display=reels.length?"none":"";
+    $("libList").innerHTML=reels.map(r=>`
+      <div class="item">
+        <video src="${esc(r.url||"")}#t=0.5" preload="metadata" muted playsinline></video>
+        <div class="meta"><div class="t">${esc(r.title)}</div><div class="s">${r.sceneCount} scenes · ${(+r.durationSec).toFixed(1)}s · ${esc(r.status)}</div></div>
+        <div class="acts">
+          <a class="btn sm" href="${esc(r.url||"#")}" download target="_blank" rel="noopener">⬇</a>
+          <button class="btn ghost sm lib-del" data-id="${esc(r.id)}">✕</button>
+        </div>
+      </div>`).join("");
+    $("libList").querySelectorAll(".lib-del").forEach(b=>b.addEventListener("click",async()=>{
+      b.disabled=true;
+      try{ await api("/api/admin/reel/library/"+encodeURIComponent(b.dataset.id),{method:"DELETE"}); loadLibrary(); }catch(e){ b.disabled=false; }
+    }));
+  }catch(e){ if(e.status===401) gate(); }
+}
+
+// boot
+api("/api/admin/templates?kind=reel").then(main).catch(gate);
+$("keyInput")&&$("keyInput").addEventListener("keydown",e=>{ if(e.key==="Enter") saveKey(); });
+$("search")&&$("search").addEventListener("keydown",e=>{ if(e.key==="Enter") doSearch(); });
+</script>
+</body>
+</html>
