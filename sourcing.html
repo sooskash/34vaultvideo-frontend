@@ -228,7 +228,7 @@ function renderFeed(){
     const reelUrl=/^https?:\/\//.test(x.reelUrl||"")?x.reelUrl:"";
     const artist=(x.mentions&&x.mentions.length)?`<span>by @${esc(x.mentions[0])}</span>`:"";
     let act="";
-    if(x.onSite&&x.match) act=`<a class="btn sm" href="https://34vaultvideo.com/watch.html?slug=${encodeURIComponent(x.match.slug)}" target="_blank" rel="noopener">Open on site</a>`;
+    if(x.onSite&&x.match) act=`<a class="btn sm" href="studio.html?source=${encodeURIComponent(x.match.slug)}" title="Edit this source into a reel">🎬 Studio</a>`;
     else if(x._added) act=`<span class="btn ghost sm" style="cursor:default;opacity:.8">Added ✓</span>`;
     else if(x.sourceName) act=`<button class="btn sm find-src" data-i="${i}">Find source</button>`;
     else act=`<button class="btn sm find-src" data-i="${i}">🔍 Find sauce</button>`;

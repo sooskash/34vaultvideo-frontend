@@ -120,7 +120,8 @@
         <h2><span class="step">2</span> Scenes <span class="tag" id="sceneTotal" style="margin-left:auto">0.0s</span></h2>
         <div class="row" style="margin-bottom:10px">
           <button class="btn sm" id="addSceneBtn" onclick="addSceneAtPlayhead()" disabled>＋ Add scene at playhead</button>
-          <button class="btn ghost sm" onclick="renderScenes()">Refresh</button>
+          <button class="btn ghost sm" id="autoFillBtn" onclick="autoFillScenes()" disabled title="Spread evenly-spaced scenes across the video as a starting point">✨ Auto-fill</button>
+          <button class="btn ghost sm" onclick="SCENES=[];renderScenes()">Clear</button>
         </div>
         <div class="rlist" id="sceneList"><div class="scene-empty">Load a video, scrub to a moment, then “Add scene at playhead”. Adjust start/length per row. No limit on scenes.</div></div>
       </div>
@@ -147,6 +148,25 @@
           <button class="btn ghost sm" id="saveTplBtn" onclick="saveTemplate()">💾 Save template</button>
         </div>
         <div class="msg" id="tplMsg"></div>
+      </div>
+
+      <!-- 3.5 music -->
+      <div class="card">
+        <h2><span class="step">♪</span> Music <span class="tag" style="margin-left:auto;font-weight:700">optional</span></h2>
+        <div class="row">
+          <div class="f"><label>Track</label>
+            <select id="musicSelect" onchange="onMusicSelect()"><option value="">None</option></select>
+          </div>
+          <div class="f" style="max-width:110px"><label>Start (s)</label><input type="number" id="musicStart" min="0" step="0.5" value="0" /></div>
+          <button class="btn ghost sm" id="musicPrevBtn" onclick="previewMusic()" disabled>▶</button>
+        </div>
+        <audio id="musicAudio" style="display:none"></audio>
+        <div class="row" style="margin-top:10px">
+          <div class="f"><label>Add a track (mp3 / m4a, ≤25MB)</label><input type="file" id="musicFile" accept="audio/*" style="padding:7px 10px;height:auto" /></div>
+          <button class="btn ghost sm" id="musicUpBtn" onclick="uploadMusic()">⬆ Add</button>
+        </div>
+        <div class="hint">The track loops to fill the reel and is cut to its length. Set “Start” to pick which part of the song plays.</div>
+        <div class="msg" id="musicMsg"></div>
       </div>
 
       <!-- 4 create -->
@@ -190,7 +210,8 @@ async function api(path,opts={}){
   const d=await r.json().catch(()=>({})); if(!r.ok){ const e=new Error(d.error||("HTTP "+r.status)); e.status=r.status; throw e; } return d;
 }
 function gate(){ $("gate").style.display=""; $("main").style.display="none"; }
-function main(){ $("gate").style.display="none"; $("main").style.display=""; loadTemplates(); loadLibrary(); }
+function main(){ $("gate").style.display="none"; $("main").style.display=""; loadTemplates(); loadMusic(); loadLibrary();
+  const s=new URLSearchParams(location.search).get("source"); if(s) loadSource(s); }
 async function saveKey(){ const k=$("keyInput").value.trim(); if(!k) return; KEY=k;
   try{ await api("/api/admin/templates?kind=reel"); localStorage.setItem("_vadminKey",k); main(); }catch(e){ show($("gateMsg"),"err","Invalid key."); } }
 function logout(){ localStorage.removeItem("_vadminKey"); KEY=""; gate(); }
@@ -224,7 +245,7 @@ async function loadSource(slug){
     $("loaded").style.display="";
     $("srcVideo").src=`${CLIPSRC}?slug=${encodeURIComponent(v.slug)}`;
     $("srcInfo").innerHTML=`<b>${esc(v.title)}</b> · ${Math.round(v.duration||0)}s`;
-    $("addSceneBtn").disabled=false; updateAssembleBtn();
+    $("addSceneBtn").disabled=false; $("autoFillBtn").disabled=false; updateAssembleBtn();
     if(!v.r2Key) show($("srcMsg"),"warn",`This video isn’t hosted yet — <a href="watch.html?slug=${encodeURIComponent(v.slug)}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:800">open it once to host it</a>, then reload here. (Assembly needs a hosted copy.)`);
     else show($("srcMsg"),"ok","Hosted ✓ — scrub and add scenes.");
   }catch(e){ show($("srcMsg"),"err",e.message||"Failed"); }
@@ -234,6 +255,14 @@ async function loadSource(slug){
 function addSceneAtPlayhead(){
   const t=$("srcVideo").currentTime||0;
   SCENES.push({start:Math.max(0,+t.toFixed(2)),len:2}); renderScenes();
+}
+// "reel generator" starter: spread evenly-spaced scenes across the video (skip intro/outro).
+function autoFillScenes(){
+  const dur=($("srcVideo")&&$("srcVideo").duration)||(SRC&&SRC.duration)||0;
+  if(!dur){ show($("srcMsg"),"warn","Let the video load its duration first, then Auto-fill."); return; }
+  const N=6, skip=Math.min(8,dur*0.08), usable=Math.max(1,dur-skip*2), gap=usable/N;
+  SCENES=[]; for(let i=0;i<N;i++) SCENES.push({start:+(skip+i*gap).toFixed(2),len:2});
+  renderScenes();
 }
 function renderScenes(){
   const total=SCENES.reduce((a,s)=>a+(+s.len||0),0);
@@ -303,6 +332,31 @@ async function saveTemplate(){
   finally{ $("saveTplBtn").disabled=false; }
 }
 
+// ── music ──
+let MUSIC=[];
+async function loadMusic(){
+  try{ const d=await api("/api/admin/templates?kind=music"); MUSIC=d.templates||[];
+    $("musicSelect").innerHTML=`<option value="">None</option>`+MUSIC.map(m=>`<option value="${esc(m.id)}">${esc(m.name)}</option>`).join("");
+    onMusicSelect();
+  }catch(e){}
+}
+function currentMusicUrl(){ const m=MUSIC.find(x=>x.id===$("musicSelect").value); return (m&&m.config&&m.config.url)||""; }
+function onMusicSelect(){ const url=currentMusicUrl(); $("musicPrevBtn").disabled=!url; if(url) $("musicAudio").src=url; }
+function previewMusic(){ const a=$("musicAudio"); if(!a.src) return; try{ a.currentTime=+$("musicStart").value||0; }catch(e){} a.play().catch(()=>{}); setTimeout(()=>a.pause(),6000); }
+async function uploadMusic(){
+  const f=$("musicFile").files[0]; if(!f){ show($("musicMsg"),"err","Choose an audio file."); return; }
+  if(f.size>25*1024*1024){ show($("musicMsg"),"err","Max 25MB."); return; }
+  $("musicUpBtn").disabled=true; show($("musicMsg"),"busy",`<span class="spin"></span> Uploading…`);
+  try{
+    const dataUrl=await new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(f); });
+    const name=f.name.replace(/\.[^.]+$/,"").slice(0,60)||"Music";
+    const d=await api("/api/admin/reel/music",{method:"POST",body:JSON.stringify({name,dataUrl})});
+    show($("musicMsg"),"ok","Track added.");
+    await loadMusic(); if(d.template) $("musicSelect").value=d.template.id; onMusicSelect(); $("musicFile").value="";
+  }catch(e){ show($("musicMsg"),"err",e.message||"Failed"); }
+  finally{ $("musicUpBtn").disabled=false; }
+}
+
 // ── 4 · assemble ──
 async function assemble(){
   if(!(SRC&&SRC.r2Key&&SCENES.length)) return;
@@ -311,7 +365,8 @@ async function assemble(){
   $("result").style.display="none";
   try{
     const d=await api("/api/admin/reel/assemble",{method:"POST",body:JSON.stringify({
-      sourceSlug:SRC.slug, scenes:SCENES, template:currentTpl(), caption:$("igCaption").value.trim()
+      sourceSlug:SRC.slug, scenes:SCENES, template:currentTpl(), caption:$("igCaption").value.trim(),
+      musicId:$("musicSelect").value||undefined, musicStart:+$("musicStart").value||0
     })});
     const url=d.reel&&d.reel.url;
     show($("asmMsg"),"ok",`Done — ${d.reel.sceneCount} scenes, ${(+d.reel.durationSec).toFixed(1)}s. Saved to your library.`);
