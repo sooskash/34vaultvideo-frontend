@@ -260,9 +260,10 @@ async function findSource(x){
     renderCandidates(x, d.candidates||[], d.matchedQuery);
   }catch(e){ body.innerHTML=`<div class="msg err" style="display:block;margin:0">${esc(e.message||"Search failed")}</div>`; }
 }
+const r34search=s=>String(s||"").replace(/[^\w\s]/g," ").split(/\s+/).filter(Boolean).map(encodeURIComponent).join("+");
 function renderCandidates(x, cands, matchedQuery){
   const body=$("finderBody");
-  const manual=`<div class="hint" style="margin-top:14px">Not it? <a href="https://rule34video.com/search/${encodeURIComponent(x.sourceName)}/" target="_blank" rel="noopener" style="color:var(--accent);font-weight:800">Search rule34video manually →</a>${(x.mentions&&x.mentions.length)?` · or <a href="https://rule34video.com/search/${encodeURIComponent(x.mentions[0])}/" target="_blank" rel="noopener" style="color:var(--accent);font-weight:800">by artist @${esc(x.mentions[0])} →</a>`:""}</div>`;
+  const manual=`<div class="hint" style="margin-top:14px">Not it? <a href="https://rule34video.com/search/${r34search(x.sourceName)}/" target="_blank" rel="noopener" style="color:var(--accent);font-weight:800">Search rule34video manually →</a>${(x.mentions&&x.mentions.length)?` · or <a href="https://rule34video.com/search/${r34search(x.mentions[0])}/" target="_blank" rel="noopener" style="color:var(--accent);font-weight:800">by artist @${esc(x.mentions[0])} →</a>`:""}</div>`;
   if(!cands.length){
     body.innerHTML=`<div class="hint" style="margin:0">No rule34video results for “${esc(x.sourceName)}”. It may be on another site, or titled differently.</div>${manual}`;
     return;
