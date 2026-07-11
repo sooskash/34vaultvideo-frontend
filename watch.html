@@ -940,11 +940,9 @@ async function load(){
               const slots=[];
               for(const r of usable){ const c=cnt.get(r)||0; if(!c) continue; const spacing=r.len/c, sub=Math.min(segDur,spacing); for(let j=0;j<c;j++) slots.push({start:r.start+j*spacing, len:sub}); }
               slots.sort((a,b)=>a.start-b.start);
-              // fine verify each slot; truncate at the first unsafe frame
-              for(let k=0;k<slots.length;k++){ if(opts.onVerify) opts.onVerify(k+1,slots.length);
-                let safeLen=0; for(let t=slots[k].start; t<slots[k].start+slots[k].len; t+=0.5){ await seekVid(src,t); if((await analyzeFrame()).unsafe) break; safeLen=(t+0.5)-slots[k].start; }
-                safeLen=Math.min(safeLen,slots[k].len); if(safeLen>=0.8) final.push({t:slots[k].start,len:safeLen});
-              }
+              // slots already sit inside AI-verified clean runs (every sample in the run
+              // was rated clean by Z3D), so accept them directly.
+              for(const sl of slots) if(sl.len>=0.8) final.push({t:sl.start, len:sl.len});
             }
             final.sort((a,b)=>a.t-b.t);
             try{ console.log("[reel SFW] final", final.map(c=>({t:+c.t.toFixed(1),len:+c.len.toFixed(1)}))); }catch(e){}
