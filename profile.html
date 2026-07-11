@@ -65,6 +65,15 @@ body{padding-top:var(--topH);padding-bottom:60px}
 .stat .n{font-size:22px;font-weight:900;font-variant-numeric:tabular-nums}
 .stat .l{font-size:10.5px;font-weight:700;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.3px}
 .admin-badge{font-size:10px;font-weight:900;color:var(--accent);text-transform:uppercase;letter-spacing:.4px}
+/* Owner-tool launcher tiles */
+.tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:11px}
+.tool{display:flex;gap:12px;align-items:center;text-decoration:none;background:var(--panel2);border:1px solid var(--border);border-radius:13px;padding:14px;transition:transform .12s,border-color .15s}
+.tool:hover{transform:translateY(-2px);border-color:var(--accent)}
+.tool .ic{width:42px;height:42px;flex:none;display:grid;place-items:center;border-radius:11px;background:var(--grad-accent);font-size:20px}
+.tool .nm{font-size:14px;font-weight:900;color:var(--text,#eef1f8)}
+.tool .ds{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.4}
+.tool.soon{opacity:.6;cursor:default;pointer-events:none}
+.tool .soon-tag{font-size:9.5px;font-weight:900;color:var(--accent);text-transform:uppercase;letter-spacing:.4px}
 </style>
 </head>
 <body>
@@ -130,6 +139,24 @@ body{padding-top:var(--topH);padding-bottom:60px}
     <div class="pane" id="pane-admin">
       <div class="card">
         <h2><span class="admin-badge">Owner tools</span></h2>
+        <div class="tools">
+          <a class="tool" href="sourcing.html">
+            <div class="ic">✦</div>
+            <div><div class="nm">Content Sourcing</div><div class="ds">Mine competitor IG reels → find &amp; add the source</div></div>
+          </a>
+          <a class="tool" href="admin.html">
+            <div class="ic">⛏</div>
+            <div><div class="nm">Scrape &amp; Host</div><div class="ds">Add rule34video content, moderation queues</div></div>
+          </a>
+          <span class="tool soon">
+            <div class="ic">🎬</div>
+            <div><div class="nm">Reel Studio <span class="soon-tag">building</span></div><div class="ds">Edit clips into reels, templates &amp; scheduling</div></div>
+          </span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="admin-badge">Catalog</span></h2>
         <div class="stats" id="adminStats">
           <div class="stat"><div class="n">—</div><div class="l">Catalog</div></div>
           <div class="stat"><div class="n">—</div><div class="l">Hosted</div></div>
