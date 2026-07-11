@@ -885,29 +885,31 @@ async function load(){
             //   sfw      = each scene must be clean the whole way; explicit ones dropped.
             //   cropnsfw = keep more footage but face-crop ONLY the flagged moments.
             if(opts.onIntro) opts.onIntro(introSkip);
-            if(opts.onModel) opts.onModel("loading");
-            await loadNsfwModel(); // throws → caught by caller → nothing is produced
-            if(opts.onModel) opts.onModel("ready");
-            const analyzeFrame=async()=>{ const rs=regionStats(src);
-              let p=null; try{ p=await nsfwProbs(src); }catch(e){}
-              // unsafe if: model flags it, OR lots of skin overall, OR a dense flesh cell
-              // (genital/nudity close-up on dark fur), OR black/fade.
-              return { unsafe: !p || rs.bright<=24 || probUnsafe(p) || rs.skin>0.32 || rs.maxCell>0.75, risk: p?probRisk(p):rs.skin, p, skin:rs.skin, maxCell:rs.maxCell }; };
             // Credits/outro can be long — cut a generous tail so they're never picked.
             const endTrim=Math.min(60,Math.max(12,total*0.2));
             const span=Math.max(1,(total-endTrim)-introSkip);
             // Equal-length scenes, spread across the video, that fit the usable span.
             segDur=Math.max(1.2, Math.min(winDur, span/scenes));
-            const step=Math.min(1.0, segDur/2);            // dense: ≥2 samples/scene
-            const N=Math.min(70, Math.max(12, Math.ceil(span/step)+1));
-            const samp=[];
-            for(let i=0;i<N;i++){
-              const t=introSkip+span*(i/(N-1||1)); await seekVid(src,t);
-              const a=await analyzeFrame(); samp.push({t, unsafe:a.unsafe, risk:a.risk, p:a.p, skin:a.skin, maxCell:a.maxCell});
-              if(opts.onScan) opts.onScan(i+1,N);
+            // Sample frames across the video, then classify them with the SERVER-SIDE
+            // Z3D-E621 model (furry + anime + human aware). This is the real accuracy —
+            // the in-browser heuristic was blind to furry anatomy.
+            const N=Math.min(72, Math.max(12, Math.ceil(span/5)+1));
+            const capCv=document.createElement("canvas"), capX=capCv.getContext("2d");
+            const grabURL=()=>{ const sw=src.videoWidth||16, sh=src.videoHeight||9, w=320, h=Math.max(1,Math.round(320*sh/sw)); capCv.width=w; capCv.height=h; capX.drawImage(src,0,0,w,h); return capCv.toDataURL("image/jpeg",0.6); };
+            const times=[], urls=[];
+            for(let i=0;i<N;i++){ const t=introSkip+span*(i/(N-1||1)); await seekVid(src,t); times.push(t); urls.push(grabURL()); if(opts.onScan) opts.onScan(i+1,N); }
+            // classify in batches through our backend → Z3D service
+            const verdicts=new Array(N);
+            for(let s=0;s<N;s+=16){
+              const batch=urls.slice(s,s+16);
+              const r=await fetch(`${API}/api/reel/nsfw`,{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({images:batch})});
+              if(!r.ok) throw new Error("AI check failed ("+r.status+") — the detector service may be starting up, try again in a minute.");
+              const j=await r.json(); (j.results||[]).forEach((v,k)=>{ verdicts[s+k]=v; });
+              if(opts.onVerify) opts.onVerify(Math.min(s+16,N),N);
             }
+            const samp=times.map((t,i)=>{ const v=verdicts[i]||{}; return { t, unsafe: !!v.explicit, risk: v.explicit?1:0, tags:v.tags }; });
             scanSamp=samp; // draw() reads this to crop only flagged moments (cropnsfw)
-            try{ console.log("[reel SFW] scan", samp.map(s=>({t:+s.t.toFixed(1), H:+(((s.p||{}).Hentai)||0).toFixed(2), P:+(((s.p||{}).Porn)||0).toFixed(2), skin:+s.skin.toFixed(2), cell:+(s.maxCell||0).toFixed(2), bad:s.unsafe}))); }catch(e){}
+            try{ console.log("[reel SFW] AI scan", samp.map(s=>({t:+s.t.toFixed(1), bad:s.unsafe, tags:(s.tags||[]).slice(0,3)}))); }catch(e){}
             const requireClean = opts.crop!=="cropnsfw";
             let final=[]; // {t,len}
             if(!requireClean){
@@ -1061,9 +1063,8 @@ async function load(){
           let foundScenes=null;
           const out=await renderClip({mode:"ig",start,scenes,skip,autoSkip,crop,size,emojiImg:igEmojiImg,duration:dur,loop:document.getElementById("veIgLoop").checked,censor:document.getElementById("veIgBlur").checked,bgColor:IG_BG[document.getElementById("veIgTpl").value]||IG_BG.cork,topLines,charImg:igCharImg,
             onIntro:s=>{ if(s>0.5) m.textContent=`Skipping ~${s.toFixed(0)}s intro…`; },
-            onModel:st=>{ if(st==="loading") m.textContent="Loading the AI content model (first run ~10 MB, then cached)…"; },
-            onScan:(i,n,found)=>{ if(found!=null){ foundScenes=found; } else { m.textContent=`AI-scanning frames… ${i}/${n}`; } },
-            onVerify:(k,n)=>{ m.textContent=`Verifying scene ${k}/${n} frame-by-frame…`; },
+            onScan:(i,n,found)=>{ if(found!=null){ foundScenes=found; } else { m.textContent=`Sampling video… ${i}/${n}`; } },
+            onVerify:(k,n)=>{ m.textContent=`AI-checking frames… ${k}/${n}`; },
             onTick:e=>{m.textContent=`Recording… ${e.toFixed(0)}/${dur}s`;}});
           download(out.blob,`34vault-reel-${v.sourceId}.${out.ext}`);
           const sceneNote=(crop==="sfw"||crop==="cropnsfw")?` · AI-checked, ${foundScenes||0} scene${foundScenes===1?"":"s"}${foundScenes<scenes?` (only ${foundScenes} of ${scenes} usable)`:""}`:"";
