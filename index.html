@@ -957,26 +957,29 @@ let activeCategory=null, activeCategoryName="";
 // `all` holds only the loaded window; the server does filtering/sorting/paging.
 let total=0, offset=0, loading=false, done=false, _qToken=0;
 
-// ── Thumbnails: hit the R2 CDN directly (no API 302 round-trip — that hop was the
-// slow part). If a thumb isn't mirrored yet the CDN 404s and __thumbFall retries via
-// the API proxy (which mirrors it to R2 on first hit), then falls to a placeholder.
+// ── Thumbnails: load the SOURCE thumb straight from rule34video's CDN (fast, global,
+// no backend hop). The page is referrerpolicy=no-referrer, which the source serves fine
+// (verified). Only ~0.5% of the 300k catalog is mirrored to our R2, so CDN-first meant
+// nearly every grid image 404'd → slow API-proxy round-trip. Source-first fixes that.
+// __thumbFall cascades source → our CDN mirror → API proxy (mirrors on first hit) → blank.
 const CDN_THUMBS="https://cdn.34vault.com/thumbs";
 window.__NOTHUMB="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22320%22 height=%22180%22%3E%3Crect fill=%22%230d1018%22 width=%22320%22 height=%22180%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%231a1e2a%22 font-size=%2214%22 font-family=%22sans-serif%22%3ENo Thumb%3C/text%3E%3C/svg%3E";
 window.__thumbFall=function(img,sid){
   var stage=img.dataset.p||"0";
-  // Stage 0: most "failures" are Cloudflare serving a cached error for THIS exact
-  // URL (verified live — the same URL 503s bare but 200s with a cache-busting
-  // query string), not a missing object. Bypass the cache before assuming the
-  // worse and paying for a slower API-proxy round-trip.
-  if(stage==="0"){ img.dataset.p="1"; img.src=img.src.split("?")[0]+"?cb="+Date.now(); return; }
-  if(stage==="1"&&sid){ img.dataset.p="2"; img.src=(window.__API__||"")+"/api/thumb/"+sid; return; }
+  if(stage==="0"&&sid){ img.dataset.p="1"; img.src=CDN_THUMBS+"/"+sid+".jpg?cb="+Date.now(); return; } // → our CDN mirror
+  if(stage==="1"&&sid){ img.dataset.p="2"; img.src=(window.__API__||"")+"/api/thumb/"+sid; return; }   // → API proxy (mirrors to R2)
   img.onerror=null; img.src=window.__NOTHUMB;
 };
-// Thumbnails are stored with a one-year immutable Cache-Control, so an edited
-// thumbnail needs a cache-buster to actually show up instead of sitting behind
-// the old cached bytes — updatedAt changes whenever the video row (incl. its
-// thumbnail) is edited, so it doubles as a free per-video cache key.
-function thumbSrc(v){ if(!v||!v.sourceId) return (v&&v.thumbUrl)||window.__NOTHUMB; var ver=v.updatedAt?new Date(v.updatedAt).getTime():""; return CDN_THUMBS+"/"+v.sourceId+".jpg"+(ver?"?v="+ver:""); }
+// Source thumb by default. Uploaded videos (no source thumb) and OWNER-EDITED thumbs
+// live on our CDN — for those prefer the CDN copy (updatedAt >> createdAt = edited, and
+// doubles as the cache-buster key past the 1-year immutable Cache-Control).
+function thumbSrc(v){
+  if(!v) return window.__NOTHUMB;
+  var ver=v.updatedAt?new Date(v.updatedAt).getTime():0, cre=v.createdAt?new Date(v.createdAt).getTime():0;
+  var edited=ver&&cre&&(ver-cre>60000);
+  if(v.sourceId&&(edited||!v.thumbUrl)) return CDN_THUMBS+"/"+v.sourceId+".jpg"+(ver?"?v="+ver:"");
+  return v.thumbUrl||(v.sourceId?CDN_THUMBS+"/"+v.sourceId+".jpg":window.__NOTHUMB);
+}
 
 // Elements
 const grid       = document.getElementById("grid");
