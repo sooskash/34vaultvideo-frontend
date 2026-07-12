@@ -399,7 +399,7 @@ async function loadSource(slug){
     $("addSceneBtn").disabled=false; $("autoFillBtn").disabled=false; $("smartBtn").disabled=false;
     $("thumbVid").src=`${CLIPSRC}?slug=${encodeURIComponent(v.slug)}`;
     SCENES=[]; SELIDX=-1; for(const k in THUMBS) delete THUMBS[k]; renderScenes(); updateAssembleBtn();
-    if(!v.r2Key) show($("srcMsg"),"ok",`Ready — scrub & add scenes, then Assemble (your clips stream on the fly, no hosting wait). <button class="btn sm" onclick="hostSource('${esc(v.slug)}')" style="margin-left:6px">⚡ Host it</button> <span style="opacity:.75">to unlock 🤖 Smart-auto + faster assembly.</span>`);
+    if(!v.r2Key) show($("srcMsg"),"ok",`Ready — 🤖 Smart-auto or scrub & add scenes, then Assemble. Nothing needs hosting. <button class="btn sm" onclick="hostSource('${esc(v.slug)}')" style="margin-left:6px">⚡ Host it</button> <span style="opacity:.75">only if you want a saved copy (faster repeat + playback).</span>`);
     else show($("srcMsg"),"ok","Hosted ✓ — 🤖 Smart auto, or scrub and add scenes.");
   }catch(e){ show($("srcMsg"),"err",e.message||"Failed"); }
 }
@@ -446,7 +446,7 @@ function autoFillScenes(){
   SCENES=[]; for(let i=0;i<N;i++) SCENES.push({start:+(skip+i*gap).toFixed(2),len:2}); SELIDX=0; renderScenes();
 }
 async function smartAuto(){
-  if(!(SRC&&SRC.r2Key)){ show($("sceneMsg"),"warn","Load a hosted video first."); return; }
+  if(!SRC){ show($("sceneMsg"),"warn","Load a video first."); return; }
   $("smartBtn").disabled=true; show($("sceneMsg"),"busy",`<span class="spin"></span> AI scanning for SFW scenes… (~20–40s)`);
   try{
     const d=await api("/api/admin/reel/autoscenes",{method:"POST",body:JSON.stringify({sourceSlug:SRC.slug,count:6})});
