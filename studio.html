@@ -81,6 +81,13 @@
   .tlbl{font-size:11.5px;font-weight:800}
   /* overlay (sticker/emoji) rows */
   .ovsel{height:32px;font-size:12px}
+  /* live reel-frame preview mockup */
+  .mock{position:relative;width:100%;max-width:230px;aspect-ratio:9/16;margin:0 auto;border-radius:9px;overflow:hidden;background:#0d1018;border:1px solid var(--border2,#262b3a)}
+  .mock .mockempty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;font-size:11px;color:var(--sub,#8891a8);padding:14px}
+  .mock .mband{position:absolute;background:#0d1018;overflow:hidden}
+  .mock .mband img{width:100%;height:100%;object-fit:cover}
+  .mock .mcap{position:absolute;left:0;right:0;text-align:center;font-weight:900;line-height:1.05;font-family:Arial,Helvetica,sans-serif;padding:0 4px;white-space:pre-wrap}
+  .mock .mov{position:absolute}
   .cap-line{display:flex;gap:8px;margin-bottom:7px}
   .lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:11px}
   .lib .item{background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);border-radius:11px;overflow:hidden}
@@ -183,6 +190,13 @@
     </div>
 
     <div>
+      <!-- live preview of the actual reel frame -->
+      <div class="card">
+        <h2>Preview <span class="tag" style="margin-left:auto;font-weight:700">live</span></h2>
+        <div class="mock" id="mock"><div class="mockempty">Load a video &amp; add scenes to preview the reel frame.</div></div>
+        <div class="hint" style="text-align:center;margin-top:8px">This is how the reel frame looks — background, caption, clip &amp; stickers. Final motion/music is in the assembled video.</div>
+      </div>
+
       <!-- 3 template -->
       <div class="card">
         <h2><span class="step">3</span> Template</h2>
@@ -238,6 +252,7 @@
           <button class="btn ghost sm" id="emojiAddBtn" onclick="addEmoji()">＋</button>
         </div>
         <div class="hint" style="margin-top:6px">Upload a transparent PNG for the best result. Hit 💾 on any sticker to save it as a named preset for reuse.</div>
+        <div class="msg" id="ovMsg"></div>
         <div id="ovList" style="margin-top:10px"></div>
       </div>
 
@@ -406,7 +421,7 @@ function renderScenes(){
     t.addEventListener("drop",e=>{ e.preventDefault(); moveScene(_dragI,i); _dragI=null; });
   });
   el.querySelectorAll(".x").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); const i=+b.dataset.i; SCENES.splice(i,1); if(SELIDX>=SCENES.length) SELIDX=SCENES.length-1; renderScenes(); }));
-  renderTrim(); ensureThumbs(); updateAssembleBtn();
+  renderTrim(); ensureThumbs(); updateAssembleBtn(); renderMockup();
 }
 function moveScene(from,to){ if(from==null||from===to||from<0||to<0) return; const [it]=SCENES.splice(from,1); SCENES.splice(to,0,it); SELIDX=to; renderScenes(); }
 function vidDur(){ const v=$("srcVideo"); return (v&&v.duration&&isFinite(v.duration)?v.duration:0)||(SRC&&SRC.duration)||0; }
@@ -522,6 +537,7 @@ function applyTpl(cfg){
   OVERLAYS=(cfg.overlays||[]).filter(o=>o&&o.data).map(o=>({data:o.data,kind:o.kind||"character",name:o.name||"",pos:o.pos||"tr",size:o.size||"M"}));
   renderOverlays();
   if(cfg.music){ if(cfg.music.id) $("musicSelect").value=cfg.music.id; $("musicStart").value=cfg.music.start||0; onMusicSelect(); }
+  renderMockup();
 }
 function currentTpl(){
   const cap=[]; const y1=150,y2=245;
@@ -530,6 +546,20 @@ function currentTpl(){
   const SZ={S:150,M:250,L:380};
   const overlays=OVERLAYS.map(o=>{ const w=SZ[o.size]||250; const {x,y}=overlayXY(o.pos||"tr",w); return {data:o.data,x,y,w,pos:o.pos,size:o.size,kind:o.kind,name:o.name}; });
   return {size:"1080x1920",bg:$("bg").value,band:{scale:+$("band").value,y:+$("bandY").value},caption:cap,fontSize:72,fontColor:"black",overlays,music:{id:$("musicSelect").value||"",start:+$("musicStart").value||0}};
+}
+// live 9:16 mockup of the actual reel frame (bg + caption + clip band + stickers), scaled 1080→box
+function renderMockup(){
+  const el=$("mock"); if(!el) return;
+  const PW=el.clientWidth||230, sc=PW/1080, tpl=currentTpl();
+  const hasContent=SCENES.length||(tpl.overlays&&tpl.overlays.length)||(tpl.caption&&tpl.caption.length);
+  if(!hasContent){ el.style.background="#0d1018"; el.innerHTML=`<div class="mockempty">Load a video &amp; add scenes to preview the reel frame.</div>`; return; }
+  el.style.background=tpl.bg||"#C7A876";
+  const idx=SELIDX>=0?SELIDX:0, scn=SCENES[idx], th=scn?THUMBS[scn.start.toFixed(2)]:null;
+  const bw=(tpl.band.scale||1000)*sc, bx=((1080-(tpl.band.scale||1000))/2)*sc, by=(tpl.band.y||560)*sc, bh=bw*9/16;
+  let html=`<div class="mband" style="left:${bx}px;top:${by}px;width:${bw}px;height:${bh}px">${th?`<img src="${th}">`:`<div style="width:100%;height:100%;display:grid;place-items:center;font-size:9px;color:#8891a8">clip</div>`}</div>`;
+  for(const l of (tpl.caption||[])){ if(!l.text) continue; html+=`<div class="mcap" style="top:${l.y*sc}px;color:${tpl.fontColor||'black'};font-size:${(tpl.fontSize||72)*sc}px">${esc(l.text)}</div>`; }
+  for(const o of (tpl.overlays||[])){ html+=`<img class="mov" src="${o.data}" style="left:${o.x*sc}px;top:${o.y*sc}px;width:${o.w*sc}px">`; }
+  el.innerHTML=html;
 }
 // ── stickers / emoji overlays ──
 let OVERLAYS=[], PRESETS=[];  // OVERLAYS:[{data,kind,name,pos,size}]
@@ -548,10 +578,14 @@ function emojiToPng(ch){ return new Promise(resolve=>{
 function fileToPng(f,max=440){ return new Promise((res,rej)=>{ const img=new Image(),u=URL.createObjectURL(f);
   img.onload=()=>{ const sc=Math.min(1,max/Math.max(img.width,img.height)); const c=document.createElement("canvas"); c.width=Math.round(img.width*sc); c.height=Math.round(img.height*sc); c.getContext("2d").drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(u); res(c.toDataURL("image/png")); };
   img.onerror=rej; img.src=u; }); }
+function ovMsg(cls,txt){ const el=$("ovMsg"); if(el) show(el,cls,txt); }
 async function addEmoji(){ const e=$("emojiIn").value.trim(); if(!e) return; $("emojiAddBtn").disabled=true;
-  try{ OVERLAYS.push({data:await emojiToPng(e),kind:"emoji",name:e,pos:"tr",size:"M"}); $("emojiIn").value=""; renderOverlays(); }finally{ $("emojiAddBtn").disabled=false; } }
-async function addSticker(){ const f=$("stickerFile").files[0]; if(!f) return; if(f.size>8*1024*1024){ alert("Image too big (max 8MB)"); return; }
-  try{ OVERLAYS.push({data:await fileToPng(f),kind:"character",name:(f.name||"character").replace(/\.[^.]+$/,"").slice(0,40),pos:"mc",size:"L"}); $("stickerFile").value=""; renderOverlays(); }catch(e){} }
+  try{ OVERLAYS.push({data:await emojiToPng(e),kind:"emoji",name:e,pos:"tr",size:"M"}); $("emojiIn").value=""; renderOverlays(); ovMsg("ok","Emoji added — see the Preview above."); }
+  catch(err){ ovMsg("err","Couldn't add emoji: "+(err&&err.message||err)); } finally{ $("emojiAddBtn").disabled=false; } }
+async function addSticker(){ const f=$("stickerFile").files[0]; if(!f){ ovMsg("err","Choose a PNG first."); return; } if(f.size>8*1024*1024){ ovMsg("err","Image too big (max 8MB)."); return; }
+  $("stickerAddBtn").disabled=true;
+  try{ OVERLAYS.push({data:await fileToPng(f),kind:"character",name:(f.name||"character").replace(/\.[^.]+$/,"").slice(0,40),pos:"mc",size:"L"}); $("stickerFile").value=""; renderOverlays(); ovMsg("ok","Sticker added — see the Preview above."); }
+  catch(err){ ovMsg("err","Couldn't read that image — try a PNG/JPG. ("+(err&&err.message||err)+")"); } finally{ $("stickerAddBtn").disabled=false; } }
 async function loadPresets(){
   try{
     const [em,ch]=await Promise.all([api("/api/admin/templates?kind=emoji"),api("/api/admin/templates?kind=character")]);
@@ -567,7 +601,7 @@ async function savePreset(i){ const o=OVERLAYS[i]; if(!o) return; const name=pro
 const OV_POS=[["tl","top-left"],["tc","top"],["tr","top-right"],["ml","left"],["mc","center"],["mr","right"],["bl","bottom-left"],["bc","bottom"],["br","bottom-right"]];
 function renderOverlays(){
   const el=$("ovList"); if(!el) return;
-  if(!OVERLAYS.length){ el.innerHTML=`<div class="hint" style="margin:0">No stickers. Add an emoji, upload a character, or use a saved preset.</div>`; return; }
+  if(!OVERLAYS.length){ el.innerHTML=`<div class="hint" style="margin:0">No stickers. Add an emoji, upload a character, or use a saved preset.</div>`; renderMockup(); return; }
   el.innerHTML=OVERLAYS.map((o,i)=>`
     <div style="display:flex;gap:8px;align-items:center;background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);border-radius:9px;padding:7px 9px;margin-bottom:6px">
       <img src="${o.data}" style="width:34px;height:34px;object-fit:contain;background:#0d1018;border-radius:6px;flex:none">
@@ -580,6 +614,7 @@ function renderOverlays(){
   el.querySelectorAll(".ovsel").forEach(s=>s.addEventListener("change",()=>{ OVERLAYS[+s.dataset.i][s.dataset.k]=s.value; }));
   el.querySelectorAll(".ovsave").forEach(b=>b.addEventListener("click",()=>savePreset(+b.dataset.i)));
   el.querySelectorAll(".ovrm").forEach(b=>b.addEventListener("click",()=>{ OVERLAYS.splice(+b.dataset.i,1); renderOverlays(); }));
+  renderMockup();
 }
 async function loadTemplates(){
   try{
@@ -722,6 +757,7 @@ $("keyInput")&&$("keyInput").addEventListener("keydown",e=>{ if(e.key==="Enter")
 $("search")&&$("search").addEventListener("keydown",e=>{ if(e.key==="Enter") doSearch(); });
 $("linkin")&&$("linkin").addEventListener("keydown",e=>{ if(e.key==="Enter") loadFromLink(); });
 $("srcVideo")&&$("srcVideo").addEventListener("timeupdate",syncPlayhead);
+["cap1","cap2","bg","band","bandY"].forEach(id=>{ const el=$(id); if(el){ el.addEventListener("input",renderMockup); el.addEventListener("change",renderMockup); } });
 </script>
 </body>
 </html>
