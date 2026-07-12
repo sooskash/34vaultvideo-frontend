@@ -1155,13 +1155,37 @@ async function runQuery(reset){
   fetchInto(pageMode==="pages" ? (page-1)*PAGE : 0, "replace", token);
 }
 
+// Stale-while-revalidate cache for grid pages: paint the last result for a query INSTANTLY
+// (on return/open), then revalidate in the background. Persisted so a fresh page load feels
+// instant; 30-min paint window, self-evicting on quota. Fresh data always overwrites.
+const _gridMem=new Map();
+function gridCacheGet(url){
+  if(_gridMem.has(url)) return _gridMem.get(url);
+  try{ var s=localStorage.getItem("vg:"+url); if(s){ var o=JSON.parse(s); if(o&&Date.now()-o.t<1800000){ _gridMem.set(url,o); return o; } } }catch(e){}
+  return null;
+}
+function gridCacheSet(url,videos,total){
+  var o={videos:videos,total:total,t:Date.now()}; _gridMem.set(url,o);
+  try{ localStorage.setItem("vg:"+url,JSON.stringify(o)); }
+  catch(e){ try{ Object.keys(localStorage).forEach(function(k){ if(k.indexOf("vg:")===0) localStorage.removeItem(k); }); localStorage.setItem("vg:"+url,JSON.stringify(o)); }catch(_){ } }
+}
+
 // Fetch one page from the server. mode "replace" swaps `all` (reset / pages-mode);
 // "append" adds to it (scroll-mode load-more).
 async function fetchInto(off, mode, token){
   if(mode==="append" && loading) return; // only scroll-appends need dedup; replace/paginate always fire
+  const url=buildVideosUrl(off);
+  if(mode!=="append"){
+    const c=gridCacheGet(url);
+    if(c && token===_qToken){ // instant paint from cache, then revalidate below
+      all=c.videos; total=Number(c.total||0); offset=off+c.videos.length; done=offset>=total||!c.videos.length;
+      resolveNames(); calcAvgViewsPerDay(); buildFilters(); render();
+      gridCount.innerHTML = total?`<b>${total.toLocaleString()}</b> videos`:"";
+    }
+  }
   loading=true;
   try{
-    const r=await fetch(buildVideosUrl(off));
+    const r=await fetch(url);
     if(!r.ok) throw 0;
     const d=await r.json();
     if(token!==_qToken) return; // superseded by a newer query
@@ -1178,6 +1202,7 @@ async function fetchInto(off, mode, token){
       all=vids;
       resolveNames(); calcAvgViewsPerDay(); buildFilters();
       render();
+      gridCacheSet(url,vids,total);
     }
     gridCount.innerHTML = total?`<b>${total.toLocaleString()}</b> videos`:"";
     if(activeArtist) renderArtistHead();   // header shows the now-known video count

@@ -399,9 +399,39 @@ async function loadSource(slug){
     $("addSceneBtn").disabled=false; $("autoFillBtn").disabled=false; $("smartBtn").disabled=false;
     $("thumbVid").src=`${CLIPSRC}?slug=${encodeURIComponent(v.slug)}`;
     SCENES=[]; SELIDX=-1; for(const k in THUMBS) delete THUMBS[k]; renderScenes(); updateAssembleBtn();
-    if(!v.r2Key) show($("srcMsg"),"warn",`This video isn’t hosted yet — <a href="watch.html?slug=${encodeURIComponent(v.slug)}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:800">open it once to host it</a>, then reload here. (Assembly needs a hosted copy.)`);
+    if(!v.r2Key) show($("srcMsg"),"warn",`This video isn’t hosted yet. <button class="btn sm" onclick="hostSource('${esc(v.slug)}')" style="margin-left:6px">⚡ Host it now</button> <span style="opacity:.75">— needed to assemble (~10–40s).</span>`);
     else show($("srcMsg"),"ok","Hosted ✓ — 🤖 Smart auto, or scrub and add scenes.");
   }catch(e){ show($("srcMsg"),"err",e.message||"Failed"); }
+}
+
+// Host an un-hosted source into our CDN right here: kick host-now, poll the slug until its
+// r2Key appears, then flip SRC to hosted so Smart-auto + Assemble unlock — no leaving the studio.
+async function hostSource(slug){
+  slug=String(slug||"").trim(); if(!slug||!(SRC&&SRC.slug===slug)) return;
+  show($("srcMsg"),"busy",`<span class="spin"></span> Hosting this video into your CDN… (~10–40s, keep this open)`);
+  try{
+    const r=await fetch(`${API}/api/videos/slug/${encodeURIComponent(slug)}/host-now`,{method:"POST",credentials:"include"});
+    const d=await r.json().catch(()=>({}));
+    if(r.status===503){ show($("srcMsg"),"warn",`High demand right now. <button class="btn sm" onclick="hostSource('${esc(slug)}')">Try again</button>`); return; }
+    if(d&&d.ready&&d.videoUrl){ _srcHosted(slug); return; }
+  }catch(e){ show($("srcMsg"),"err",`Couldn't start hosting. <button class="btn sm" onclick="hostSource('${esc(slug)}')">Retry</button>`); return; }
+  const started=Date.now();
+  const timer=setInterval(async()=>{
+    if(!(SRC&&SRC.slug===slug)){ clearInterval(timer); return; }        // user switched source
+    if(Date.now()-started>180000){ clearInterval(timer); show($("srcMsg"),"warn",`Still working — <button class="btn sm" onclick="hostSource('${esc(slug)}')">check again</button>.`); return; }
+    try{
+      const rr=await fetch(`${API}/api/videos/slug/${encodeURIComponent(slug)}?_=${Date.now()}`,{credentials:"include"});
+      const vv=(await rr.json()).video;
+      if(vv&&vv.r2Key){ clearInterval(timer); _srcHosted(slug); }
+    }catch(e){}
+  },3000);
+}
+function _srcHosted(slug){
+  if(!(SRC&&SRC.slug===slug)) return;
+  SRC.r2Key=true;
+  $("srcVideo").src=`${CLIPSRC}?slug=${encodeURIComponent(slug)}`; // now 302s to the fast R2 copy
+  updateAssembleBtn();
+  show($("srcMsg"),"ok","Hosted ✓ — 🤖 Smart auto, or scrub and add scenes.");
 }
 
 // ── 2 · scenes (visual filmstrip: drag to reorder, click to trim, AI or manual) ──
