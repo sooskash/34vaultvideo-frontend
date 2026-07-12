@@ -764,12 +764,12 @@ const CAP_BAD=/\b(hentai|porn|nsfw|sex|sexy|nude|nudes|naked|xxx|cum|cumshot|ana
 const CAP_TAGS=["#animation","#3danimation","#animeedit","#animereels","#edit","#reels","#reelsviral","#viral","#fyp","#trending","#blender","#gameart","#characterdesign","#fanart"];
 function capClean(s){ return String(s||"").replace(CAP_BAD," ").replace(/[#@]/g," ").replace(/[^\w\s&'’-]/g," ").replace(/\s+/g," ").trim(); }
 function clientDecoyCaption(){
-  const cats=(SRC.categories||[]).map(capClean).filter(c=>c&&c.length>2);
-  const generic=/^(3d|2d|sfm|blender|animated|animation|cgi|compilation|western|1girl|solo)$/i;
-  const f=cats.find(c=>!generic.test(c))||cats[0]||capClean(SRC.title).split(" ").slice(0,3).join(" ")||"This series";
-  const tag="#"+f.replace(/[^\w]/g,"");
-  const tags=[...new Set([tag,...CAP_TAGS])].filter(t=>t.length>2).slice(0,11);
-  return `${f}\n\n${f} is a fan-favourite universe loved worldwide for its unforgettable characters, stunning visuals and epic moments. Dive in and see why fans can't get enough.\n\n⭐ Rating: 8.4/10\nFollow for daily edits 🔥\n\n${tags.join(" ")}`;
+  const bad=/(sex|fuck|rape|cum|anal|pussy|dick|cock|penis|nude|naked|porn|blowjob|creampie|hardcore|xxx|slut|whore|bdsm|gangbang|milf|ahegao|futa|breeding|hentai)/i;
+  const generic=/^(3d|2d|sfm|blender|animated|animation|cgi|compilation|western|1girl|solo|sound|voiced|uncensored)$/i;
+  const cats=((SRC&&SRC.categories)||[]).map(c=>String(c).trim()).filter(Boolean);
+  const f=cats.find(c=>!generic.test(c)&&!bad.test(c))||"";  // never the raw title
+  if(!f) return `Edits that hit different 🔥\n\nDaily anime & game moments — clean cuts, crisp visuals, and the scenes worth rewatching. Follow for more.\n\n⭐ 8.5/10`;
+  return `${f}\n\n${f} is a fan-favourite universe loved worldwide for its unforgettable characters, stunning visuals and epic moments. Dive in and see why fans can't get enough.\n\n⭐ Rating: 8.4/10\nFollow for more 🔥`;
 }
 async function autoCaption(){
   if(!SRC){ show($("asmMsg"),"warn","Load a source video first."); return; }
