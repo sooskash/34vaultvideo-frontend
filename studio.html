@@ -71,6 +71,13 @@
   .trim .hd{font-size:12px;font-weight:800;margin-bottom:9px}
   .trim .r{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
   .trim .num{width:70px}
+  /* trim slider = where the scene sits in the full video */
+  .track{position:relative;height:30px;background:var(--bg,#0a0b0e);border:1px solid var(--border2,#262b3a);border-radius:7px;margin:2px 0 12px;overflow:hidden}
+  .track .seg{position:absolute;top:0;bottom:0;background:rgba(245,158,11,.30);border-left:2px solid var(--accent);border-right:2px solid var(--accent)}
+  .track .phl{position:absolute;top:0;bottom:0;width:2px;background:#fff;box-shadow:0 0 4px rgba(0,0,0,.6)}
+  .trng{display:flex;flex-direction:column;gap:3px;margin-bottom:10px;font-size:11px;color:var(--sub,#8891a8)}
+  .trng label{display:flex;justify-content:space-between;margin:0;font-weight:700}
+  .trng input[type=range]{width:100%;height:auto;padding:0;accent-color:var(--accent,#f59e0b)}
   .cap-line{display:flex;gap:8px;margin-bottom:7px}
   .lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:11px}
   .lib .item{background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);border-radius:11px;overflow:hidden}
@@ -160,7 +167,8 @@
           <button class="btn sm" id="addSceneBtn" onclick="addSceneAtPlayhead()" disabled>＋ Add at playhead</button>
           <button class="btn sm" id="smartBtn" onclick="smartAuto()" disabled title="AI picks SFW scenes across the video (edit after)">🤖 Smart auto</button>
           <button class="btn ghost sm" id="autoFillBtn" onclick="autoFillScenes()" disabled title="Spread evenly-spaced scenes as a starting point">✨ Even</button>
-          <button class="btn ghost sm" onclick="SCENES=[];SELIDX=-1;renderScenes()">Clear</button>
+          <button class="btn ghost sm" id="previewReelBtn" onclick="previewReel()" title="Play the scenes in order — a preview of the reel's clip">▶ Preview reel</button>
+          <button class="btn ghost sm" onclick="stopSeq();SCENES=[];SELIDX=-1;renderScenes()">Clear</button>
         </div>
         <div class="hint" id="sceneHint" style="margin:0 0 8px">Drag tiles to reorder. Click a tile to trim it.</div>
         <div class="strip" id="sceneStrip"><div class="scene-empty">Load a video, then <b>🤖 Smart auto</b> to let AI pick SFW scenes, or scrub and <b>＋ Add at playhead</b>. Drag tiles to reorder, click to trim.</div></div>
@@ -380,24 +388,65 @@ function renderScenes(){
   renderTrim(); ensureThumbs(); updateAssembleBtn();
 }
 function moveScene(from,to){ if(from==null||from===to||from<0||to<0) return; const [it]=SCENES.splice(from,1); SCENES.splice(to,0,it); SELIDX=to; renderScenes(); }
+function vidDur(){ const v=$("srcVideo"); return (v&&v.duration&&isFinite(v.duration)?v.duration:0)||(SRC&&SRC.duration)||0; }
 function renderTrim(){
   const p=$("trimPanel");
   if(SELIDX<0||SELIDX>=SCENES.length){ p.style.display="none"; return; }
-  const s=SCENES[SELIDX]; p.style.display="";
-  p.innerHTML=`<div class="hd">Scene ${SELIDX+1} — trim</div><div class="r">
-    <label style="margin:0">start</label><input class="num" type="number" id="trStart" step="0.1" min="0" value="${s.start}">
-    <button class="btn ghost sm" id="trSet">Set to playhead</button>
-    <label style="margin:0 0 0 6px">length</label>
-    <button class="btn ghost sm" id="trMinus">−</button><input class="num" type="number" id="trLen" step="0.1" min="0.3" value="${s.len}"><button class="btn ghost sm" id="trPlus">+</button>
-    <button class="btn ghost sm" id="trPrev">▶ preview</button></div>`;
-  $("trStart").addEventListener("change",()=>{ s.start=Math.max(0,+$("trStart").value||0); renderScenes(); });
-  $("trLen").addEventListener("change",()=>{ s.len=Math.max(0.3,+$("trLen").value||2); renderScenes(); });
-  $("trSet").addEventListener("click",()=>{ s.start=Math.max(0,+($("srcVideo").currentTime||0).toFixed(2)); renderScenes(); });
-  $("trMinus").addEventListener("click",()=>{ s.len=Math.max(0.3,+(s.len-0.5).toFixed(1)); renderScenes(); });
-  $("trPlus").addEventListener("click",()=>{ s.len=+(s.len+0.5).toFixed(1); renderScenes(); });
+  const s=SCENES[SELIDX];
+  const dur=Math.max(vidDur(), s.start+s.len, 1);
+  p.style.display="";
+  p.innerHTML=`<div class="hd">Scene ${SELIDX+1} — where it's from in the full video</div>
+    <div class="track" id="trTrack"><div class="seg" id="trSeg"></div><div class="phl" id="trPhl" style="display:none"></div></div>
+    <div class="trng"><label>Start <span id="trStartL"></span></label><input type="range" id="trStartR" min="0" max="${dur.toFixed(2)}" step="0.1"></div>
+    <div class="trng"><label>End <span id="trEndL"></span></label><input type="range" id="trEndR" min="0" max="${dur.toFixed(2)}" step="0.1"></div>
+    <div class="r">
+      <button class="btn ghost sm" id="trSet">Start = playhead</button>
+      <label style="margin:0 0 0 4px">len</label><button class="btn ghost sm" id="trMinus">−</button><input class="num" type="number" id="trLen" step="0.1" min="0.3"><button class="btn ghost sm" id="trPlus">+</button>
+      <button class="btn sm" id="trPrev">▶ preview scene</button>
+    </div>`;
+  function paint(seekTo){
+    const end=Math.min(dur,s.start+s.len);
+    $("trSeg").style.left=(s.start/dur*100)+"%"; $("trSeg").style.width=Math.max(0.6,s.len/dur*100)+"%";
+    $("trStartR").value=s.start; $("trEndR").value=end; $("trLen").value=(+s.len).toFixed(1);
+    $("trStartL").textContent=fmtTime(s.start); $("trEndL").textContent=fmtTime(end);
+    if(seekTo!=null){ const v=$("srcVideo"); try{ v.pause(); v.currentTime=seekTo; }catch(e){} }
+  }
+  paint();
+  $("trStartR").addEventListener("input",()=>{ const end=s.start+s.len; let ns=Math.max(0,Math.min(+$("trStartR").value,end-0.3)); s.len=+(end-ns).toFixed(2); s.start=+ns.toFixed(2); paint(ns); });
+  $("trEndR").addEventListener("input",()=>{ let ne=Math.min(dur,Math.max(+$("trEndR").value,s.start+0.3)); s.len=+(ne-s.start).toFixed(2); paint(ne); });
+  const commit=()=>{ delete THUMBS[s.start.toFixed(2)]; renderScenes(); };
+  $("trStartR").addEventListener("change",commit);
+  $("trEndR").addEventListener("change",commit);
+  $("trLen").addEventListener("change",()=>{ s.len=Math.max(0.3,+$("trLen").value||2); commit(); });
+  $("trSet").addEventListener("click",()=>{ s.start=Math.max(0,+($("srcVideo").currentTime||0).toFixed(2)); commit(); });
+  $("trMinus").addEventListener("click",()=>{ s.len=Math.max(0.3,+(s.len-0.5).toFixed(1)); commit(); });
+  $("trPlus").addEventListener("click",()=>{ s.len=+(s.len+0.5).toFixed(1); commit(); });
   $("trPrev").addEventListener("click",()=>previewScene(SELIDX));
 }
-function previewScene(i){ const v=$("srcVideo"),s=SCENES[i]; if(!v||!s) return; try{ v.currentTime=s.start; }catch(e){} v.play().catch(()=>{}); if(_prevTimer) clearTimeout(_prevTimer); _prevTimer=setTimeout(()=>v.pause(),s.len*1000); }
+// live playhead marker on the trim track, driven by the source video's playback
+function syncPlayhead(){
+  const phl=document.getElementById("trPhl"); if(!phl) return;
+  const dur=vidDur(); if(!dur) return;
+  const t=$("srcVideo").currentTime||0;
+  phl.style.display=""; phl.style.left=(Math.min(dur,t)/dur*100)+"%";
+}
+function previewScene(i){ stopSeq(); const v=$("srcVideo"),s=SCENES[i]; if(!v||!s) return; try{ v.currentTime=s.start; }catch(e){} v.play().catch(()=>{}); if(_prevTimer) clearTimeout(_prevTimer); _prevTimer=setTimeout(()=>v.pause(),s.len*1000); }
+// sequence-play every scene in order = a preview of the reel's clip flow
+let _seqActive=false, _seqTimer=null;
+function stopSeq(){ _seqActive=false; if(_seqTimer){clearTimeout(_seqTimer);_seqTimer=null;} try{$("srcVideo").pause();}catch(e){} const b=$("previewReelBtn"); if(b) b.textContent="▶ Preview reel"; }
+function previewReel(){
+  const v=$("srcVideo"); if(!v||!SCENES.length) return;
+  if(_seqActive){ stopSeq(); return; }
+  _seqActive=true; const b=$("previewReelBtn"); if(b) b.textContent="⏹ Stop";
+  (function playAt(k){
+    if(!_seqActive) return;
+    if(k>=SCENES.length){ stopSeq(); return; }
+    SELIDX=k; renderScenes();
+    const s=SCENES[k]; try{ v.currentTime=s.start; }catch(e){} v.play().catch(()=>{});
+    if(_seqTimer) clearTimeout(_seqTimer);
+    _seqTimer=setTimeout(()=>playAt(k+1), s.len*1000);
+  })(0);
+}
 // grab a thumbnail per scene from a hidden video (same-origin clipsrc → canvas not tainted)
 async function ensureThumbs(){
   if(_thumbBusy) return; const tv=$("thumbVid"); if(!tv.src) return; _thumbBusy=true;
@@ -538,6 +587,7 @@ api("/api/admin/templates?kind=reel").then(main).catch(gate);
 $("keyInput")&&$("keyInput").addEventListener("keydown",e=>{ if(e.key==="Enter") saveKey(); });
 $("search")&&$("search").addEventListener("keydown",e=>{ if(e.key==="Enter") doSearch(); });
 $("linkin")&&$("linkin").addEventListener("keydown",e=>{ if(e.key==="Enter") loadFromLink(); });
+$("srcVideo")&&$("srcVideo").addEventListener("timeupdate",syncPlayhead);
 </script>
 </body>
 </html>
