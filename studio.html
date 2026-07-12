@@ -290,6 +290,12 @@
       <span style="font-size:12px;font-weight:800;color:var(--sub,#8891a8)">📤 Push to:</span>
       <label class="pchk"><input type="checkbox" id="pt_telegram" checked> Telegram</label>
       <label class="pchk"><input type="checkbox" id="pt_instagram"> Instagram</label>
+      <select id="pt_ig_mode" title="How Instagram (Buffer) posts this reel" onchange="document.getElementById('pt_ig_at').style.display=this.value==='at'?'':'none'" style="font-size:12px;padding:3px 6px;border-radius:7px;border:1px solid var(--line,#2a3350);background:var(--panel,#141a2e);color:var(--fg,#e8ecf6)">
+        <option value="queue">Buffer queue (scheduled)</option>
+        <option value="now">Share now</option>
+        <option value="at">Schedule at…</option>
+      </select>
+      <input type="datetime-local" id="pt_ig_at" style="display:none;font-size:12px;padding:3px 6px;border-radius:7px;border:1px solid var(--line,#2a3350);background:var(--panel,#141a2e);color:var(--fg,#e8ecf6)">
       <span class="hint" style="margin:0">— the 📤 button on a reel pushes to the checked platforms.</span>
     </div>
     <div class="msg" id="libMsg"></div>
@@ -845,9 +851,15 @@ async function doPost(reel){
   if(!reel) return;
   const targets=[]; if($("pt_telegram").checked) targets.push("telegram"); if($("pt_instagram").checked) targets.push("instagram");
   if(!targets.length){ show($("libMsg"),"warn","Pick at least one platform under “Push to:”."); return; }
+  let schedule=null;
+  if(targets.includes("instagram")){
+    const mode=$("pt_ig_mode").value;
+    if(mode==="at"){ const v=$("pt_ig_at").value; if(!v){ show($("libMsg"),"warn","Pick a date & time for “Schedule at…”."); return; } schedule={mode:"at",at:new Date(v).toISOString()}; }
+    else schedule={mode};
+  }
   show($("libMsg"),"busy",`<span class="spin"></span> Pushing reel #${reel.num} to ${targets.join(", ")}…`);
   try{
-    const d=await api("/api/admin/reel/"+encodeURIComponent(reel.id)+"/post",{method:"POST",body:JSON.stringify({targets})});
+    const d=await api("/api/admin/reel/"+encodeURIComponent(reel.id)+"/post",{method:"POST",body:JSON.stringify({targets,schedule})});
     const res=d.results||{};
     let copied=false; if(targets.includes("instagram")){ try{ await navigator.clipboard.writeText(d.igCaption||""); copied=true; }catch(e){} }
     const summary=targets.map(t=>`${t}: <b>${esc(res[t]||"?")}</b>`).join(" · ");
