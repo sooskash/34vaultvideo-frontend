@@ -227,17 +227,17 @@
       <!-- stickers / emoji -->
       <div class="card">
         <h2><span class="step">★</span> Stickers &amp; emoji <span class="tag" style="margin-left:auto;font-weight:700">optional</span></h2>
-        <div class="row" style="margin-bottom:8px">
-          <div class="f"><label>Saved stickers &amp; characters</label><select id="presetSel"></select></div>
-          <button class="btn ghost sm" id="presetAddBtn" onclick="addFromPreset()">＋ Use</button>
-        </div>
         <div class="row">
-          <div class="f" style="max-width:130px"><label>Emoji</label><input id="emojiIn" placeholder="😀 🔥 💦" maxlength="6" /></div>
-          <button class="btn ghost sm" id="emojiAddBtn" onclick="addEmoji()">＋ Emoji</button>
-          <div class="f"><label>Or upload a character / sticker</label><input type="file" id="stickerFile" accept="image/*" style="padding:7px 10px;height:auto" /></div>
-          <button class="btn ghost sm" id="stickerAddBtn" onclick="addSticker()">＋ Image</button>
+          <div class="f"><label>Upload a PNG sticker / emoji / character (transparent ok)</label><input type="file" id="stickerFile" accept="image/png,image/webp,image/*" style="padding:7px 10px;height:auto" /></div>
+          <button class="btn sm" id="stickerAddBtn" onclick="addSticker()">＋ Add PNG</button>
         </div>
-        <div class="hint" style="margin-top:6px">Emojis render as full-colour picture emojis. Hit 💾 on any sticker to save it as a named preset for reuse.</div>
+        <div class="row" style="margin-top:8px">
+          <div class="f"><label>Saved presets</label><select id="presetSel"></select></div>
+          <button class="btn ghost sm" id="presetAddBtn" onclick="addFromPreset()">＋ Use</button>
+          <div class="f" style="max-width:130px"><label>or type emoji</label><input id="emojiIn" placeholder="🔥" maxlength="6" /></div>
+          <button class="btn ghost sm" id="emojiAddBtn" onclick="addEmoji()">＋</button>
+        </div>
+        <div class="hint" style="margin-top:6px">Upload a transparent PNG for the best result. Hit 💾 on any sticker to save it as a named preset for reuse.</div>
         <div id="ovList" style="margin-top:10px"></div>
       </div>
 
@@ -261,6 +261,7 @@
   <!-- library -->
   <div class="card">
     <h2>Reel library <span class="tag" id="libCount" style="margin-left:8px">0</span></h2>
+    <div class="msg" id="libMsg"></div>
     <div class="lib" id="libList"></div>
     <div class="hint" id="libEmpty">No reels yet — assemble one above and it lands here, ready to schedule/post (Instagram push coming next).</div>
   </div>
@@ -671,13 +672,15 @@ async function loadLibrary(){
     $("libList").innerHTML=REELS.map((r,i)=>`
       <div class="item">
         <video src="${esc(r.url||"")}#t=0.5" preload="metadata" muted playsinline></video>
-        <div class="meta"><div class="t">${esc(r.title)}</div><div class="s">${r.sceneCount} scenes · ${(+r.durationSec).toFixed(1)}s · ${esc(r.status)}</div></div>
-        <div class="acts">
-          ${r.spec?`<button class="btn sm lib-edit" data-i="${i}" title="Reopen &amp; tweak">✎ Edit</button>`:""}
+        <div class="meta"><div class="t">${r.num?`#${r.num} · `:""}${esc(r.title)}</div><div class="s">${r.sceneCount} scenes · ${(+r.durationSec).toFixed(1)}s · ${r.status==="posted"?'<span style="color:#86efac">posted ✓</span>':esc(r.status)}</div></div>
+        <div class="acts" style="flex-wrap:wrap">
+          <button class="btn sm lib-post" data-i="${i}" title="Post to Telegram + copy IG caption">📤 Post</button>
+          ${r.spec?`<button class="btn ghost sm lib-edit" data-i="${i}" title="Reopen &amp; tweak">✎</button>`:""}
           <a class="btn ghost sm" href="${esc(r.url||"#")}" download target="_blank" rel="noopener" title="Download">⬇</a>
           <button class="btn ghost sm lib-del" data-id="${esc(r.id)}" title="Delete">✕</button>
         </div>
       </div>`).join("");
+    $("libList").querySelectorAll(".lib-post").forEach(b=>b.addEventListener("click",()=>doPost(REELS[+b.dataset.i])));
     $("libList").querySelectorAll(".lib-edit").forEach(b=>b.addEventListener("click",()=>loadProject(REELS[+b.dataset.i].spec)));
     $("libList").querySelectorAll(".lib-del").forEach(b=>b.addEventListener("click",async()=>{
       b.disabled=true;
@@ -697,6 +700,20 @@ async function loadProject(spec){
   renderScenes();
   try{ window.scrollTo({top:0,behavior:"smooth"}); }catch(e){}
   show($("asmMsg"),"ok","Project loaded — tweak scenes/template/music, then Assemble to make an updated reel.");
+}
+// Post: Telegram channel gets the reel + #number + full-video link; IG caption (with the
+// same #number) is copied to your clipboard to paste when you post the reel to Instagram.
+async function doPost(reel){
+  if(!reel) return;
+  show($("libMsg"),"busy",`<span class="spin"></span> Posting reel #${reel.num}…`);
+  try{
+    const d=await api("/api/admin/reel/"+encodeURIComponent(reel.id)+"/post",{method:"POST",body:"{}"});
+    const tg=(d.results&&d.results.telegram)||"?";
+    let copied=false; try{ await navigator.clipboard.writeText(d.igCaption||""); copied=true; }catch(e){}
+    const ok=tg==="sent";
+    show($("libMsg"),ok?"ok":"warn",`Reel #${d.num}: Telegram → <b>${esc(tg)}</b>.${copied?" IG caption copied to clipboard —":" IG caption ready —"} download the reel (⬇) and post it to Instagram; viewers find the full video by searching #${d.num} in your Telegram.`);
+    loadLibrary();
+  }catch(e){ show($("libMsg"),"err",e.message||"Post failed"); }
 }
 
 // boot
