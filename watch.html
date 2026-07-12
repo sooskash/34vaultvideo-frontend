@@ -303,10 +303,7 @@ window.__thumbFall=function(img,sid){
 };
 function thumbSrc(x){
   if(!x) return NO_THUMB;
-  var ver=x.updatedAt?new Date(x.updatedAt).getTime():0, cre=x.createdAt?new Date(x.createdAt).getTime():0;
-  var edited=ver&&cre&&(ver-cre>60000);
-  if(x.sourceId&&(edited||!x.thumbUrl)) return CDN_THUMBS+"/"+x.sourceId+".jpg"+(ver?"?v="+ver:"");
-  return x.thumbUrl||(x.sourceId?CDN_THUMBS+"/"+x.sourceId+".jpg":NO_THUMB);
+  return x.thumbUrl || (x.sourceId ? CDN_THUMBS+"/"+x.sourceId+".jpg" : NO_THUMB);
 }
 
 function vcard(x){

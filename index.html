@@ -970,15 +970,13 @@ window.__thumbFall=function(img,sid){
   if(stage==="1"&&sid){ img.dataset.p="2"; img.src=(window.__API__||"")+"/api/thumb/"+sid; return; }   // → API proxy (mirrors to R2)
   img.onerror=null; img.src=window.__NOTHUMB;
 };
-// Source thumb by default. Uploaded videos (no source thumb) and OWNER-EDITED thumbs
-// live on our CDN — for those prefer the CDN copy (updatedAt >> createdAt = edited, and
-// doubles as the cache-buster key past the 1-year immutable Cache-Control).
+// Use thumbUrl directly: scraped videos → the source CDN (fast); owner-edited/uploaded
+// videos → our CDN (the backend sets thumbUrl to the CDN url with a ?v= cache-buster when
+// a thumb is saved). Empty thumbUrl → our CDN keyed by sourceId. (No updatedAt heuristic —
+// updatedAt bumps on every view, so it can't tell "edited thumbnail" from "watched".)
 function thumbSrc(v){
   if(!v) return window.__NOTHUMB;
-  var ver=v.updatedAt?new Date(v.updatedAt).getTime():0, cre=v.createdAt?new Date(v.createdAt).getTime():0;
-  var edited=ver&&cre&&(ver-cre>60000);
-  if(v.sourceId&&(edited||!v.thumbUrl)) return CDN_THUMBS+"/"+v.sourceId+".jpg"+(ver?"?v="+ver:"");
-  return v.thumbUrl||(v.sourceId?CDN_THUMBS+"/"+v.sourceId+".jpg":window.__NOTHUMB);
+  return v.thumbUrl || (v.sourceId ? CDN_THUMBS+"/"+v.sourceId+".jpg" : window.__NOTHUMB);
 }
 
 // Elements
