@@ -86,6 +86,20 @@
   .sr{display:flex;gap:9px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border,#1e222e);cursor:pointer}
   .sr:hover{background:var(--surface2,#181b22)} .sr img{width:74px;aspect-ratio:16/9;object-fit:cover;border-radius:6px;background:#0d1018;flex:none}
   .sr .t{font-size:12.5px;font-weight:700;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  /* source picker tabs + result grid */
+  .srctabs{display:flex;gap:6px;margin-bottom:11px;flex-wrap:wrap}
+  .stab{font-size:12px;font-weight:800;padding:6px 12px;border-radius:8px;cursor:pointer;background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);color:var(--sub,#8891a8)}
+  .stab.on{background:var(--grad-accent,linear-gradient(135deg,#ffce54,#f59e0b));color:#2a1500;border-color:transparent}
+  .resgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:9px;margin-top:11px;max-height:330px;overflow:auto}
+  .rescard{background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);border-radius:9px;overflow:hidden;cursor:pointer;transition:border-color .15s,transform .1s}
+  .rescard:hover{border-color:var(--accent);transform:translateY(-2px)}
+  .rescard .th{width:100%;aspect-ratio:16/9;background:#0d1018;position:relative;overflow:hidden}
+  .rescard .th img{width:100%;height:100%;object-fit:cover;display:block}
+  .rescard .th .b{position:absolute;top:4px;right:4px;font-size:9px;font-weight:900;padding:1px 6px;border-radius:999px}
+  .b.host{background:rgba(34,197,94,.9);color:#04240f} .b.nohost{background:rgba(245,158,11,.95);color:#2a1500}
+  .rescard .cap{padding:6px 7px 2px;font-size:11px;font-weight:700;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .rescard .sub{font-size:10px;color:var(--sub,#8891a8);padding:0 7px 6px}
+  .resgrid .empty{grid-column:1/-1;text-align:center;color:var(--sub);font-size:12px;padding:20px 6px}
 </style>
 </head>
 <body>
@@ -117,12 +131,22 @@
       <!-- 1 source -->
       <div class="card">
         <h2><span class="step">1</span> Source video</h2>
-        <div class="row">
-          <div class="f"><input id="search" placeholder="Search your catalog… (or paste a slug)" autocomplete="off" /></div>
-          <button class="btn ghost" id="searchBtn" onclick="doSearch()">Search</button>
+        <div class="srctabs">
+          <button class="stab on" data-tab="search" onclick="srcTab('search')">🔍 Search</button>
+          <button class="stab" data-tab="browse" onclick="srcTab('browse')">📼 Browse</button>
+          <button class="stab" data-tab="sourcing" onclick="srcTab('sourcing')">✦ From sourcing</button>
+          <button class="stab" data-tab="link" onclick="srcTab('link')">🔗 Paste link</button>
         </div>
-        <div id="results" style="margin-top:8px"></div>
-        <div id="loaded" style="display:none;margin-top:10px">
+        <div class="spane" id="sp-search">
+          <div class="row"><div class="f"><input id="search" placeholder="Search titles on your site…" autocomplete="off" /></div><button class="btn ghost" id="searchBtn" onclick="doSearch()">Search</button></div>
+        </div>
+        <div class="spane" id="sp-browse" style="display:none"><div class="hint" style="margin:0">Your most-viewed videos — the hosted ones (green) are ready to edit. Click to load.</div></div>
+        <div class="spane" id="sp-sourcing" style="display:none"><div class="hint" style="margin:0">Reels from your Sourcing feed whose source you already have on-site. Click to edit that source.</div></div>
+        <div class="spane" id="sp-link" style="display:none">
+          <div class="row"><div class="f"><input id="linkin" placeholder="Paste a 34vaultvideo link (watch.html?slug=…) or a slug" autocomplete="off" /></div><button class="btn ghost" id="linkBtn" onclick="loadFromLink()">Load</button></div>
+        </div>
+        <div class="resgrid" id="results" style="display:none"></div>
+        <div id="loaded" style="display:none;margin-top:12px">
           <video id="srcVideo" controls preload="metadata" playsinline></video>
           <div class="hint" id="srcInfo"></div>
           <div class="msg" id="srcMsg"></div>
@@ -236,33 +260,73 @@ async function saveKey(){ const k=$("keyInput").value.trim(); if(!k) return; KEY
   try{ await api("/api/admin/templates?kind=reel"); localStorage.setItem("_vadminKey",k); main(); }catch(e){ show($("gateMsg"),"err","Invalid key."); } }
 function logout(){ localStorage.removeItem("_vadminKey"); KEY=""; gate(); }
 
-// ── 1 · source ──
+// ── 1 · source (tabbed visual picker) ──
+function srcTab(t){
+  document.querySelectorAll(".stab").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));
+  document.querySelectorAll(".spane").forEach(p=>p.style.display=p.id==="sp-"+t?"":"none");
+  $("results").style.display="none"; $("results").innerHTML="";
+  if(t==="browse") browsePopular();
+  else if(t==="sourcing") loadFromSourcing();
+}
+function parseSlug(s){
+  s=String(s||"").trim();
+  let m=s.match(/[?&]slug=([^&#]+)/); if(m) return decodeURIComponent(m[1]);
+  m=s.match(/\/r\/([^/?#]+)/); if(m) return decodeURIComponent(m[1]);
+  return decodeURIComponent(s.replace(/[?#].*$/,"").replace(/\/+$/,"").split("/").pop()||s);
+}
+// items: [{slug,title,thumb,hosted,sub}]
+function renderGrid(items,emptyMsg){
+  const el=$("results"); el.style.display="";
+  if(!items.length){ el.innerHTML=`<div class="empty">${esc(emptyMsg||"Nothing found.")}</div>`; return; }
+  el.innerHTML=items.map((v,i)=>`
+    <div class="rescard" data-i="${i}">
+      <div class="th">${/^https?:\/\//.test(v.thumb||"")?`<img src="${esc(v.thumb)}" referrerpolicy="no-referrer" loading="lazy" onerror="this.style.display='none'" alt="">`:""}
+        <span class="b ${v.hosted?'host':'nohost'}">${v.hosted?'hosted':'not hosted'}</span></div>
+      <div class="cap">${esc(v.title||"(untitled)")}</div>${v.sub?`<div class="sub">${esc(v.sub)}</div>`:""}
+    </div>`).join("");
+  el.querySelectorAll(".rescard").forEach(c=>c.addEventListener("click",()=>loadSource(items[+c.dataset.i].slug)));
+}
 async function doSearch(){
   const q=$("search").value.trim(); if(!q) return;
-  // a slug looks like words-with-dashes-and-an-id; try direct load first if it has no spaces
-  $("searchBtn").disabled=true;
+  // if they pasted a link/slug, just load it
+  if(/https?:\/\/|slug=|\//.test(q)){ return loadSource(parseSlug(q)); }
+  $("searchBtn").disabled=true; $("results").style.display=""; $("results").innerHTML=`<div class="empty"><span class="spin"></span> Searching…</div>`;
   try{
-    const d=await fetch(`${API}/api/videos?all=1&limit=24&sort=views&q=${encodeURIComponent(q)}`).then(r=>r.json());
+    const d=await fetch(`${API}/api/videos?all=1&limit=24&sort=views&q=${encodeURIComponent(q)}`,{credentials:"include"}).then(r=>r.json());
     const vids=(d.videos||d||[]);
-    $("results").innerHTML = vids.length ? vids.slice(0,10).map(v=>`
-      <div class="sr" data-slug="${esc(v.slug)}" data-hosted="${v.r2Key?1:0}">
-        <img src="${esc(v.thumbUrl||"")}" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'" alt=""/>
-        <div style="flex:1;min-width:0"><div class="t">${esc(v.title)}</div>
-          <div class="hint" style="margin:2px 0 0">${Math.round(v.duration||0)}s · ${v.r2Key?'<span style="color:#86efac">hosted ✓</span>':'<span style="color:#fcd34d">not hosted</span>'}</div></div>
-      </div>`).join("") : `<div class="hint">No matches. Try another term, or paste an exact slug.</div>`;
-    $("results").querySelectorAll(".sr").forEach(el=>el.addEventListener("click",()=>loadSource(el.dataset.slug)));
+    renderGrid(vids.map(v=>({slug:v.slug,title:v.title,thumb:v.thumbUrl,hosted:!!v.r2Key,sub:Math.round(v.duration||0)+"s"})),"No matches — try another term or the Paste-link tab.");
   }catch(e){ show($("srcMsg"),"err",e.message||"Search failed"); }
   finally{ $("searchBtn").disabled=false; }
 }
-async function loadSource(slug){
+async function browsePopular(){
+  $("results").style.display=""; $("results").innerHTML=`<div class="empty"><span class="spin"></span> Loading…</div>`;
   try{
-    const d=await fetch(`${API}/api/videos?all=1&limit=1&q=${encodeURIComponent(slug)}`).then(r=>r.json());
-    let v=(d.videos||d||[]).find(x=>x.slug===slug) || (d.videos||d||[])[0];
-    if(!v){ show($("srcMsg"),"err","Couldn't load that video."); return; }
+    const d=await fetch(`${API}/api/videos?all=1&limit=36&sort=views`,{credentials:"include"}).then(r=>r.json());
+    const vids=(d.videos||d||[]);
+    renderGrid(vids.map(v=>({slug:v.slug,title:v.title,thumb:v.thumbUrl,hosted:!!v.r2Key,sub:Math.round(v.duration||0)+"s"})),"No videos yet.");
+  }catch(e){ show($("srcMsg"),"err",e.message||"Failed"); }
+}
+async function loadFromSourcing(){
+  $("results").style.display=""; $("results").innerHTML=`<div class="empty"><span class="spin"></span> Loading sourcing feed…</div>`;
+  try{
+    const d=await api("/api/admin/sourcing");
+    const seen={}, items=[];
+    for(const r of (d.feed||[])){ if(r.onSite&&r.match&&r.match.slug&&!seen[r.match.slug]){ seen[r.match.slug]=1;
+      items.push({slug:r.match.slug,title:r.sourceName||r.match.title,thumb:r.thumb,hosted:true,sub:"▶ "+(r.plays||0).toLocaleString()+" on IG"}); } }
+    renderGrid(items,"No confirmed sources in your feed yet — match some in the Sourcing tool first.");
+  }catch(e){ if(e.status===401) gate(); else show($("srcMsg"),"err",e.message||"Failed"); }
+}
+function loadFromLink(){ const s=parseSlug($("linkin").value); if(!s){ show($("srcMsg"),"err","Paste a link or slug."); return; } loadSource(s); }
+async function loadSource(slug){
+  slug=String(slug||"").trim(); if(!slug){ show($("srcMsg"),"err","No video specified."); return; }
+  $("loaded").style.display=""; show($("srcMsg"),"busy",`<span class="spin"></span> Loading…`);
+  try{
+    const r=await fetch(`${API}/api/videos/slug/${encodeURIComponent(slug)}`,{credentials:"include"});
+    if(!r.ok) throw new Error(r.status===404?"That video isn't in your catalog.":"HTTP "+r.status);
+    const v=(await r.json()).video;
+    if(!v||!v.slug){ show($("srcMsg"),"err","Couldn't load that video."); return; }
     SRC={slug:v.slug,title:v.title,r2Key:v.r2Key,duration:v.duration};
-    $("results").innerHTML="";
-    $("search").value=v.slug;
-    $("loaded").style.display="";
+    $("results").style.display="none"; $("results").innerHTML="";
     $("srcVideo").src=`${CLIPSRC}?slug=${encodeURIComponent(v.slug)}`;
     $("srcInfo").innerHTML=`<b>${esc(v.title)}</b> · ${Math.round(v.duration||0)}s`;
     $("addSceneBtn").disabled=false; $("autoFillBtn").disabled=false; $("smartBtn").disabled=false;
@@ -473,6 +537,7 @@ async function loadLibrary(){
 api("/api/admin/templates?kind=reel").then(main).catch(gate);
 $("keyInput")&&$("keyInput").addEventListener("keydown",e=>{ if(e.key==="Enter") saveKey(); });
 $("search")&&$("search").addEventListener("keydown",e=>{ if(e.key==="Enter") doSearch(); });
+$("linkin")&&$("linkin").addEventListener("keydown",e=>{ if(e.key==="Enter") loadFromLink(); });
 </script>
 </body>
 </html>
