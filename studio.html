@@ -399,7 +399,7 @@ async function loadSource(slug){
     $("addSceneBtn").disabled=false; $("autoFillBtn").disabled=false; $("smartBtn").disabled=false;
     $("thumbVid").src=`${CLIPSRC}?slug=${encodeURIComponent(v.slug)}`;
     SCENES=[]; SELIDX=-1; for(const k in THUMBS) delete THUMBS[k]; renderScenes(); updateAssembleBtn();
-    if(!v.r2Key) show($("srcMsg"),"warn",`This video isn’t hosted yet. <button class="btn sm" onclick="hostSource('${esc(v.slug)}')" style="margin-left:6px">⚡ Host it now</button> <span style="opacity:.75">— needed to assemble (~10–40s).</span>`);
+    if(!v.r2Key) show($("srcMsg"),"ok",`Ready — scrub & add scenes, then Assemble (your clips stream on the fly, no hosting wait). <button class="btn sm" onclick="hostSource('${esc(v.slug)}')" style="margin-left:6px">⚡ Host it</button> <span style="opacity:.75">to unlock 🤖 Smart-auto + faster assembly.</span>`);
     else show($("srcMsg"),"ok","Hosted ✓ — 🤖 Smart auto, or scrub and add scenes.");
   }catch(e){ show($("srcMsg"),"err",e.message||"Failed"); }
 }
@@ -631,7 +631,7 @@ function paintThumb(key){
       const ph=t.querySelector(".ph"); const img=document.createElement("img"); img.src=url; t.insertBefore(img,t.firstChild); if(ph) ph.remove();
     }});
 }
-function updateAssembleBtn(){ $("assembleBtn").disabled=!(SRC&&SRC.r2Key&&SCENES.length); }
+function updateAssembleBtn(){ $("assembleBtn").disabled=!(SRC&&SCENES.length); }
 
 // ── 3 · template ──
 const DEFAULT_TPL={size:"1080x1920",bg:"#C7A876",band:{scale:1000,y:560},caption:[{text:"Nothing is Perfect-",y:150},{text:"Me: -",y:245}],fontSize:72,fontColor:"black"};
@@ -820,7 +820,7 @@ async function autoCaption(){
 }
 // ── 4 · assemble ──
 async function assemble(){
-  if(!(SRC&&SRC.r2Key&&SCENES.length)) return;
+  if(!(SRC&&SCENES.length)) return;
   $("assembleBtn").disabled=true;
   show($("asmMsg"),"busy",`<span class="spin"></span> Assembling on the render worker… (~10–40s)`);
   $("result").style.display="none";
