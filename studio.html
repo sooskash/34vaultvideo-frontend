@@ -59,7 +59,8 @@
   .scene-empty{font-size:12px;color:var(--sub);text-align:center;padding:18px 6px}
   /* visual filmstrip */
   .strip{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 10px;min-height:96px}
-  .tile{position:relative;width:110px;flex:none;border-radius:9px;overflow:hidden;background:#0d1018;border:2px solid var(--border2,#262b3a);cursor:grab;aspect-ratio:9/16;max-height:150px}
+  .tile{position:relative;width:110px;flex:none;border-radius:9px;overflow:hidden;background:#0d1018;border:2px solid var(--border2,#262b3a);cursor:grab;aspect-ratio:9/16;max-height:150px;touch-action:none;user-select:none}
+  .tile img{pointer-events:none;-webkit-user-drag:none}
   .tile.sel{border-color:var(--accent)}
   .tile.drag{opacity:.4}
   .tile img{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
@@ -420,20 +421,34 @@ function renderScenes(){
   el.innerHTML=SCENES.map((s,i)=>{
     const th=THUMBS[s.start.toFixed(2)];
     const inner=th?`<img src="${th}" alt="">`:`<div class="ph">scene ${i+1}<br>@${fmtTime(s.start)}</div>`;
-    return `<div class="tile ${i===SELIDX?'sel':''}" draggable="true" data-i="${i}">${inner}<span class="idx">${i+1}</span><span class="dur">${(+s.len).toFixed(1)}s</span><button class="x" data-i="${i}" title="Remove">✕</button></div>`;
+    return `<div class="tile ${i===SELIDX?'sel':''}" data-i="${i}">${inner}<span class="idx">${i+1}</span><span class="dur">${(+s.len).toFixed(1)}s</span><button class="x" data-i="${i}" title="Remove">✕</button></div>`;
   }).join("");
+  // pointer-based reorder (HTML5 drag was flaky) — short press = select, drag = reorder
   el.querySelectorAll(".tile").forEach(t=>{
     const i=+t.dataset.i;
-    t.addEventListener("click",e=>{ if(e.target.classList.contains("x")) return; SELIDX=i; renderScenes(); previewScene(i); });
-    t.addEventListener("dragstart",()=>{ _dragI=i; t.classList.add("drag"); });
-    t.addEventListener("dragend",()=>t.classList.remove("drag"));
-    t.addEventListener("dragover",e=>e.preventDefault());
-    t.addEventListener("drop",e=>{ e.preventDefault(); moveScene(_dragI,i); _dragI=null; });
+    t.addEventListener("pointerdown",e=>{
+      if(e.target.classList.contains("x")) return;
+      e.preventDefault();
+      const sx=e.clientX, sy=e.clientY; let moved=false, tgt=i;
+      const move=ev=>{
+        if(!moved && Math.hypot(ev.clientX-sx,ev.clientY-sy)<6) return;
+        moved=true; t.classList.add("drag");
+        const tiles=[...el.querySelectorAll(".tile")]; let best=1e9;
+        tiles.forEach((el2,k)=>{ const r=el2.getBoundingClientRect(); const d=Math.abs((r.left+r.right)/2-ev.clientX); if(d<best){ best=d; tgt=k; } });
+        tiles.forEach((el2,k)=>el2.style.outline=(k===tgt&&tgt!==i)?"2px solid var(--accent)":"");
+      };
+      const up=()=>{
+        window.removeEventListener("pointermove",move); window.removeEventListener("pointerup",up);
+        el.querySelectorAll(".tile").forEach(el2=>el2.style.outline="");
+        if(moved){ moveScene(i,tgt); } else { SELIDX=i; renderScenes(); previewScene(i); }
+      };
+      window.addEventListener("pointermove",move); window.addEventListener("pointerup",up);
+    });
   });
   el.querySelectorAll(".x").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); const i=+b.dataset.i; SCENES.splice(i,1); if(SELIDX>=SCENES.length) SELIDX=SCENES.length-1; renderScenes(); }));
   renderTrim(); ensureThumbs(); updateAssembleBtn(); renderMockup();
 }
-function moveScene(from,to){ if(from==null||from===to||from<0||to<0) return; const [it]=SCENES.splice(from,1); SCENES.splice(to,0,it); SELIDX=to; renderScenes(); }
+function moveScene(from,to){ from=+from; to=Math.max(0,Math.min(SCENES.length-1,+to)); if(from<0||from===to){ renderScenes(); return; } const [it]=SCENES.splice(from,1); SCENES.splice(to,0,it); SELIDX=to; renderScenes(); }
 function vidDur(){ const v=$("srcVideo"); return (v&&v.duration&&isFinite(v.duration)?v.duration:0)||(SRC&&SRC.duration)||0; }
 function renderTrim(){
   const p=$("trimPanel");
