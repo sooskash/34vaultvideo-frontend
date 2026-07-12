@@ -81,6 +81,8 @@
   .tlbl{font-size:11.5px;font-weight:800}
   /* overlay (sticker/emoji) rows */
   .ovsel{height:32px;font-size:12px}
+  .pchk{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;cursor:pointer;background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);border-radius:8px;padding:5px 10px}
+  .pchk input{width:auto;height:auto;margin:0}
   /* live reel-frame preview mockup */
   .mock{position:relative;width:100%;max-width:230px;aspect-ratio:9/16;margin:0 auto;border-radius:9px;overflow:hidden;background:#0d1018;border:1px solid var(--border2,#262b3a)}
   .mock .mockempty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;font-size:11px;color:var(--sub,#8891a8);padding:14px}
@@ -245,16 +247,15 @@
       <div class="card">
         <h2><span class="step">★</span> Stickers &amp; emoji <span class="tag" style="margin-left:auto;font-weight:700">optional</span></h2>
         <div class="row">
-          <div class="f"><label>Upload a PNG sticker / emoji / character (transparent ok)</label><input type="file" id="stickerFile" accept="image/png,image/webp,image/*" style="padding:7px 10px;height:auto" /></div>
+          <div class="f"><label>Upload a PNG (emoji / sticker / character — transparent ok)</label><input type="file" id="stickerFile" accept="image/png,image/webp,image/*" style="padding:7px 10px;height:auto" /></div>
+          <div class="f" style="max-width:150px"><label>Place</label><select id="stickerPlace"><option value="under">Under caption</option><option value="br">Bottom-right</option><option value="bl">Bottom-left</option><option value="center">Center</option></select></div>
           <button class="btn sm" id="stickerAddBtn" onclick="addSticker()">＋ Add PNG</button>
         </div>
         <div class="row" style="margin-top:8px">
           <div class="f"><label>Saved presets</label><select id="presetSel"></select></div>
           <button class="btn ghost sm" id="presetAddBtn" onclick="addFromPreset()">＋ Use</button>
-          <div class="f" style="max-width:130px"><label>or type emoji</label><input id="emojiIn" placeholder="🔥" maxlength="6" /></div>
-          <button class="btn ghost sm" id="emojiAddBtn" onclick="addEmoji()">＋</button>
         </div>
-        <div class="hint" style="margin-top:6px">Upload a transparent PNG for the best result. Hit 💾 on any sticker to save it as a named preset for reuse.</div>
+        <div class="hint" style="margin-top:6px">Pick where it starts, then <b>drag it to move</b> and <b>pull its corner to resize</b> on the Preview. Hit 💾 to save a sticker as a named preset.</div>
         <div class="msg" id="ovMsg"></div>
         <div id="ovList" style="margin-top:10px"></div>
       </div>
@@ -279,9 +280,15 @@
   <!-- library -->
   <div class="card">
     <h2>Reel library <span class="tag" id="libCount" style="margin-left:8px">0</span></h2>
+    <div class="row" style="align-items:center;margin-bottom:10px">
+      <span style="font-size:12px;font-weight:800;color:var(--sub,#8891a8)">📤 Push to:</span>
+      <label class="pchk"><input type="checkbox" id="pt_telegram" checked> Telegram</label>
+      <label class="pchk"><input type="checkbox" id="pt_instagram"> Instagram</label>
+      <span class="hint" style="margin:0">— the 📤 button on a reel pushes to the checked platforms.</span>
+    </div>
     <div class="msg" id="libMsg"></div>
     <div class="lib" id="libList"></div>
-    <div class="hint" id="libEmpty">No reels yet — assemble one above and it lands here, ready to schedule/post (Instagram push coming next).</div>
+    <div class="hint" id="libEmpty">No reels yet — assemble one above and it lands here, ready to push.</div>
   </div>
 </div>
 
@@ -603,9 +610,16 @@ function ovMsg(cls,txt){ const el=$("ovMsg"); if(el) show(el,cls,txt); }
 async function addEmoji(){ const e=$("emojiIn").value.trim(); if(!e) return; $("emojiAddBtn").disabled=true;
   try{ OVERLAYS.push({data:await emojiToPng(e),kind:"emoji",name:e,x:390,y:300,w:300}); $("emojiIn").value=""; renderOverlays(); ovMsg("ok","Emoji added — drag &amp; resize it on the Preview above."); }
   catch(err){ ovMsg("err","Couldn't add emoji: "+(err&&err.message||err)); } finally{ $("emojiAddBtn").disabled=false; } }
+function placeXY(place,w){ const W=1080,H=1920,m=50,h=w;
+  if(place==="under") return {x:Math.round((W-w)/2),y:300,w};
+  if(place==="center") return {x:Math.round((W-w)/2),y:Math.round((H-h)/2),w};
+  if(place==="bl") return {x:m,y:H-h-150,w};
+  return {x:W-w-m,y:H-h-150,w}; }
 async function addSticker(){ const f=$("stickerFile").files[0]; if(!f){ ovMsg("err","Choose a PNG first."); return; } if(f.size>8*1024*1024){ ovMsg("err","Image too big (max 8MB)."); return; }
   $("stickerAddBtn").disabled=true;
-  try{ OVERLAYS.push({data:await fileToPng(f),kind:"character",name:(f.name||"character").replace(/\.[^.]+$/,"").slice(0,40),x:620,y:1180,w:420}); $("stickerFile").value=""; renderOverlays(); ovMsg("ok","Added — drag &amp; resize it on the Preview above."); }
+  try{ const place=$("stickerPlace").value; const w=place==="under"?300:420; const p=placeXY(place,w);
+    OVERLAYS.push({data:await fileToPng(f),kind:place==="under"?"emoji":"character",name:(f.name||"sticker").replace(/\.[^.]+$/,"").slice(0,40),x:p.x,y:p.y,w:p.w});
+    $("stickerFile").value=""; renderOverlays(); ovMsg("ok","Added — drag &amp; resize it on the Preview above."); }
   catch(err){ ovMsg("err","Couldn't read that image — try a PNG/JPG. ("+(err&&err.message||err)+")"); } finally{ $("stickerAddBtn").disabled=false; } }
 async function loadPresets(){
   try{
@@ -762,15 +776,18 @@ async function loadProject(spec){
 // same #number) is copied to your clipboard to paste when you post the reel to Instagram.
 async function doPost(reel){
   if(!reel) return;
-  show($("libMsg"),"busy",`<span class="spin"></span> Posting reel #${reel.num}…`);
+  const targets=[]; if($("pt_telegram").checked) targets.push("telegram"); if($("pt_instagram").checked) targets.push("instagram");
+  if(!targets.length){ show($("libMsg"),"warn","Pick at least one platform under “Push to:”."); return; }
+  show($("libMsg"),"busy",`<span class="spin"></span> Pushing reel #${reel.num} to ${targets.join(", ")}…`);
   try{
-    const d=await api("/api/admin/reel/"+encodeURIComponent(reel.id)+"/post",{method:"POST",body:"{}"});
-    const tg=(d.results&&d.results.telegram)||"?";
-    let copied=false; try{ await navigator.clipboard.writeText(d.igCaption||""); copied=true; }catch(e){}
-    const ok=tg==="sent";
-    show($("libMsg"),ok?"ok":"warn",`Reel #${d.num}: Telegram → <b>${esc(tg)}</b>.${copied?" IG caption copied to clipboard —":" IG caption ready —"} download the reel (⬇) and post it to Instagram; viewers find the full video by searching #${d.num} in your Telegram.`);
+    const d=await api("/api/admin/reel/"+encodeURIComponent(reel.id)+"/post",{method:"POST",body:JSON.stringify({targets})});
+    const res=d.results||{};
+    let copied=false; if(targets.includes("instagram")){ try{ await navigator.clipboard.writeText(d.igCaption||""); copied=true; }catch(e){} }
+    const summary=targets.map(t=>`${t}: <b>${esc(res[t]||"?")}</b>`).join(" · ");
+    const igNote=targets.includes("instagram")&&/manual|caption ready/i.test(res.instagram||"")?` IG caption ${copied?"copied — ":""}download the reel (⬇) & post it; viewers find it via #${d.num} in Telegram.`:"";
+    show($("libMsg"),d.posted?"ok":"warn",`Reel #${d.num} — ${summary}.${igNote}`);
     loadLibrary();
-  }catch(e){ show($("libMsg"),"err",e.message||"Post failed"); }
+  }catch(e){ show($("libMsg"),"err",e.message||"Push failed"); }
 }
 
 // boot
