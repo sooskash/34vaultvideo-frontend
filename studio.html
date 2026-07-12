@@ -80,6 +80,10 @@
   .track .hnd.hl{left:0;border-radius:7px 0 0 7px} .track .hnd.hr{right:0;border-radius:0 7px 7px 0}
   .track .phl{position:absolute;top:0;bottom:0;width:2px;background:#fff;box-shadow:0 0 4px rgba(0,0,0,.6);pointer-events:none}
   .tlbl{font-size:11.5px;font-weight:800}
+  .trrow{display:flex;gap:5px;align-items:center;margin-bottom:7px}
+  .trrow .trk{width:26px;flex:none;font-size:11px;font-weight:800;color:var(--sub,#8891a8)}
+  .trrow .num{width:78px;text-align:center}
+  .trrow .nb{padding:0 8px;min-width:0;font-variant-numeric:tabular-nums}
   /* overlay (sticker/emoji) rows */
   .ovsel{height:32px;font-size:12px}
   .pchk{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;cursor:pointer;background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);border-radius:8px;padding:5px 10px}
@@ -450,47 +454,79 @@ function renderScenes(){
 }
 function moveScene(from,to){ from=+from; to=Math.max(0,Math.min(SCENES.length-1,+to)); if(from<0||from===to){ renderScenes(); return; } const [it]=SCENES.splice(from,1); SCENES.splice(to,0,it); SELIDX=to; renderScenes(); }
 function vidDur(){ const v=$("srcVideo"); return (v&&v.duration&&isFinite(v.duration)?v.duration:0)||(SRC&&SRC.duration)||0; }
+let _trDebounce=null;
 function renderTrim(){
   const p=$("trimPanel");
   if(SELIDX<0||SELIDX>=SCENES.length){ p.style.display="none"; return; }
   const s=SCENES[SELIDX];
   const dur=Math.max(vidDur(), s.start+s.len, 1);
   p.style.display="";
-  p.innerHTML=`<div class="hd">Scene ${SELIDX+1} — drag the edges to trim, the middle to move</div>
+  p.innerHTML=`<div class="hd">Scene ${SELIDX+1} — scrub the player, then set exact In / Out (or nudge)</div>
     <div class="track" id="trTrack"><div class="seg" id="trSeg"><div class="hnd hl" id="trHL"></div><div class="hnd hr" id="trHR"></div></div><div class="phl" id="trPhl" style="display:none"></div></div>
-    <div class="r" style="justify-content:space-between"><span class="tlbl">▶ <span id="trStartL"></span></span><span class="tlbl" style="color:var(--sub,#8891a8)"><span id="trLenL"></span></span><span class="tlbl"><span id="trEndL"></span> ⏹</span></div>
-    <div class="r" style="margin-top:8px">
-      <button class="btn ghost sm" id="trSet">Start = playhead</button>
-      <label style="margin:0 0 0 4px">len</label><button class="btn ghost sm" id="trMinus">−</button><input class="num" type="number" id="trLen" step="0.1" min="0.3"><button class="btn ghost sm" id="trPlus">+</button>
-      <button class="btn sm" id="trPrev">▶ preview scene</button>
-    </div>`;
+    <div class="trrow"><span class="trk">In</span>
+      <button class="btn ghost sm nb" data-edge="start" data-d="-1">−1</button>
+      <button class="btn ghost sm nb" data-edge="start" data-d="-0.1">−.1</button>
+      <input class="num" type="number" id="trStart" step="0.05" min="0" max="${dur.toFixed(2)}">
+      <button class="btn ghost sm nb" data-edge="start" data-d="0.1">+.1</button>
+      <button class="btn ghost sm nb" data-edge="start" data-d="1">+1</button>
+      <button class="btn sm" id="trSetStart" title="Set In to the frame showing in the player">⇤ here</button>
+    </div>
+    <div class="trrow"><span class="trk">Out</span>
+      <button class="btn ghost sm nb" data-edge="end" data-d="-1">−1</button>
+      <button class="btn ghost sm nb" data-edge="end" data-d="-0.1">−.1</button>
+      <input class="num" type="number" id="trEnd" step="0.05" min="0" max="${dur.toFixed(2)}">
+      <button class="btn ghost sm nb" data-edge="end" data-d="0.1">+.1</button>
+      <button class="btn ghost sm nb" data-edge="end" data-d="1">+1</button>
+      <button class="btn sm" id="trSetEnd" title="Set Out to the frame showing in the player">here ⇥</button>
+    </div>
+    <div class="r" style="justify-content:space-between;margin-top:4px"><span class="tlbl">length <span id="trLenL"></span></span><button class="btn sm" id="trPrev">▶ preview scene</button></div>`;
+  const endT=()=>s.start+s.len;
   function paint(seekTo){
-    const end=Math.min(dur,s.start+s.len);
+    const end=endT();
     $("trSeg").style.left=(s.start/dur*100)+"%"; $("trSeg").style.width=Math.max(1.2,s.len/dur*100)+"%";
-    $("trStartL").textContent=fmtTime(s.start); $("trEndL").textContent=fmtTime(end); $("trLenL").textContent=(+s.len).toFixed(1)+"s";
-    $("trLen").value=(+s.len).toFixed(1);
+    $("trStart").value=s.start.toFixed(2); $("trEnd").value=end.toFixed(2); $("trLenL").textContent=(+s.len).toFixed(2)+"s";
     if(seekTo!=null){ const v=$("srcVideo"); try{ v.pause(); v.currentTime=seekTo; }catch(e){} }
   }
   paint();
+  // one place applies a change: repaint + seek + live tile/total, and refresh the thumbnail
+  // after a short idle so rapid nudges/typing stay smooth.
+  function apply(seekTo,heavy){
+    paint(seekTo);
+    const de=document.querySelector(`#sceneStrip .tile[data-i="${SELIDX}"] .dur`); if(de) de.textContent=(+s.len).toFixed(1)+"s";
+    $("sceneTotal").textContent=SCENES.reduce((a,x)=>a+(+x.len||0),0).toFixed(1)+"s";
+    renderMockup();
+    if(heavy){ delete THUMBS[s.start.toFixed(2)]; clearTimeout(_trDebounce); renderScenes(); }
+    else { clearTimeout(_trDebounce); _trDebounce=setTimeout(()=>{ delete THUMBS[s.start.toFixed(2)]; renderScenes(); },700); }
+  }
+  const setStart=(ns)=>{ ns=Math.max(0,Math.min(+ns,endT()-0.1)); s.len=+(endT()-ns).toFixed(2); s.start=+ns.toFixed(2); };
+  const setEnd=(ne)=>{ ne=Math.min(dur,Math.max(+ne,s.start+0.1)); s.len=+(ne-s.start).toFixed(2); };
+  // exact numeric entry
+  $("trStart").addEventListener("input",()=>{ setStart(+$("trStart").value||0); apply(s.start,false); });
+  $("trEnd").addEventListener("input",()=>{ setEnd(+$("trEnd").value||0); apply(endT(),false); });
+  $("trStart").addEventListener("change",()=>apply(s.start,true));
+  $("trEnd").addEventListener("change",()=>apply(endT(),true));
+  // nudge buttons
+  p.querySelectorAll(".nb").forEach(b=>b.addEventListener("click",()=>{ const d=+b.dataset.d;
+    if(b.dataset.edge==="start"){ setStart(s.start+d); apply(s.start,false); } else { setEnd(endT()+d); apply(endT(),false); } }));
+  // set to the video's current frame (frame-accurate)
+  $("trSetStart").addEventListener("click",()=>{ setStart(+($("srcVideo").currentTime||0)); apply(s.start,true); });
+  $("trSetEnd").addEventListener("click",()=>{ setEnd(+($("srcVideo").currentTime||0)); apply(endT(),true); });
+  $("trPrev").addEventListener("click",()=>previewScene(SELIDX));
+  // track drag stays for coarse positioning
   const track=$("trTrack");
   const timeAt=x=>{ const r=track.getBoundingClientRect(); return Math.max(0,Math.min(1,(x-r.left)/r.width))*dur; };
   let drag=null;
   const move=e=>{ if(!drag) return; const t=timeAt(e.clientX);
-    if(drag.mode==="start"){ const end=s.start+s.len; const ns=Math.max(0,Math.min(t,end-0.3)); s.start=+ns.toFixed(2); s.len=+(end-ns).toFixed(2); paint(ns); }
-    else if(drag.mode==="end"){ const ne=Math.min(dur,Math.max(t,s.start+0.3)); s.len=+(ne-s.start).toFixed(2); paint(ne); }
-    else { const ns=Math.max(0,Math.min(t-drag.grab,dur-s.len)); s.start=+ns.toFixed(2); paint(ns); } };
+    if(drag.mode==="start"){ setStart(t); paint(s.start); }
+    else if(drag.mode==="end"){ setEnd(t); paint(endT()); }
+    else { const ns=Math.max(0,Math.min(t-drag.grab,dur-s.len)); s.start=+ns.toFixed(2); paint(ns); }
+    $("trStart").value=s.start.toFixed(2); $("trEnd").value=endT().toFixed(2); };
   const up=()=>{ window.removeEventListener("pointermove",move); window.removeEventListener("pointerup",up);
     if(drag){ drag=null; delete THUMBS[s.start.toFixed(2)]; renderScenes(); } };
   const down=(mode,e)=>{ e.preventDefault(); e.stopPropagation(); drag={mode,grab:timeAt(e.clientX)-s.start}; window.addEventListener("pointermove",move); window.addEventListener("pointerup",up); };
   $("trHL").addEventListener("pointerdown",e=>down("start",e));
   $("trHR").addEventListener("pointerdown",e=>down("end",e));
   $("trSeg").addEventListener("pointerdown",e=>{ if(!e.target.classList.contains("hnd")) down("move",e); });
-  track.addEventListener("pointerdown",e=>{ if(e.target!==track) return; const t=timeAt(e.clientX); const end=s.start+s.len; const ns=Math.max(0,Math.min(t,end-0.3)); s.start=+ns.toFixed(2); s.len=+(end-ns).toFixed(2); delete THUMBS[s.start.toFixed(2)]; renderScenes(); });
-  $("trLen").addEventListener("change",()=>{ s.len=Math.max(0.3,+$("trLen").value||2); delete THUMBS[s.start.toFixed(2)]; renderScenes(); });
-  $("trSet").addEventListener("click",()=>{ s.start=Math.max(0,+($("srcVideo").currentTime||0).toFixed(2)); delete THUMBS[s.start.toFixed(2)]; renderScenes(); });
-  $("trMinus").addEventListener("click",()=>{ s.len=Math.max(0.3,+(s.len-0.5).toFixed(1)); renderScenes(); });
-  $("trPlus").addEventListener("click",()=>{ s.len=+(s.len+0.5).toFixed(1); renderScenes(); });
-  $("trPrev").addEventListener("click",()=>previewScene(SELIDX));
 }
 // live playhead marker on the trim track, driven by the source video's playback
 function syncPlayhead(){
