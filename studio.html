@@ -227,20 +227,25 @@
       <!-- stickers / emoji -->
       <div class="card">
         <h2><span class="step">★</span> Stickers &amp; emoji <span class="tag" style="margin-left:auto;font-weight:700">optional</span></h2>
+        <div class="row" style="margin-bottom:8px">
+          <div class="f"><label>Saved stickers &amp; characters</label><select id="presetSel"></select></div>
+          <button class="btn ghost sm" id="presetAddBtn" onclick="addFromPreset()">＋ Use</button>
+        </div>
         <div class="row">
           <div class="f" style="max-width:130px"><label>Emoji</label><input id="emojiIn" placeholder="😀 🔥 💦" maxlength="6" /></div>
           <button class="btn ghost sm" id="emojiAddBtn" onclick="addEmoji()">＋ Emoji</button>
-          <div class="f"><label>Or upload a sticker / character PNG</label><input type="file" id="stickerFile" accept="image/*" style="padding:7px 10px;height:auto" /></div>
+          <div class="f"><label>Or upload a character / sticker</label><input type="file" id="stickerFile" accept="image/*" style="padding:7px 10px;height:auto" /></div>
           <button class="btn ghost sm" id="stickerAddBtn" onclick="addSticker()">＋ Image</button>
         </div>
+        <div class="hint" style="margin-top:6px">Emojis render as full-colour picture emojis. Hit 💾 on any sticker to save it as a named preset for reuse.</div>
         <div id="ovList" style="margin-top:10px"></div>
       </div>
 
       <!-- 4 create -->
       <div class="card">
         <h2><span class="step">4</span> Create reel</h2>
-        <label>Instagram caption (optional — saved with the reel)</label>
-        <input id="igCaption" placeholder="▶ Full video — link in bio 🔗" />
+        <label>Instagram caption (IG-safe, saved with the reel)</label>
+        <div class="row" style="align-items:flex-start"><div class="f"><textarea id="igCaption" placeholder="▶ Full video — link in bio 🔗" style="width:100%;min-height:74px;resize:vertical;background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);border-radius:9px;color:var(--text);font:inherit;font-size:12.5px;line-height:1.45;padding:9px 11px;outline:none"></textarea></div><button class="btn ghost sm" id="capBtn" onclick="autoCaption()" title="Generate an IG-safe caption from the video">✨ Auto</button></div>
         <button class="btn big" id="assembleBtn" style="margin-top:12px" onclick="assemble()" disabled>🎬 Assemble reel</button>
         <div class="msg" id="asmMsg"></div>
         <div id="result" style="display:none;margin-top:12px">
@@ -277,7 +282,7 @@ async function api(path,opts={}){
   const d=await r.json().catch(()=>({})); if(!r.ok){ const e=new Error(d.error||("HTTP "+r.status)); e.status=r.status; throw e; } return d;
 }
 function gate(){ $("gate").style.display=""; $("main").style.display="none"; }
-function main(){ $("gate").style.display="none"; $("main").style.display=""; loadTemplates(); loadMusic(); loadLibrary();
+function main(){ $("gate").style.display="none"; $("main").style.display=""; loadTemplates(); loadMusic(); loadPresets(); loadLibrary();
   const s=new URLSearchParams(location.search).get("source"); if(s) loadSource(s); }
 async function saveKey(){ const k=$("keyInput").value.trim(); if(!k) return; KEY=k;
   try{ await api("/api/admin/templates?kind=reel"); localStorage.setItem("_vadminKey",k); main(); }catch(e){ show($("gateMsg"),"err","Invalid key."); } }
@@ -348,7 +353,7 @@ async function loadSource(slug){
     if(!r.ok) throw new Error(r.status===404?"That video isn't in your catalog.":"HTTP "+r.status);
     const v=(await r.json()).video;
     if(!v||!v.slug){ show($("srcMsg"),"err","Couldn't load that video."); return; }
-    SRC={slug:v.slug,title:v.title,r2Key:v.r2Key,duration:v.duration};
+    SRC={slug:v.slug,title:v.title,r2Key:v.r2Key,duration:v.duration,tags:v.tags||[],categories:v.categories||[]};
     $("results").style.display="none"; $("results").innerHTML="";
     $("srcVideo").src=`${CLIPSRC}?slug=${encodeURIComponent(v.slug)}`;
     $("srcInfo").innerHTML=`<b>${esc(v.title)}</b> · ${Math.round(v.duration||0)}s`;
@@ -456,11 +461,13 @@ function syncPlayhead(){
 function previewScene(i){ stopSeq(); const v=$("srcVideo"),s=SCENES[i]; if(!v||!s) return; try{ v.currentTime=s.start; }catch(e){} v.play().catch(()=>{}); if(_prevTimer) clearTimeout(_prevTimer); _prevTimer=setTimeout(()=>v.pause(),s.len*1000); }
 // sequence-play every scene in order = a preview of the reel's clip flow
 let _seqActive=false, _seqTimer=null;
-function stopSeq(){ _seqActive=false; if(_seqTimer){clearTimeout(_seqTimer);_seqTimer=null;} try{$("srcVideo").pause();}catch(e){} const b=$("previewReelBtn"); if(b) b.textContent="▶ Preview reel"; }
+function stopSeq(){ _seqActive=false; if(_seqTimer){clearTimeout(_seqTimer);_seqTimer=null;} try{$("srcVideo").pause();}catch(e){} try{$("musicAudio").pause();}catch(e){} const b=$("previewReelBtn"); if(b) b.textContent="▶ Preview reel"; }
 function previewReel(){
   const v=$("srcVideo"); if(!v||!SCENES.length) return;
   if(_seqActive){ stopSeq(); return; }
   _seqActive=true; const b=$("previewReelBtn"); if(b) b.textContent="⏹ Stop";
+  const a=$("musicAudio"), murl=currentMusicUrl();  // play the chosen track alongside the clip
+  if(murl){ if(a.getAttribute("src")!==murl) a.src=murl; try{ a.currentTime=+$("musicStart").value||0; }catch(e){} a.play().catch(()=>{}); }
   (function playAt(k){
     if(!_seqActive) return;
     if(k>=SCENES.length){ stopSeq(); return; }
@@ -511,41 +518,66 @@ function applyTpl(cfg){
   $("bg").value=cfg.bg||"#C7A876";
   $("band").value=String((cfg.band&&cfg.band.scale)||1000);
   const by=(cfg.band&&cfg.band.y)!=null?cfg.band.y:560; $("bandY").value=by; $("bandYv").textContent=by;
-  OVERLAYS=(cfg.overlays||[]).filter(o=>o&&o.data).map(o=>({data:o.data,pos:o.pos||"tr",size:o.size||"M"}));
+  OVERLAYS=(cfg.overlays||[]).filter(o=>o&&o.data).map(o=>({data:o.data,kind:o.kind||"character",name:o.name||"",pos:o.pos||"tr",size:o.size||"M"}));
   renderOverlays();
+  if(cfg.music){ if(cfg.music.id) $("musicSelect").value=cfg.music.id; $("musicStart").value=cfg.music.start||0; onMusicSelect(); }
 }
 function currentTpl(){
   const cap=[]; const y1=150,y2=245;
   if($("cap1").value.trim()) cap.push({text:$("cap1").value.trim(),y:y1});
   if($("cap2").value.trim()) cap.push({text:$("cap2").value.trim(),y:y2});
   const SZ={S:150,M:250,L:380};
-  const overlays=OVERLAYS.map(o=>{ const w=SZ[o.size]||250; const {x,y}=overlayXY(o.pos||"tr",w); return {data:o.data,x,y,w,pos:o.pos,size:o.size}; });
-  return {size:"1080x1920",bg:$("bg").value,band:{scale:+$("band").value,y:+$("bandY").value},caption:cap,fontSize:72,fontColor:"black",overlays};
+  const overlays=OVERLAYS.map(o=>{ const w=SZ[o.size]||250; const {x,y}=overlayXY(o.pos||"tr",w); return {data:o.data,x,y,w,pos:o.pos,size:o.size,kind:o.kind,name:o.name}; });
+  return {size:"1080x1920",bg:$("bg").value,band:{scale:+$("band").value,y:+$("bandY").value},caption:cap,fontSize:72,fontColor:"black",overlays,music:{id:$("musicSelect").value||"",start:+$("musicStart").value||0}};
 }
 // ── stickers / emoji overlays ──
-let OVERLAYS=[];  // [{data,pos,size}]
+let OVERLAYS=[], PRESETS=[];  // OVERLAYS:[{data,kind,name,pos,size}]
 function overlayXY(pos,w){ const W=1080,H=1920,m=55,h=w;
   const xs={l:m,c:(W-w)/2,r:W-w-m}, ys={t:210,m:(H-h)/2,b:H-h-150};
   return {x:Math.round(xs[pos[1]]!=null?xs[pos[1]]:xs.r), y:Math.round(ys[pos[0]]!=null?ys[pos[0]]:ys.t)}; }
-function emojiToPng(ch){ const c=document.createElement("canvas"); c.width=c.height=160; const x=c.getContext("2d"); x.font="128px serif"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(ch,80,90); return c.toDataURL("image/png"); }
+// full-colour picture emoji via Twemoji (CORS-enabled CDN); falls back to the OS glyph
+function emojiCodes(ch){ const cps=[]; for(const c of ch){ const cp=c.codePointAt(0); if(cp!==0xFE0F) cps.push(cp.toString(16)); } return cps.join("-"); }
+function fontEmoji(ch){ const c=document.createElement("canvas"); c.width=c.height=160; const x=c.getContext("2d"); x.font="128px serif"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(ch,80,90); return c.toDataURL("image/png"); }
+function emojiToPng(ch){ return new Promise(resolve=>{
+  const img=new Image(); img.crossOrigin="anonymous";
+  img.onload=()=>{ try{ const c=document.createElement("canvas"); c.width=c.height=160; c.getContext("2d").drawImage(img,8,8,144,144); resolve(c.toDataURL("image/png")); }catch(e){ resolve(fontEmoji(ch)); } };
+  img.onerror=()=>resolve(fontEmoji(ch));
+  img.src=`https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/${emojiCodes(ch)}.png`;
+}); }
 function fileToPng(f,max=440){ return new Promise((res,rej)=>{ const img=new Image(),u=URL.createObjectURL(f);
   img.onload=()=>{ const sc=Math.min(1,max/Math.max(img.width,img.height)); const c=document.createElement("canvas"); c.width=Math.round(img.width*sc); c.height=Math.round(img.height*sc); c.getContext("2d").drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(u); res(c.toDataURL("image/png")); };
   img.onerror=rej; img.src=u; }); }
-function addEmoji(){ const e=$("emojiIn").value.trim(); if(!e) return; OVERLAYS.push({data:emojiToPng(e),pos:"tr",size:"M"}); $("emojiIn").value=""; renderOverlays(); }
+async function addEmoji(){ const e=$("emojiIn").value.trim(); if(!e) return; $("emojiAddBtn").disabled=true;
+  try{ OVERLAYS.push({data:await emojiToPng(e),kind:"emoji",name:e,pos:"tr",size:"M"}); $("emojiIn").value=""; renderOverlays(); }finally{ $("emojiAddBtn").disabled=false; } }
 async function addSticker(){ const f=$("stickerFile").files[0]; if(!f) return; if(f.size>8*1024*1024){ alert("Image too big (max 8MB)"); return; }
-  try{ OVERLAYS.push({data:await fileToPng(f),pos:"mc",size:"L"}); $("stickerFile").value=""; renderOverlays(); }catch(e){} }
+  try{ OVERLAYS.push({data:await fileToPng(f),kind:"character",name:(f.name||"character").replace(/\.[^.]+$/,"").slice(0,40),pos:"mc",size:"L"}); $("stickerFile").value=""; renderOverlays(); }catch(e){} }
+async function loadPresets(){
+  try{
+    const [em,ch]=await Promise.all([api("/api/admin/templates?kind=emoji"),api("/api/admin/templates?kind=character")]);
+    PRESETS=[...(em.templates||[]).map(t=>({id:t.id,name:t.name,kind:"emoji",data:(t.config||{}).data})),
+             ...(ch.templates||[]).map(t=>({id:t.id,name:t.name,kind:"character",data:(t.config||{}).data}))].filter(p=>p.data);
+    $("presetSel").innerHTML=`<option value="">— saved presets —</option>`+PRESETS.map(p=>`<option value="${esc(p.id)}">${p.kind==="emoji"?"😀":"🖼"} ${esc(p.name)}</option>`).join("");
+  }catch(e){ if(e.status===401) gate(); }
+}
+function addFromPreset(){ const p=PRESETS.find(x=>x.id===$("presetSel").value); if(!p) return;
+  OVERLAYS.push({data:p.data,kind:p.kind,name:p.name,pos:p.kind==="emoji"?"tr":"mc",size:p.kind==="emoji"?"M":"L"}); renderOverlays(); }
+async function savePreset(i){ const o=OVERLAYS[i]; if(!o) return; const name=prompt("Save this "+(o.kind||"sticker")+" as (name):",o.name||""); if(!name) return;
+  try{ await api("/api/admin/templates",{method:"POST",body:JSON.stringify({name:name.slice(0,60),kind:o.kind==="emoji"?"emoji":"character",config:{data:o.data}})}); o.name=name; await loadPresets(); }catch(e){ alert(e.message||"Save failed"); } }
 const OV_POS=[["tl","top-left"],["tc","top"],["tr","top-right"],["ml","left"],["mc","center"],["mr","right"],["bl","bottom-left"],["bc","bottom"],["br","bottom-right"]];
 function renderOverlays(){
   const el=$("ovList"); if(!el) return;
-  if(!OVERLAYS.length){ el.innerHTML=`<div class="hint" style="margin:0">No stickers. Add an emoji or upload a character/sticker to overlay on the reel.</div>`; return; }
+  if(!OVERLAYS.length){ el.innerHTML=`<div class="hint" style="margin:0">No stickers. Add an emoji, upload a character, or use a saved preset.</div>`; return; }
   el.innerHTML=OVERLAYS.map((o,i)=>`
     <div style="display:flex;gap:8px;align-items:center;background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);border-radius:9px;padding:7px 9px;margin-bottom:6px">
       <img src="${o.data}" style="width:34px;height:34px;object-fit:contain;background:#0d1018;border-radius:6px;flex:none">
+      <span style="font-size:11px;font-weight:700;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.name||o.kind||"")}</span>
       <select class="ovsel" data-i="${i}" data-k="pos" style="flex:1">${OV_POS.map(p=>`<option value="${p[0]}" ${o.pos===p[0]?"selected":""}>${p[1]}</option>`).join("")}</select>
-      <select class="ovsel" data-i="${i}" data-k="size" style="width:80px">${["S","M","L"].map(z=>`<option ${o.size===z?"selected":""}>${z}</option>`).join("")}</select>
-      <button class="btn ghost sm ovrm" data-i="${i}">✕</button>
+      <select class="ovsel" data-i="${i}" data-k="size" style="width:64px">${["S","M","L"].map(z=>`<option ${o.size===z?"selected":""}>${z}</option>`).join("")}</select>
+      <button class="btn ghost sm ovsave" data-i="${i}" title="Save as named preset">💾</button>
+      <button class="btn ghost sm ovrm" data-i="${i}" title="Remove">✕</button>
     </div>`).join("");
   el.querySelectorAll(".ovsel").forEach(s=>s.addEventListener("change",()=>{ OVERLAYS[+s.dataset.i][s.dataset.k]=s.value; }));
+  el.querySelectorAll(".ovsave").forEach(b=>b.addEventListener("click",()=>savePreset(+b.dataset.i)));
   el.querySelectorAll(".ovrm").forEach(b=>b.addEventListener("click",()=>{ OVERLAYS.splice(+b.dataset.i,1); renderOverlays(); }));
 }
 async function loadTemplates(){
@@ -594,6 +626,22 @@ async function uploadMusic(){
   finally{ $("musicUpBtn").disabled=false; }
 }
 
+// ── IG-safe auto caption (from the source video's title/categories) ──
+const CAP_BAD=/\b(hentai|porn|nsfw|sex|sexy|nude|nudes|naked|xxx|cum|cumshot|anal|pussy|dick|cock|penis|fuck|fucking|futa|futanari|rule\s?34|r34|creampie|bukkake|milf|slut|whore|blowjob|deepthroat|orgasm|hardcore|boobs|tits|18\+|nsfw|onlyfans|ahegao|breeding|hentaicomics)\b/ig;
+const CAP_TAGS=["#animation","#3danimation","#animeedit","#animereels","#edit","#reels","#reelsviral","#viral","#fyp","#trending","#blender","#gameart","#characterdesign","#fanart"];
+function capClean(s){ return String(s||"").replace(CAP_BAD," ").replace(/[#@]/g," ").replace(/[^\w\s&'’-]/g," ").replace(/\s+/g," ").trim(); }
+function autoCaption(){
+  if(!SRC){ show($("asmMsg"),"warn","Load a source video first."); return; }
+  const title=capClean(SRC.title).split(" ").slice(0,7).join(" ");
+  const cats=(SRC.categories||[]).map(capClean).filter(c=>c&&c.length>2).slice(0,3);
+  const catTags=cats.map(c=>"#"+c.replace(/[^\w]/g,"")).filter(x=>x.length>3);
+  const tags=[...new Set([...catTags.map(t=>t.toLowerCase()),...CAP_TAGS])].slice(0,12);
+  const parts=[];
+  if(title) parts.push(title);
+  parts.push("▶ Full video — link in bio 🔗");
+  parts.push(tags.join(" "));
+  $("igCaption").value=parts.join("\n\n");
+}
 // ── 4 · assemble ──
 async function assemble(){
   if(!(SRC&&SRC.r2Key&&SCENES.length)) return;
@@ -614,25 +662,41 @@ async function assemble(){
 }
 
 // ── library ──
+let REELS=[];
 async function loadLibrary(){
   try{
-    const d=await api("/api/admin/reel/library"); const reels=d.reels||[];
-    $("libCount").textContent=reels.length;
-    $("libEmpty").style.display=reels.length?"none":"";
-    $("libList").innerHTML=reels.map(r=>`
+    const d=await api("/api/admin/reel/library"); REELS=d.reels||[];
+    $("libCount").textContent=REELS.length;
+    $("libEmpty").style.display=REELS.length?"none":"";
+    $("libList").innerHTML=REELS.map((r,i)=>`
       <div class="item">
         <video src="${esc(r.url||"")}#t=0.5" preload="metadata" muted playsinline></video>
         <div class="meta"><div class="t">${esc(r.title)}</div><div class="s">${r.sceneCount} scenes · ${(+r.durationSec).toFixed(1)}s · ${esc(r.status)}</div></div>
         <div class="acts">
-          <a class="btn sm" href="${esc(r.url||"#")}" download target="_blank" rel="noopener">⬇</a>
-          <button class="btn ghost sm lib-del" data-id="${esc(r.id)}">✕</button>
+          ${r.spec?`<button class="btn sm lib-edit" data-i="${i}" title="Reopen &amp; tweak">✎ Edit</button>`:""}
+          <a class="btn ghost sm" href="${esc(r.url||"#")}" download target="_blank" rel="noopener" title="Download">⬇</a>
+          <button class="btn ghost sm lib-del" data-id="${esc(r.id)}" title="Delete">✕</button>
         </div>
       </div>`).join("");
+    $("libList").querySelectorAll(".lib-edit").forEach(b=>b.addEventListener("click",()=>loadProject(REELS[+b.dataset.i].spec)));
     $("libList").querySelectorAll(".lib-del").forEach(b=>b.addEventListener("click",async()=>{
       b.disabled=true;
       try{ await api("/api/admin/reel/library/"+encodeURIComponent(b.dataset.id),{method:"DELETE"}); loadLibrary(); }catch(e){ b.disabled=false; }
     }));
   }catch(e){ if(e.status===401) gate(); }
+}
+// reopen a saved reel's full project (source + scenes + template + music + caption) to tweak
+async function loadProject(spec){
+  if(!spec){ show($("asmMsg"),"warn","This reel predates edit-support — no saved project."); return; }
+  stopSeq();
+  await loadSource(spec.sourceSlug);
+  SCENES=(spec.scenes||[]).map(s=>({start:+s.start||0,len:+s.len||2})); SELIDX=SCENES.length?0:-1;
+  if(spec.template) applyTpl(spec.template);
+  $("igCaption").value=spec.caption||"";
+  for(const k in THUMBS) delete THUMBS[k];
+  renderScenes();
+  try{ window.scrollTo({top:0,behavior:"smooth"}); }catch(e){}
+  show($("asmMsg"),"ok","Project loaded — tweak scenes/template/music, then Assemble to make an updated reel.");
 }
 
 // boot
