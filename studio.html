@@ -87,7 +87,10 @@
   .mock .mband{position:absolute;background:#0d1018;overflow:hidden}
   .mock .mband img{width:100%;height:100%;object-fit:cover}
   .mock .mcap{position:absolute;left:0;right:0;text-align:center;font-weight:900;line-height:1.05;font-family:Arial,Helvetica,sans-serif;padding:0 4px;white-space:pre-wrap}
-  .mock .mov{position:absolute}
+  .mock .mov{position:absolute;cursor:grab;touch-action:none}
+  .mock .mov img{width:100%;height:auto;display:block;pointer-events:none;-webkit-user-drag:none}
+  .mock .mov:hover{outline:1.5px dashed var(--accent)}
+  .mock .movh{position:absolute;right:-6px;bottom:-6px;width:14px;height:14px;background:var(--accent,#f59e0b);border:1.5px solid #0a0b0e;border-radius:50%;cursor:nwse-resize}
   .cap-line{display:flex;gap:8px;margin-bottom:7px}
   .lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:11px}
   .lib .item{background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);border-radius:11px;overflow:hidden}
@@ -534,7 +537,8 @@ function applyTpl(cfg){
   $("bg").value=cfg.bg||"#C7A876";
   $("band").value=String((cfg.band&&cfg.band.scale)||1000);
   const by=(cfg.band&&cfg.band.y)!=null?cfg.band.y:560; $("bandY").value=by; $("bandYv").textContent=by;
-  OVERLAYS=(cfg.overlays||[]).filter(o=>o&&o.data).map(o=>({data:o.data,kind:o.kind||"character",name:o.name||"",pos:o.pos||"tr",size:o.size||"M"}));
+  OVERLAYS=(cfg.overlays||[]).filter(o=>o&&o.data).map(o=>({data:o.data,kind:o.kind||"character",name:o.name||"",
+    x:o.x!=null?o.x:(o.kind==="emoji"?390:620), y:o.y!=null?o.y:(o.kind==="emoji"?300:1180), w:o.w||(o.kind==="emoji"?300:420)}));
   renderOverlays();
   if(cfg.music){ if(cfg.music.id) $("musicSelect").value=cfg.music.id; $("musicStart").value=cfg.music.start||0; onMusicSelect(); }
   renderMockup();
@@ -543,24 +547,41 @@ function currentTpl(){
   const cap=[]; const y1=150,y2=245;
   if($("cap1").value.trim()) cap.push({text:$("cap1").value.trim(),y:y1});
   if($("cap2").value.trim()) cap.push({text:$("cap2").value.trim(),y:y2});
-  const SZ={S:150,M:250,L:380};
-  const overlays=OVERLAYS.map(o=>{ const w=SZ[o.size]||250; const {x,y}=overlayXY(o.pos||"tr",w); return {data:o.data,x,y,w,pos:o.pos,size:o.size,kind:o.kind,name:o.name}; });
+  const overlays=OVERLAYS.map(o=>({data:o.data,x:Math.round(o.x||0),y:Math.round(o.y||0),w:Math.round(o.w||240),kind:o.kind,name:o.name}));
   return {size:"1080x1920",bg:$("bg").value,band:{scale:+$("band").value,y:+$("bandY").value},caption:cap,fontSize:72,fontColor:"black",overlays,music:{id:$("musicSelect").value||"",start:+$("musicStart").value||0}};
 }
-// live 9:16 mockup of the actual reel frame (bg + caption + clip band + stickers), scaled 1080→box
+// live 9:16 mockup of the actual reel frame; stickers are drag-to-move + corner-resize
 function renderMockup(){
   const el=$("mock"); if(!el) return;
   const PW=el.clientWidth||230, sc=PW/1080, tpl=currentTpl();
-  const hasContent=SCENES.length||(tpl.overlays&&tpl.overlays.length)||(tpl.caption&&tpl.caption.length);
+  const hasContent=SCENES.length||OVERLAYS.length||(tpl.caption&&tpl.caption.length);
   if(!hasContent){ el.style.background="#0d1018"; el.innerHTML=`<div class="mockempty">Load a video &amp; add scenes to preview the reel frame.</div>`; return; }
   el.style.background=tpl.bg||"#C7A876";
   const idx=SELIDX>=0?SELIDX:0, scn=SCENES[idx], th=scn?THUMBS[scn.start.toFixed(2)]:null;
   const bw=(tpl.band.scale||1000)*sc, bx=((1080-(tpl.band.scale||1000))/2)*sc, by=(tpl.band.y||560)*sc, bh=bw*9/16;
   let html=`<div class="mband" style="left:${bx}px;top:${by}px;width:${bw}px;height:${bh}px">${th?`<img src="${th}">`:`<div style="width:100%;height:100%;display:grid;place-items:center;font-size:9px;color:#8891a8">clip</div>`}</div>`;
   for(const l of (tpl.caption||[])){ if(!l.text) continue; html+=`<div class="mcap" style="top:${l.y*sc}px;color:${tpl.fontColor||'black'};font-size:${(tpl.fontSize||72)*sc}px">${esc(l.text)}</div>`; }
-  for(const o of (tpl.overlays||[])){ html+=`<img class="mov" src="${o.data}" style="left:${o.x*sc}px;top:${o.y*sc}px;width:${o.w*sc}px">`; }
+  OVERLAYS.forEach((o,i)=>{ html+=`<div class="mov" data-i="${i}" title="drag to move · corner to resize" style="left:${(o.x||0)*sc}px;top:${(o.y||0)*sc}px;width:${(o.w||240)*sc}px"><img src="${o.data}" draggable="false"><div class="movh"></div></div>`; });
   el.innerHTML=html;
+  el.querySelectorAll(".mov").forEach(d=>{
+    const i=+d.dataset.i;
+    d.addEventListener("pointerdown",e=>{
+      if(e.target.classList.contains("movh")) return;
+      e.preventDefault(); const o=OVERLAYS[i], sx=e.clientX, sy=e.clientY, ox=o.x||0, oy=o.y||0;
+      const mv=ev=>{ const oh=d.offsetHeight/sc; o.x=Math.max(0,Math.min(1080-(o.w||240),ox+(ev.clientX-sx)/sc)); o.y=Math.max(0,Math.min(1920-oh,oy+(ev.clientY-sy)/sc)); d.style.left=o.x*sc+"px"; d.style.top=o.y*sc+"px"; };
+      const up=()=>{ window.removeEventListener("pointermove",mv); window.removeEventListener("pointerup",up); syncOverlaySize(i); };
+      window.addEventListener("pointermove",mv); window.addEventListener("pointerup",up);
+    });
+    d.querySelector(".movh").addEventListener("pointerdown",e=>{
+      e.preventDefault(); e.stopPropagation(); const o=OVERLAYS[i], sx=e.clientX, ow=o.w||240;
+      const mv=ev=>{ o.w=Math.round(Math.max(40,Math.min(1080,ow+(ev.clientX-sx)/sc))); d.style.width=o.w*sc+"px"; };
+      const up=()=>{ window.removeEventListener("pointermove",mv); window.removeEventListener("pointerup",up); syncOverlaySize(i); };
+      window.addEventListener("pointermove",mv); window.addEventListener("pointerup",up);
+    });
+  });
 }
+// keep the overlay-list width box in sync after a drag/resize on the preview
+function syncOverlaySize(i){ const inp=document.querySelector(`.ovw[data-i="${i}"]`); if(inp&&OVERLAYS[i]) inp.value=Math.round(OVERLAYS[i].w||240); }
 // ── stickers / emoji overlays ──
 let OVERLAYS=[], PRESETS=[];  // OVERLAYS:[{data,kind,name,pos,size}]
 function overlayXY(pos,w){ const W=1080,H=1920,m=55,h=w;
@@ -580,38 +601,39 @@ function fileToPng(f,max=440){ return new Promise((res,rej)=>{ const img=new Ima
   img.onerror=rej; img.src=u; }); }
 function ovMsg(cls,txt){ const el=$("ovMsg"); if(el) show(el,cls,txt); }
 async function addEmoji(){ const e=$("emojiIn").value.trim(); if(!e) return; $("emojiAddBtn").disabled=true;
-  try{ OVERLAYS.push({data:await emojiToPng(e),kind:"emoji",name:e,pos:"tr",size:"M"}); $("emojiIn").value=""; renderOverlays(); ovMsg("ok","Emoji added — see the Preview above."); }
+  try{ OVERLAYS.push({data:await emojiToPng(e),kind:"emoji",name:e,x:390,y:300,w:300}); $("emojiIn").value=""; renderOverlays(); ovMsg("ok","Emoji added — drag &amp; resize it on the Preview above."); }
   catch(err){ ovMsg("err","Couldn't add emoji: "+(err&&err.message||err)); } finally{ $("emojiAddBtn").disabled=false; } }
 async function addSticker(){ const f=$("stickerFile").files[0]; if(!f){ ovMsg("err","Choose a PNG first."); return; } if(f.size>8*1024*1024){ ovMsg("err","Image too big (max 8MB)."); return; }
   $("stickerAddBtn").disabled=true;
-  try{ OVERLAYS.push({data:await fileToPng(f),kind:"character",name:(f.name||"character").replace(/\.[^.]+$/,"").slice(0,40),pos:"mc",size:"L"}); $("stickerFile").value=""; renderOverlays(); ovMsg("ok","Sticker added — see the Preview above."); }
+  try{ OVERLAYS.push({data:await fileToPng(f),kind:"character",name:(f.name||"character").replace(/\.[^.]+$/,"").slice(0,40),x:620,y:1180,w:420}); $("stickerFile").value=""; renderOverlays(); ovMsg("ok","Added — drag &amp; resize it on the Preview above."); }
   catch(err){ ovMsg("err","Couldn't read that image — try a PNG/JPG. ("+(err&&err.message||err)+")"); } finally{ $("stickerAddBtn").disabled=false; } }
 async function loadPresets(){
   try{
     const [em,ch]=await Promise.all([api("/api/admin/templates?kind=emoji"),api("/api/admin/templates?kind=character")]);
-    PRESETS=[...(em.templates||[]).map(t=>({id:t.id,name:t.name,kind:"emoji",data:(t.config||{}).data})),
-             ...(ch.templates||[]).map(t=>({id:t.id,name:t.name,kind:"character",data:(t.config||{}).data}))].filter(p=>p.data);
+    const mk=(t,kind)=>({id:t.id,name:t.name,kind,data:(t.config||{}).data,x:(t.config||{}).x,y:(t.config||{}).y,w:(t.config||{}).w});
+    PRESETS=[...(em.templates||[]).map(t=>mk(t,"emoji")),...(ch.templates||[]).map(t=>mk(t,"character"))].filter(p=>p.data);
     $("presetSel").innerHTML=`<option value="">— saved presets —</option>`+PRESETS.map(p=>`<option value="${esc(p.id)}">${p.kind==="emoji"?"😀":"🖼"} ${esc(p.name)}</option>`).join("");
   }catch(e){ if(e.status===401) gate(); }
 }
 function addFromPreset(){ const p=PRESETS.find(x=>x.id===$("presetSel").value); if(!p) return;
-  OVERLAYS.push({data:p.data,kind:p.kind,name:p.name,pos:p.kind==="emoji"?"tr":"mc",size:p.kind==="emoji"?"M":"L"}); renderOverlays(); }
-async function savePreset(i){ const o=OVERLAYS[i]; if(!o) return; const name=prompt("Save this "+(o.kind||"sticker")+" as (name):",o.name||""); if(!name) return;
-  try{ await api("/api/admin/templates",{method:"POST",body:JSON.stringify({name:name.slice(0,60),kind:o.kind==="emoji"?"emoji":"character",config:{data:o.data}})}); o.name=name; await loadPresets(); }catch(e){ alert(e.message||"Save failed"); } }
+  OVERLAYS.push({data:p.data,kind:p.kind,name:p.name,
+    x:p.x!=null?p.x:(p.kind==="emoji"?390:620), y:p.y!=null?p.y:(p.kind==="emoji"?300:1180), w:p.w||(p.kind==="emoji"?300:420)});
+  renderOverlays(); ovMsg("ok",`Added “${esc(p.name)}” at its saved size &amp; position.`); }
+async function savePreset(i){ const o=OVERLAYS[i]; if(!o) return; const name=prompt("Save this "+(o.kind||"sticker")+" as (name) — its exact size & position are saved too:",o.name||""); if(!name) return;
+  try{ await api("/api/admin/templates",{method:"POST",body:JSON.stringify({name:name.slice(0,60),kind:o.kind==="emoji"?"emoji":"character",config:{data:o.data,x:Math.round(o.x||0),y:Math.round(o.y||0),w:Math.round(o.w||240)}})}); o.name=name; await loadPresets(); ovMsg("ok",`Saved “${esc(name)}” as a reusable preset.`); }catch(e){ ovMsg("err",e.message||"Save failed"); } }
 const OV_POS=[["tl","top-left"],["tc","top"],["tr","top-right"],["ml","left"],["mc","center"],["mr","right"],["bl","bottom-left"],["bc","bottom"],["br","bottom-right"]];
 function renderOverlays(){
   const el=$("ovList"); if(!el) return;
-  if(!OVERLAYS.length){ el.innerHTML=`<div class="hint" style="margin:0">No stickers. Add an emoji, upload a character, or use a saved preset.</div>`; renderMockup(); return; }
+  if(!OVERLAYS.length){ el.innerHTML=`<div class="hint" style="margin:0">No stickers. Add an emoji, upload a character, or use a saved preset — then <b>drag it to move</b> and <b>pull its corner to resize</b> right on the Preview.</div>`; renderMockup(); return; }
   el.innerHTML=OVERLAYS.map((o,i)=>`
     <div style="display:flex;gap:8px;align-items:center;background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);border-radius:9px;padding:7px 9px;margin-bottom:6px">
       <img src="${o.data}" style="width:34px;height:34px;object-fit:contain;background:#0d1018;border-radius:6px;flex:none">
-      <span style="font-size:11px;font-weight:700;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.name||o.kind||"")}</span>
-      <select class="ovsel" data-i="${i}" data-k="pos" style="flex:1">${OV_POS.map(p=>`<option value="${p[0]}" ${o.pos===p[0]?"selected":""}>${p[1]}</option>`).join("")}</select>
-      <select class="ovsel" data-i="${i}" data-k="size" style="width:64px">${["S","M","L"].map(z=>`<option ${o.size===z?"selected":""}>${z}</option>`).join("")}</select>
-      <button class="btn ghost sm ovsave" data-i="${i}" title="Save as named preset">💾</button>
+      <span style="flex:1;font-size:11.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(o.name||o.kind||"sticker")}</span>
+      <label style="margin:0;font-size:10px;color:var(--sub)">w</label><input class="ovw" type="number" data-i="${i}" min="40" max="1080" step="10" value="${Math.round(o.w||240)}" style="width:64px;height:30px;font-size:12px">
+      <button class="btn ghost sm ovsave" data-i="${i}" title="Save as named preset (exact size + position)">💾</button>
       <button class="btn ghost sm ovrm" data-i="${i}" title="Remove">✕</button>
     </div>`).join("");
-  el.querySelectorAll(".ovsel").forEach(s=>s.addEventListener("change",()=>{ OVERLAYS[+s.dataset.i][s.dataset.k]=s.value; }));
+  el.querySelectorAll(".ovw").forEach(inp=>inp.addEventListener("change",()=>{ OVERLAYS[+inp.dataset.i].w=Math.max(40,Math.min(1080,+inp.value||240)); renderMockup(); }));
   el.querySelectorAll(".ovsave").forEach(b=>b.addEventListener("click",()=>savePreset(+b.dataset.i)));
   el.querySelectorAll(".ovrm").forEach(b=>b.addEventListener("click",()=>{ OVERLAYS.splice(+b.dataset.i,1); renderOverlays(); }));
   renderMockup();
