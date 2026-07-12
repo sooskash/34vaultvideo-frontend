@@ -978,6 +978,18 @@ function thumbSrc(v){
   if(!v) return window.__NOTHUMB;
   return v.thumbUrl || (v.sourceId ? CDN_THUMBS+"/"+v.sourceId+".jpg" : window.__NOTHUMB);
 }
+// Some networks stall on the source CDN without ever firing `error`, which would leave a
+// blank thumb forever. Sweep unloaded thumbs and, past a short deadline, push them down the
+// fallback chain (our CDN → proxy → placeholder) by firing their onerror handler.
+setInterval(function(){
+  var now=Date.now();
+  document.querySelectorAll("img.c-img").forEach(function(img){
+    if(!img.onerror||(img.complete&&img.naturalWidth>0)) return;
+    var t=+(img.dataset.ts||0);
+    if(!t){ img.dataset.ts=now; return; }
+    if(now-t>4000){ img.dataset.ts=now; img.dispatchEvent(new Event("error")); }
+  });
+},2000);
 
 // Elements
 const grid       = document.getElementById("grid");

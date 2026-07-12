@@ -305,6 +305,17 @@ function thumbSrc(x){
   if(!x) return NO_THUMB;
   return x.thumbUrl || (x.sourceId ? CDN_THUMBS+"/"+x.sourceId+".jpg" : NO_THUMB);
 }
+// A stalled source thumb never fires `error`; sweep unloaded thumbs and push them down the
+// fallback chain (our CDN → proxy → placeholder) past a short deadline. See index.html.
+setInterval(function(){
+  var now=Date.now();
+  document.querySelectorAll("img.c-img").forEach(function(img){
+    if(!img.onerror||(img.complete&&img.naturalWidth>0)) return;
+    var t=+(img.dataset.ts||0);
+    if(!t){ img.dataset.ts=now; return; }
+    if(now-t>4000){ img.dataset.ts=now; img.dispatchEvent(new Event("error")); }
+  });
+},2000);
 
 function vcard(x){
   return `<div class="vcard" onclick="location.href='watch.html?slug=${encodeURIComponent(x.slug)}'">
