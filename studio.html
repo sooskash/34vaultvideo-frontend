@@ -71,13 +71,16 @@
   .trim .hd{font-size:12px;font-weight:800;margin-bottom:9px}
   .trim .r{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
   .trim .num{width:70px}
-  /* trim slider = where the scene sits in the full video */
-  .track{position:relative;height:30px;background:var(--bg,#0a0b0e);border:1px solid var(--border2,#262b3a);border-radius:7px;margin:2px 0 12px;overflow:hidden}
-  .track .seg{position:absolute;top:0;bottom:0;background:rgba(245,158,11,.30);border-left:2px solid var(--accent);border-right:2px solid var(--accent)}
-  .track .phl{position:absolute;top:0;bottom:0;width:2px;background:#fff;box-shadow:0 0 4px rgba(0,0,0,.6)}
-  .trng{display:flex;flex-direction:column;gap:3px;margin-bottom:10px;font-size:11px;color:var(--sub,#8891a8)}
-  .trng label{display:flex;justify-content:space-between;margin:0;font-weight:700}
-  .trng input[type=range]{width:100%;height:auto;padding:0;accent-color:var(--accent,#f59e0b)}
+  /* trim track = drag the edges/middle right on the clip (video-editor style) */
+  .track{position:relative;height:44px;background:var(--bg,#0a0b0e);border:1px solid var(--border2,#262b3a);border-radius:8px;margin:2px 0 9px;overflow:hidden;touch-action:none;user-select:none}
+  .track .seg{position:absolute;top:0;bottom:0;background:rgba(245,158,11,.28);cursor:grab}
+  .track .hnd{position:absolute;top:0;bottom:0;width:18px;background:var(--accent,#f59e0b);cursor:ew-resize;display:flex;align-items:center;justify-content:center}
+  .track .hnd::after{content:"";width:2px;height:18px;background:rgba(0,0,0,.55);border-radius:2px;box-shadow:4px 0 0 -0.5px rgba(0,0,0,.3),-4px 0 0 -0.5px rgba(0,0,0,.3)}
+  .track .hnd.hl{left:0;border-radius:7px 0 0 7px} .track .hnd.hr{right:0;border-radius:0 7px 7px 0}
+  .track .phl{position:absolute;top:0;bottom:0;width:2px;background:#fff;box-shadow:0 0 4px rgba(0,0,0,.6);pointer-events:none}
+  .tlbl{font-size:11.5px;font-weight:800}
+  /* overlay (sticker/emoji) rows */
+  .ovsel{height:32px;font-size:12px}
   .cap-line{display:flex;gap:8px;margin-bottom:7px}
   .lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:11px}
   .lib .item{background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);border-radius:11px;overflow:hidden}
@@ -219,6 +222,18 @@
         </div>
         <div class="hint">The track loops to fill the reel and is cut to its length. Set “Start” to pick which part of the song plays.</div>
         <div class="msg" id="musicMsg"></div>
+      </div>
+
+      <!-- stickers / emoji -->
+      <div class="card">
+        <h2><span class="step">★</span> Stickers &amp; emoji <span class="tag" style="margin-left:auto;font-weight:700">optional</span></h2>
+        <div class="row">
+          <div class="f" style="max-width:130px"><label>Emoji</label><input id="emojiIn" placeholder="😀 🔥 💦" maxlength="6" /></div>
+          <button class="btn ghost sm" id="emojiAddBtn" onclick="addEmoji()">＋ Emoji</button>
+          <div class="f"><label>Or upload a sticker / character PNG</label><input type="file" id="stickerFile" accept="image/*" style="padding:7px 10px;height:auto" /></div>
+          <button class="btn ghost sm" id="stickerAddBtn" onclick="addSticker()">＋ Image</button>
+        </div>
+        <div id="ovList" style="margin-top:10px"></div>
       </div>
 
       <!-- 4 create -->
@@ -395,32 +410,40 @@ function renderTrim(){
   const s=SCENES[SELIDX];
   const dur=Math.max(vidDur(), s.start+s.len, 1);
   p.style.display="";
-  p.innerHTML=`<div class="hd">Scene ${SELIDX+1} — where it's from in the full video</div>
-    <div class="track" id="trTrack"><div class="seg" id="trSeg"></div><div class="phl" id="trPhl" style="display:none"></div></div>
-    <div class="trng"><label>Start <span id="trStartL"></span></label><input type="range" id="trStartR" min="0" max="${dur.toFixed(2)}" step="0.1"></div>
-    <div class="trng"><label>End <span id="trEndL"></span></label><input type="range" id="trEndR" min="0" max="${dur.toFixed(2)}" step="0.1"></div>
-    <div class="r">
+  p.innerHTML=`<div class="hd">Scene ${SELIDX+1} — drag the edges to trim, the middle to move</div>
+    <div class="track" id="trTrack"><div class="seg" id="trSeg"><div class="hnd hl" id="trHL"></div><div class="hnd hr" id="trHR"></div></div><div class="phl" id="trPhl" style="display:none"></div></div>
+    <div class="r" style="justify-content:space-between"><span class="tlbl">▶ <span id="trStartL"></span></span><span class="tlbl" style="color:var(--sub,#8891a8)"><span id="trLenL"></span></span><span class="tlbl"><span id="trEndL"></span> ⏹</span></div>
+    <div class="r" style="margin-top:8px">
       <button class="btn ghost sm" id="trSet">Start = playhead</button>
       <label style="margin:0 0 0 4px">len</label><button class="btn ghost sm" id="trMinus">−</button><input class="num" type="number" id="trLen" step="0.1" min="0.3"><button class="btn ghost sm" id="trPlus">+</button>
       <button class="btn sm" id="trPrev">▶ preview scene</button>
     </div>`;
   function paint(seekTo){
     const end=Math.min(dur,s.start+s.len);
-    $("trSeg").style.left=(s.start/dur*100)+"%"; $("trSeg").style.width=Math.max(0.6,s.len/dur*100)+"%";
-    $("trStartR").value=s.start; $("trEndR").value=end; $("trLen").value=(+s.len).toFixed(1);
-    $("trStartL").textContent=fmtTime(s.start); $("trEndL").textContent=fmtTime(end);
+    $("trSeg").style.left=(s.start/dur*100)+"%"; $("trSeg").style.width=Math.max(1.2,s.len/dur*100)+"%";
+    $("trStartL").textContent=fmtTime(s.start); $("trEndL").textContent=fmtTime(end); $("trLenL").textContent=(+s.len).toFixed(1)+"s";
+    $("trLen").value=(+s.len).toFixed(1);
     if(seekTo!=null){ const v=$("srcVideo"); try{ v.pause(); v.currentTime=seekTo; }catch(e){} }
   }
   paint();
-  $("trStartR").addEventListener("input",()=>{ const end=s.start+s.len; let ns=Math.max(0,Math.min(+$("trStartR").value,end-0.3)); s.len=+(end-ns).toFixed(2); s.start=+ns.toFixed(2); paint(ns); });
-  $("trEndR").addEventListener("input",()=>{ let ne=Math.min(dur,Math.max(+$("trEndR").value,s.start+0.3)); s.len=+(ne-s.start).toFixed(2); paint(ne); });
-  const commit=()=>{ delete THUMBS[s.start.toFixed(2)]; renderScenes(); };
-  $("trStartR").addEventListener("change",commit);
-  $("trEndR").addEventListener("change",commit);
-  $("trLen").addEventListener("change",()=>{ s.len=Math.max(0.3,+$("trLen").value||2); commit(); });
-  $("trSet").addEventListener("click",()=>{ s.start=Math.max(0,+($("srcVideo").currentTime||0).toFixed(2)); commit(); });
-  $("trMinus").addEventListener("click",()=>{ s.len=Math.max(0.3,+(s.len-0.5).toFixed(1)); commit(); });
-  $("trPlus").addEventListener("click",()=>{ s.len=+(s.len+0.5).toFixed(1); commit(); });
+  const track=$("trTrack");
+  const timeAt=x=>{ const r=track.getBoundingClientRect(); return Math.max(0,Math.min(1,(x-r.left)/r.width))*dur; };
+  let drag=null;
+  const move=e=>{ if(!drag) return; const t=timeAt(e.clientX);
+    if(drag.mode==="start"){ const end=s.start+s.len; const ns=Math.max(0,Math.min(t,end-0.3)); s.start=+ns.toFixed(2); s.len=+(end-ns).toFixed(2); paint(ns); }
+    else if(drag.mode==="end"){ const ne=Math.min(dur,Math.max(t,s.start+0.3)); s.len=+(ne-s.start).toFixed(2); paint(ne); }
+    else { const ns=Math.max(0,Math.min(t-drag.grab,dur-s.len)); s.start=+ns.toFixed(2); paint(ns); } };
+  const up=()=>{ window.removeEventListener("pointermove",move); window.removeEventListener("pointerup",up);
+    if(drag){ drag=null; delete THUMBS[s.start.toFixed(2)]; renderScenes(); } };
+  const down=(mode,e)=>{ e.preventDefault(); e.stopPropagation(); drag={mode,grab:timeAt(e.clientX)-s.start}; window.addEventListener("pointermove",move); window.addEventListener("pointerup",up); };
+  $("trHL").addEventListener("pointerdown",e=>down("start",e));
+  $("trHR").addEventListener("pointerdown",e=>down("end",e));
+  $("trSeg").addEventListener("pointerdown",e=>{ if(!e.target.classList.contains("hnd")) down("move",e); });
+  track.addEventListener("pointerdown",e=>{ if(e.target!==track) return; const t=timeAt(e.clientX); const end=s.start+s.len; const ns=Math.max(0,Math.min(t,end-0.3)); s.start=+ns.toFixed(2); s.len=+(end-ns).toFixed(2); delete THUMBS[s.start.toFixed(2)]; renderScenes(); });
+  $("trLen").addEventListener("change",()=>{ s.len=Math.max(0.3,+$("trLen").value||2); delete THUMBS[s.start.toFixed(2)]; renderScenes(); });
+  $("trSet").addEventListener("click",()=>{ s.start=Math.max(0,+($("srcVideo").currentTime||0).toFixed(2)); delete THUMBS[s.start.toFixed(2)]; renderScenes(); });
+  $("trMinus").addEventListener("click",()=>{ s.len=Math.max(0.3,+(s.len-0.5).toFixed(1)); renderScenes(); });
+  $("trPlus").addEventListener("click",()=>{ s.len=+(s.len+0.5).toFixed(1); renderScenes(); });
   $("trPrev").addEventListener("click",()=>previewScene(SELIDX));
 }
 // live playhead marker on the trim track, driven by the source video's playback
@@ -488,12 +511,42 @@ function applyTpl(cfg){
   $("bg").value=cfg.bg||"#C7A876";
   $("band").value=String((cfg.band&&cfg.band.scale)||1000);
   const by=(cfg.band&&cfg.band.y)!=null?cfg.band.y:560; $("bandY").value=by; $("bandYv").textContent=by;
+  OVERLAYS=(cfg.overlays||[]).filter(o=>o&&o.data).map(o=>({data:o.data,pos:o.pos||"tr",size:o.size||"M"}));
+  renderOverlays();
 }
 function currentTpl(){
   const cap=[]; const y1=150,y2=245;
   if($("cap1").value.trim()) cap.push({text:$("cap1").value.trim(),y:y1});
   if($("cap2").value.trim()) cap.push({text:$("cap2").value.trim(),y:y2});
-  return {size:"1080x1920",bg:$("bg").value,band:{scale:+$("band").value,y:+$("bandY").value},caption:cap,fontSize:72,fontColor:"black"};
+  const SZ={S:150,M:250,L:380};
+  const overlays=OVERLAYS.map(o=>{ const w=SZ[o.size]||250; const {x,y}=overlayXY(o.pos||"tr",w); return {data:o.data,x,y,w,pos:o.pos,size:o.size}; });
+  return {size:"1080x1920",bg:$("bg").value,band:{scale:+$("band").value,y:+$("bandY").value},caption:cap,fontSize:72,fontColor:"black",overlays};
+}
+// ── stickers / emoji overlays ──
+let OVERLAYS=[];  // [{data,pos,size}]
+function overlayXY(pos,w){ const W=1080,H=1920,m=55,h=w;
+  const xs={l:m,c:(W-w)/2,r:W-w-m}, ys={t:210,m:(H-h)/2,b:H-h-150};
+  return {x:Math.round(xs[pos[1]]!=null?xs[pos[1]]:xs.r), y:Math.round(ys[pos[0]]!=null?ys[pos[0]]:ys.t)}; }
+function emojiToPng(ch){ const c=document.createElement("canvas"); c.width=c.height=160; const x=c.getContext("2d"); x.font="128px serif"; x.textAlign="center"; x.textBaseline="middle"; x.fillText(ch,80,90); return c.toDataURL("image/png"); }
+function fileToPng(f,max=440){ return new Promise((res,rej)=>{ const img=new Image(),u=URL.createObjectURL(f);
+  img.onload=()=>{ const sc=Math.min(1,max/Math.max(img.width,img.height)); const c=document.createElement("canvas"); c.width=Math.round(img.width*sc); c.height=Math.round(img.height*sc); c.getContext("2d").drawImage(img,0,0,c.width,c.height); URL.revokeObjectURL(u); res(c.toDataURL("image/png")); };
+  img.onerror=rej; img.src=u; }); }
+function addEmoji(){ const e=$("emojiIn").value.trim(); if(!e) return; OVERLAYS.push({data:emojiToPng(e),pos:"tr",size:"M"}); $("emojiIn").value=""; renderOverlays(); }
+async function addSticker(){ const f=$("stickerFile").files[0]; if(!f) return; if(f.size>8*1024*1024){ alert("Image too big (max 8MB)"); return; }
+  try{ OVERLAYS.push({data:await fileToPng(f),pos:"mc",size:"L"}); $("stickerFile").value=""; renderOverlays(); }catch(e){} }
+const OV_POS=[["tl","top-left"],["tc","top"],["tr","top-right"],["ml","left"],["mc","center"],["mr","right"],["bl","bottom-left"],["bc","bottom"],["br","bottom-right"]];
+function renderOverlays(){
+  const el=$("ovList"); if(!el) return;
+  if(!OVERLAYS.length){ el.innerHTML=`<div class="hint" style="margin:0">No stickers. Add an emoji or upload a character/sticker to overlay on the reel.</div>`; return; }
+  el.innerHTML=OVERLAYS.map((o,i)=>`
+    <div style="display:flex;gap:8px;align-items:center;background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);border-radius:9px;padding:7px 9px;margin-bottom:6px">
+      <img src="${o.data}" style="width:34px;height:34px;object-fit:contain;background:#0d1018;border-radius:6px;flex:none">
+      <select class="ovsel" data-i="${i}" data-k="pos" style="flex:1">${OV_POS.map(p=>`<option value="${p[0]}" ${o.pos===p[0]?"selected":""}>${p[1]}</option>`).join("")}</select>
+      <select class="ovsel" data-i="${i}" data-k="size" style="width:80px">${["S","M","L"].map(z=>`<option ${o.size===z?"selected":""}>${z}</option>`).join("")}</select>
+      <button class="btn ghost sm ovrm" data-i="${i}">✕</button>
+    </div>`).join("");
+  el.querySelectorAll(".ovsel").forEach(s=>s.addEventListener("change",()=>{ OVERLAYS[+s.dataset.i][s.dataset.k]=s.value; }));
+  el.querySelectorAll(".ovrm").forEach(b=>b.addEventListener("click",()=>{ OVERLAYS.splice(+b.dataset.i,1); renderOverlays(); }));
 }
 async function loadTemplates(){
   try{
