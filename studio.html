@@ -763,17 +763,23 @@ async function uploadMusic(){
 const CAP_BAD=/\b(hentai|porn|nsfw|sex|sexy|nude|nudes|naked|xxx|cum|cumshot|anal|pussy|dick|cock|penis|fuck|fucking|futa|futanari|rule\s?34|r34|creampie|bukkake|milf|slut|whore|blowjob|deepthroat|orgasm|hardcore|boobs|tits|18\+|nsfw|onlyfans|ahegao|breeding|hentaicomics)\b/ig;
 const CAP_TAGS=["#animation","#3danimation","#animeedit","#animereels","#edit","#reels","#reelsviral","#viral","#fyp","#trending","#blender","#gameart","#characterdesign","#fanart"];
 function capClean(s){ return String(s||"").replace(CAP_BAD," ").replace(/[#@]/g," ").replace(/[^\w\s&'’-]/g," ").replace(/\s+/g," ").trim(); }
-function autoCaption(){
+function clientDecoyCaption(){
+  const cats=(SRC.categories||[]).map(capClean).filter(c=>c&&c.length>2);
+  const generic=/^(3d|2d|sfm|blender|animated|animation|cgi|compilation|western|1girl|solo)$/i;
+  const f=cats.find(c=>!generic.test(c))||cats[0]||capClean(SRC.title).split(" ").slice(0,3).join(" ")||"This series";
+  const tag="#"+f.replace(/[^\w]/g,"");
+  const tags=[...new Set([tag,...CAP_TAGS])].filter(t=>t.length>2).slice(0,11);
+  return `${f}\n\n${f} is a fan-favourite universe loved worldwide for its unforgettable characters, stunning visuals and epic moments. Dive in and see why fans can't get enough.\n\n⭐ Rating: 8.4/10\nFollow for daily edits 🔥\n\n${tags.join(" ")}`;
+}
+async function autoCaption(){
   if(!SRC){ show($("asmMsg"),"warn","Load a source video first."); return; }
-  const title=capClean(SRC.title).split(" ").slice(0,7).join(" ");
-  const cats=(SRC.categories||[]).map(capClean).filter(c=>c&&c.length>2).slice(0,3);
-  const catTags=cats.map(c=>"#"+c.replace(/[^\w]/g,"")).filter(x=>x.length>3);
-  const tags=[...new Set([...catTags.map(t=>t.toLowerCase()),...CAP_TAGS])].slice(0,12);
-  const parts=[];
-  if(title) parts.push(title);
-  parts.push("▶ Full video — link in bio 🔗");
-  parts.push(tags.join(" "));
-  $("igCaption").value=parts.join("\n\n");
+  $("capBtn").disabled=true; const prev=$("capBtn").textContent; $("capBtn").textContent="…";
+  try{
+    const d=await api("/api/admin/reel/caption",{method:"POST",body:JSON.stringify({title:SRC.title,categories:SRC.categories||[]})});
+    $("igCaption").value=d.caption||clientDecoyCaption();
+    show($("asmMsg"),"ok",`Caption generated${d.ai?" (AI)":""} — a No. is added automatically when you Post. Edit freely.`);
+  }catch(e){ $("igCaption").value=clientDecoyCaption(); }
+  finally{ $("capBtn").disabled=false; $("capBtn").textContent=prev; }
 }
 // ── 4 · assemble ──
 async function assemble(){
