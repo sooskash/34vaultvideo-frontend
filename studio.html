@@ -85,6 +85,13 @@
   .trrow .trk{width:26px;flex:none;font-size:11px;font-weight:800;color:var(--sub,#8891a8)}
   .trrow .num{width:78px;text-align:center}
   .trrow .nb{padding:0 8px;min-width:0;font-variant-numeric:tabular-nums}
+  /* per-scene visual crop */
+  .cropwrap{position:relative;margin-top:8px;border-radius:9px;overflow:hidden;background:#000;max-width:100%;user-select:none;touch-action:none;line-height:0}
+  .cropwrap img{display:block;width:100%;height:auto;pointer-events:none;-webkit-user-drag:none}
+  .cropwrap .loadfr{display:grid;place-items:center;min-height:150px;color:var(--sub,#8891a8);font-size:11px;line-height:1.4;text-align:center;padding:8px}
+  .cropbox{position:absolute;border:2px solid var(--accent,#f59e0b);box-shadow:0 0 0 4000px rgba(0,0,0,.5);cursor:grab;box-sizing:border-box}
+  .cropbox .ch{position:absolute;right:-10px;bottom:-10px;width:18px;height:18px;background:var(--accent,#f59e0b);border:2px solid #0a0b0e;border-radius:4px;cursor:nwse-resize}
+  .tile .cropmark{position:absolute;bottom:4px;right:4px;font-size:10px;background:rgba(245,158,11,.95);color:#2a1500;border-radius:5px;padding:0 5px;font-weight:900;line-height:16px}
   /* overlay (sticker/emoji) rows */
   .ovsel{height:32px;font-size:12px}
   .pchk{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;cursor:pointer;background:var(--surface2,#181b22);border:1px solid var(--border2,#262b3a);border-radius:8px;padding:5px 10px}
@@ -194,7 +201,9 @@
         <div class="hint" id="sceneHint" style="margin:0 0 8px">Drag tiles to reorder. Click a tile to trim it.</div>
         <div class="strip" id="sceneStrip"><div class="scene-empty">Load a video, then <b>🤖 Smart auto</b> to let AI pick SFW scenes, or scrub and <b>＋ Add at playhead</b>. Drag tiles to reorder, click to trim.</div></div>
         <div class="trim" id="trimPanel" style="display:none"></div>
+        <div class="trim" id="cropPanel" style="display:none"></div>
         <video id="thumbVid" crossorigin="anonymous" preload="metadata" muted playsinline style="display:none"></video>
+        <video id="cropVid" crossorigin="anonymous" preload="metadata" muted playsinline style="display:none"></video>
         <canvas id="thumbCanvas" width="180" height="320" style="display:none"></canvas>
         <div class="msg" id="sceneMsg"></div>
       </div>
@@ -398,7 +407,8 @@ async function loadSource(slug){
     $("srcInfo").innerHTML=`<b>${esc(v.title)}</b> · ${Math.round(v.duration||0)}s`;
     $("addSceneBtn").disabled=false; $("autoFillBtn").disabled=false; $("smartBtn").disabled=false;
     $("thumbVid").src=`${CLIPSRC}?slug=${encodeURIComponent(v.slug)}`;
-    SCENES=[]; SELIDX=-1; for(const k in THUMBS) delete THUMBS[k]; renderScenes(); updateAssembleBtn();
+    $("cropVid").src=`${CLIPSRC}?slug=${encodeURIComponent(v.slug)}`;
+    SCENES=[]; SELIDX=-1; for(const k in THUMBS) delete THUMBS[k]; for(const k in CROPFRAMES) delete CROPFRAMES[k]; renderScenes(); updateAssembleBtn();
     if(!v.r2Key) show($("srcMsg"),"ok",`Ready — 🤖 Smart-auto or scrub & add scenes, then Assemble. Nothing needs hosting. <button class="btn sm" onclick="hostSource('${esc(v.slug)}')" style="margin-left:6px">⚡ Host it</button> <span style="opacity:.75">only if you want a saved copy (faster repeat + playback).</span>`);
     else show($("srcMsg"),"ok","Hosted ✓ — 🤖 Smart auto, or scrub and add scenes.");
   }catch(e){ show($("srcMsg"),"err",e.message||"Failed"); }
@@ -459,11 +469,11 @@ function renderScenes(){
   const total=SCENES.reduce((a,s)=>a+(+s.len||0),0);
   $("sceneTotal").textContent=total.toFixed(1)+"s";
   const el=$("sceneStrip");
-  if(!SCENES.length){ el.innerHTML=`<div class="scene-empty">Load a video, then <b>🤖 Smart auto</b>, or scrub and <b>＋ Add at playhead</b>. Drag tiles to reorder, click to trim.</div>`; $("trimPanel").style.display="none"; updateAssembleBtn(); return; }
+  if(!SCENES.length){ el.innerHTML=`<div class="scene-empty">Load a video, then <b>🤖 Smart auto</b>, or scrub and <b>＋ Add at playhead</b>. Drag tiles to reorder, click to trim.</div>`; $("trimPanel").style.display="none"; $("cropPanel").style.display="none"; updateAssembleBtn(); return; }
   el.innerHTML=SCENES.map((s,i)=>{
     const th=THUMBS[s.start.toFixed(2)];
     const inner=th?`<img src="${th}" alt="">`:`<div class="ph">scene ${i+1}<br>@${fmtTime(s.start)}</div>`;
-    return `<div class="tile ${i===SELIDX?'sel':''}" data-i="${i}">${inner}<span class="idx">${i+1}</span><span class="dur">${(+s.len).toFixed(1)}s</span><button class="x" data-i="${i}" title="Remove">✕</button></div>`;
+    return `<div class="tile ${i===SELIDX?'sel':''}" data-i="${i}">${inner}<span class="idx">${i+1}</span><span class="dur">${(+s.len).toFixed(1)}s</span>${s.crop?'<span class="cropmark" title="cropped">✂</span>':''}<button class="x" data-i="${i}" title="Remove">✕</button></div>`;
   }).join("");
   // pointer-based reorder (HTML5 drag was flaky) — short press = select, drag = reorder
   el.querySelectorAll(".tile").forEach(t=>{
@@ -488,7 +498,7 @@ function renderScenes(){
     });
   });
   el.querySelectorAll(".x").forEach(b=>b.addEventListener("click",e=>{ e.stopPropagation(); const i=+b.dataset.i; SCENES.splice(i,1); if(SELIDX>=SCENES.length) SELIDX=SCENES.length-1; renderScenes(); }));
-  renderTrim(); ensureThumbs(); updateAssembleBtn(); renderMockup();
+  renderTrim(); renderCrop(); ensureThumbs(); updateAssembleBtn(); renderMockup();
 }
 function moveScene(from,to){ from=+from; to=Math.max(0,Math.min(SCENES.length-1,+to)); if(from<0||from===to){ renderScenes(); return; } const [it]=SCENES.splice(from,1); SCENES.splice(to,0,it); SELIDX=to; renderScenes(); }
 function vidDur(){ const v=$("srcVideo"); return (v&&v.duration&&isFinite(v.duration)?v.duration:0)||(SRC&&SRC.duration)||0; }
@@ -633,6 +643,109 @@ function paintThumb(key){
 }
 function updateAssembleBtn(){ $("assembleBtn").disabled=!(SRC&&SCENES.length); }
 
+// ── per-scene visual crop ──────────────────────────────────────────────────
+// A 16:9 box on the scene's frame: drag to pan, pull the corner to zoom. Stored on the
+// scene as normalized {x,y,w,h} (0..1 of the source frame). No box = the whole frame is used.
+const CROPFRAMES={};   // start(2dp) -> {url,w,h}  (a true-aspect still of the scene)
+function captureFullFrame(t){
+  return new Promise((resolve,reject)=>{
+    const tv=$("cropVid"); if(!tv||!tv.src) return reject(new Error("no source"));
+    let done=false;
+    const to=setTimeout(()=>{ if(!done){ done=true; cleanup(); reject(new Error("timeout")); } },6000);
+    function cleanup(){ clearTimeout(to); tv.removeEventListener("seeked",onS); }
+    function onS(){ if(done) return; done=true; cleanup();
+      try{
+        const vw=tv.videoWidth||16, vh=tv.videoHeight||9, sc=Math.min(1,720/Math.max(vw,1));
+        const c=document.createElement("canvas"); c.width=Math.max(2,Math.round(vw*sc)); c.height=Math.max(2,Math.round(vh*sc));
+        c.getContext("2d").drawImage(tv,0,0,c.width,c.height);
+        resolve({url:c.toDataURL("image/jpeg",0.72),w:vw,h:vh});
+      }catch(e){ reject(e); }
+    }
+    tv.addEventListener("seeked",onS);
+    try{ tv.currentTime=Math.max(0,t); }catch(e){ cleanup(); reject(e); }
+  });
+}
+// largest centered 16:9 (in pixels) crop for a frame of pixel size vw×vh, as normalized coords
+function defaultCrop(vw,vh){
+  const ar=(vw||16)/(vh||9), R=(16/9)/ar;   // normalized w = R·h so the pixel box is 16:9
+  if(R<=1) return {x:+((1-R)/2).toFixed(4),y:0,w:+R.toFixed(4),h:1};
+  const h=1/R; return {x:0,y:+((1-h)/2).toFixed(4),w:1,h:+h.toFixed(4)};
+}
+function renderCrop(){
+  const p=$("cropPanel");
+  if(SELIDX<0||SELIDX>=SCENES.length){ p.style.display="none"; return; }
+  const s=SCENES[SELIDX];
+  p.style.display="";
+  p.innerHTML=`<div class="hd" style="display:flex;align-items:center;gap:8px">✂ Crop
+      <span style="font-weight:600;color:var(--sub,#8891a8)">scene ${SELIDX+1}${s.crop?" · cropped":""}</span>
+      <span style="flex:1"></span>
+      <button class="btn ghost sm" id="crReset"${s.crop?"":" disabled"}>Reset to full frame</button></div>
+    <div class="cropwrap" id="crWrap"><div class="loadfr"><span class="spin"></span> grabbing this scene's frame…</div></div>
+    <div class="row" style="align-items:center;gap:10px;margin-top:9px">
+      <span class="tlbl" style="font-size:11px">Zoom</span>
+      <input type="range" id="crZoom" min="100" max="400" step="5" value="100" style="flex:1">
+      <span id="crZoomV" style="font-size:11px;font-variant-numeric:tabular-nums;min-width:36px;text-align:right">1.0×</span>
+    </div>
+    <div class="hint" style="margin:6px 0 0">Drag the box to reposition, pull the corner or use the <b>Zoom</b> slider to zoom in. It's locked to 16:9 — exactly the region that fills the reel's clip band. No box = the whole frame is used.</div>`;
+  $("crReset").addEventListener("click",()=>{ delete s.crop; renderMockup(); renderCrop();
+    const m=document.querySelector(`#sceneStrip .tile[data-i="${SELIDX}"] .cropmark`); if(m) m.remove(); });
+  const key=s.start.toFixed(2);
+  if(CROPFRAMES[key]){ mountCropBox(s,CROPFRAMES[key]); return; }
+  captureFullFrame(s.start)
+    .then(fr=>{ CROPFRAMES[key]=fr; if(SCENES[SELIDX]===s){ mountCropBox(s,fr); if(s.crop) renderMockup(); } })
+    .catch(()=>{ const w=$("crWrap"); if(w) w.innerHTML=`<div class="loadfr">Couldn't grab a frame at this moment — nudge the scene's In point a little, or crop a different scene.</div>`; });
+}
+function mountCropBox(s,fr){
+  const wrap=$("crWrap"); if(!wrap) return;
+  wrap.innerHTML=`<img src="${fr.url}" alt=""><div class="cropbox" id="crBox"><div class="ch"></div></div>`;
+  const box=$("crBox"), R=()=>wrap.getBoundingClientRect();
+  const dc=defaultCrop(fr.w,fr.h);       // zoom 1.0 = the largest 16:9 crop
+  const ratio=dc.h/dc.w;                  // keeps the box 16:9-in-pixels
+  const cur=s.crop?{...s.crop}:{...dc};
+  const zEl=$("crZoom"), zvEl=$("crZoomV");
+  function draw(){ const r=R(); box.style.left=(cur.x*r.width)+"px"; box.style.top=(cur.y*r.height)+"px"; box.style.width=(cur.w*r.width)+"px"; box.style.height=(cur.h*r.height)+"px"; }
+  function syncZoom(){ const z=Math.max(1,Math.min(4, dc.w/Math.max(cur.w,1e-4))); if(zEl) zEl.value=Math.round(z*100); if(zvEl) zvEl.textContent=z.toFixed(1)+"×"; }
+  function applyZoom(z){
+    z=Math.max(1,Math.min(4,z));
+    const cx=cur.x+cur.w/2, cy=cur.y+cur.h/2;
+    let w=Math.min(dc.w,Math.max(0.14,dc.w/z)), h=w*ratio;
+    if(h>1){ h=1; w=h/ratio; }
+    cur.w=w; cur.h=h;
+    cur.x=Math.max(0,Math.min(1-w,cx-w/2)); cur.y=Math.max(0,Math.min(1-h,cy-h/2));
+    draw();
+  }
+  draw(); syncZoom();
+  function commit(){
+    s.crop={x:+cur.x.toFixed(4),y:+cur.y.toFixed(4),w:+cur.w.toFixed(4),h:+cur.h.toFixed(4)};
+    renderMockup();
+    const tile=document.querySelector(`#sceneStrip .tile[data-i="${SELIDX}"]`);
+    if(tile && !tile.querySelector(".cropmark")){ const m=document.createElement("span"); m.className="cropmark"; m.title="cropped"; m.textContent="✂"; tile.insertBefore(m, tile.querySelector(".x")); }
+    const rb=$("crReset"); if(rb) rb.disabled=false;
+  }
+  box.addEventListener("pointerdown",e=>{               // move (pan)
+    if(e.target.classList.contains("ch")) return; e.preventDefault();
+    const r=R(), sx=e.clientX, sy=e.clientY, o={...cur};
+    const mv=ev=>{ cur.x=Math.max(0,Math.min(1-cur.w,o.x+(ev.clientX-sx)/r.width)); cur.y=Math.max(0,Math.min(1-cur.h,o.y+(ev.clientY-sy)/r.height)); draw(); };
+    const up=()=>{ window.removeEventListener("pointermove",mv); window.removeEventListener("pointerup",up); commit(); };
+    window.addEventListener("pointermove",mv); window.addEventListener("pointerup",up);
+  });
+  box.querySelector(".ch").addEventListener("pointerdown",e=>{   // resize (zoom), keep 16:9, anchor top-left
+    e.preventDefault(); e.stopPropagation(); const r=R(), sx=e.clientX, o={...cur};
+    const mv=ev=>{
+      let wpx=Math.max(r.width*0.14, Math.min(r.width*(1-o.x), o.w*r.width+(ev.clientX-sx)));
+      let hpx=wpx*9/16;
+      if(hpx>r.height*(1-o.y)){ hpx=r.height*(1-o.y); wpx=hpx*16/9; }
+      cur.w=wpx/r.width; cur.h=hpx/r.height; draw(); syncZoom();
+    };
+    const up=()=>{ window.removeEventListener("pointermove",mv); window.removeEventListener("pointerup",up); commit(); };
+    window.addEventListener("pointermove",mv); window.addEventListener("pointerup",up);
+  });
+  if(zEl){                                              // zoom slider (centered zoom)
+    zEl.oninput=()=>{ applyZoom((+zEl.value||100)/100); if(zvEl) zvEl.textContent=((+zEl.value||100)/100).toFixed(1)+"×"; renderMockup(); };
+    zEl.onchange=()=>{ applyZoom((+zEl.value||100)/100); commit(); };
+  }
+}
+
 // ── 3 · template ──
 const DEFAULT_TPL={size:"1080x1920",bg:"#C7A876",band:{scale:1000,y:560},caption:[{text:"Nothing is Perfect-",y:150},{text:"Me: -",y:245}],fontSize:72,fontColor:"black"};
 function applyTpl(cfg){
@@ -662,9 +775,18 @@ function renderMockup(){
   const hasContent=SCENES.length||OVERLAYS.length||(tpl.caption&&tpl.caption.length);
   if(!hasContent){ el.style.background="#0d1018"; el.innerHTML=`<div class="mockempty">Load a video &amp; add scenes to preview the reel frame.</div>`; return; }
   el.style.background=tpl.bg||"#C7A876";
-  const idx=SELIDX>=0?SELIDX:0, scn=SCENES[idx], th=scn?THUMBS[scn.start.toFixed(2)]:null;
+  const idx=SELIDX>=0?SELIDX:0, scn=SCENES[idx];
   const bw=(tpl.band.scale||1000)*sc, bx=((1080-(tpl.band.scale||1000))/2)*sc, by=(tpl.band.y||560)*sc, bh=bw*9/16;
-  let html=`<div class="mband" style="left:${bx}px;top:${by}px;width:${bw}px;height:${bh}px">${th?`<img src="${th}">`:`<div style="width:100%;height:100%;display:grid;place-items:center;font-size:9px;color:#8891a8">clip</div>`}</div>`;
+  const cf=scn?CROPFRAMES[scn.start.toFixed(2)]:null;
+  let bandInner;
+  if(scn&&scn.crop&&cf){                       // show the exact cropped region inside the band
+    const c=scn.crop, ar=(cf.w/cf.h)||(16/9), iw=bw/c.w, ih=iw/ar, ix=-c.x*iw, iy=-c.y*ih;
+    bandInner=`<img src="${cf.url}" style="position:absolute;left:${ix}px;top:${iy}px;width:${iw}px;height:${ih}px;max-width:none;object-fit:fill">`;
+  } else {
+    const th=scn?THUMBS[scn.start.toFixed(2)]:null;
+    bandInner=th?`<img src="${th}">`:`<div style="width:100%;height:100%;display:grid;place-items:center;font-size:9px;color:#8891a8">clip</div>`;
+  }
+  let html=`<div class="mband" style="left:${bx}px;top:${by}px;width:${bw}px;height:${bh}px">${bandInner}</div>`;
   for(const l of (tpl.caption||[])){ if(!l.text) continue; html+=`<div class="mcap" style="top:${l.y*sc}px;color:${tpl.fontColor||'black'};font-size:${(tpl.fontSize||72)*sc}px">${esc(l.text)}</div>`; }
   OVERLAYS.forEach((o,i)=>{ html+=`<div class="mov" data-i="${i}" title="drag to move · corner to resize" style="left:${(o.x||0)*sc}px;top:${(o.y||0)*sc}px;width:${(o.w||240)*sc}px"><img src="${o.data}" draggable="false"><div class="movh"></div></div>`; });
   el.innerHTML=html;
@@ -868,7 +990,7 @@ async function loadProject(spec){
   if(!spec){ show($("asmMsg"),"warn","This reel predates edit-support — no saved project."); return; }
   stopSeq();
   await loadSource(spec.sourceSlug);
-  SCENES=(spec.scenes||[]).map(s=>({start:+s.start||0,len:+s.len||2})); SELIDX=SCENES.length?0:-1;
+  SCENES=(spec.scenes||[]).map(s=>{ const o={start:+s.start||0,len:+s.len||2}; if(s.crop&&typeof s.crop==="object") o.crop={x:+s.crop.x||0,y:+s.crop.y||0,w:+s.crop.w||1,h:+s.crop.h||1}; return o; }); SELIDX=SCENES.length?0:-1;
   if(spec.template) applyTpl(spec.template);
   $("igCaption").value=spec.caption||"";
   for(const k in THUMBS) delete THUMBS[k];
