@@ -224,6 +224,8 @@
           <div class="f"><label>Saved template</label>
             <select id="tplSelect" onchange="onTplSelect()"><option value="">Custom</option></select>
           </div>
+          <button class="btn ghost sm" id="updTplBtn" onclick="updateTemplate()" title="Overwrite the selected template with the current settings" disabled>✎ Update</button>
+          <button class="btn ghost sm" id="delTplBtn" onclick="deleteTemplate()" title="Delete the selected template" disabled>🗑</button>
         </div>
         <div class="cap-line" style="margin-top:10px"><input id="cap1" placeholder="Top caption line" /></div>
         <div class="cap-line"><input id="cap2" placeholder="Second caption line (optional)" /></div>
@@ -233,8 +235,25 @@
           <div class="f"><label>Band Y (<span id="bandYv">560</span>)</label><input type="range" id="bandY" min="120" max="1400" value="560" oninput="document.getElementById('bandYv').textContent=this.value" /></div>
         </div>
         <div class="row" style="margin-top:10px">
+          <div class="f"><label>Background image (optional — overrides colour)</label><input type="file" id="bgImgFile" accept="image/*" style="padding:7px 10px;height:auto" onchange="onBgImagePick()" /></div>
+          <button class="btn ghost sm" id="bgImgClear" onclick="clearBgImage()" style="display:none">✕ Clear</button>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <div class="f"><label>Transition between scenes</label>
+            <select id="txScene" onchange="renderMockup()"><option value="none">None (hard cut)</option><option value="dissolve">Dissolve (crossfade)</option><option value="fade">Fade through black</option></select>
+          </div>
+          <div class="f" style="max-width:104px"><label>Length (s)</label><input type="number" id="txDur" min="0.1" max="2" step="0.1" value="0.5" /></div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <div class="f"><label>Ending</label>
+            <select id="txEnd"><option value="none">None</option><option value="fade">Fade out to black</option></select>
+          </div>
+          <div class="f" style="max-width:104px"><label>Length (s)</label><input type="number" id="txEndDur" min="0.2" max="3" step="0.1" value="0.8" /></div>
+          <button class="btn ghost sm" id="txTestBtn" onclick="testTransitions()" title="Preview the transitions on the frames above">▶ Test</button>
+        </div>
+        <div class="row" style="margin-top:10px">
           <div class="f"><input id="tplName" placeholder="Template name to save" /></div>
-          <button class="btn ghost sm" id="saveTplBtn" onclick="saveTemplate()">💾 Save template</button>
+          <button class="btn ghost sm" id="saveTplBtn" onclick="saveTemplate()">💾 Save as new</button>
         </div>
         <div class="msg" id="tplMsg"></div>
       </div>
@@ -502,23 +521,31 @@ function renderScenes(){
 }
 function moveScene(from,to){ from=+from; to=Math.max(0,Math.min(SCENES.length-1,+to)); if(from<0||from===to){ renderScenes(); return; } const [it]=SCENES.splice(from,1); SCENES.splice(to,0,it); SELIDX=to; renderScenes(); }
 function vidDur(){ const v=$("srcVideo"); return (v&&v.duration&&isFinite(v.duration)?v.duration:0)||(SRC&&SRC.duration)||0; }
-let _trDebounce=null, _trWin=null;
+let _trDebounce=null, _trWin=null, _trZoom=1;   // trim-timeline zoom: 0 = whole clip, 1 = tight on scene
 function renderTrim(){
   const p=$("trimPanel");
   if(SELIDX<0||SELIDX>=SCENES.length){ p.style.display="none"; return; }
   const s=SCENES[SELIDX];
   const dur=Math.max(vidDur(), s.start+s.len, 1);
-  // zoom the track to a window around the scene so the segment is large and the two
-  // handles never pile up (a 2s scene on a 460s video would otherwise be ~1px).
-  const pad=Math.max(1.5, s.len*1.2);
-  let lo=Math.max(0, s.start-pad), hi=Math.min(dur, s.start+s.len+pad);
-  if(hi-lo < s.len+1){ lo=Math.max(0, s.start-0.5); hi=Math.min(dur, s.start+s.len+0.5); }
-  const span=Math.max(0.1, hi-lo);
+  // Premiere-style zoomable timeline: _trZoom picks the visible span — the whole clip (Fit all)
+  // through a tight window around the scene — centered on the scene. Zoom OUT to drag a scene
+  // far, IN to fine-trim. (Was a fixed auto-zoom, so far moves needed endless nudging.)
+  const tight=Math.min(dur, s.len + Math.max(1.5, s.len*1.2)*2);
+  let span=Math.max(0.2, dur*Math.pow(tight/dur, Math.max(0,Math.min(1,_trZoom))));
+  let lo=Math.max(0, Math.min(s.start+s.len/2-span/2, dur-span)), hi=Math.min(dur, lo+span);
   _trWin={lo,hi,span};
   p.style.display="";
-  p.innerHTML=`<div class="hd">Scene ${SELIDX+1} — scrub the player, then set exact In / Out (or nudge)</div>
+  p.innerHTML=`<div class="hd" style="display:flex;align-items:center;gap:8px">Scene ${SELIDX+1}
+      <span style="flex:1"></span>
+      <button class="btn ghost sm" id="trJump" title="Move this scene to where the player is now (keeps its length)">◎ Move to playhead</button></div>
+    <div class="r" style="align-items:center;gap:8px;margin-bottom:6px">
+      <span class="tlbl" style="font-size:12px">🔍</span>
+      <input type="range" id="trZoom" min="0" max="100" step="1" value="${Math.round(_trZoom*100)}" style="flex:1">
+      <button class="btn ghost sm" id="trFit" title="See the whole clip">Fit all</button>
+      <button class="btn ghost sm" id="trZs" title="Zoom to the scene">Scene</button>
+    </div>
     <div class="track" id="trTrack"><div class="seg" id="trSeg"><div class="hnd hl" id="trHL"></div><div class="hnd hr" id="trHR"></div></div><div class="phl" id="trPhl" style="display:none"></div></div>
-    <div class="trkscale"><span id="trLo"></span><span style="opacity:.7">◄ zoomed around scene ►</span><span id="trHi"></span></div>
+    <div class="trkscale"><span id="trLo"></span><span style="opacity:.7">◄ drag the clip to move · handles to trim ►</span><span id="trHi"></span></div>
     <div class="trrow"><span class="trk">In</span>
       <button class="btn ghost sm nb" data-edge="start" data-d="-1">−1</button>
       <button class="btn ghost sm nb" data-edge="start" data-d="-0.1">−.1</button>
@@ -569,6 +596,16 @@ function renderTrim(){
   $("trSetStart").addEventListener("click",()=>{ setStart(+($("srcVideo").currentTime||0)); apply(s.start,true); });
   $("trSetEnd").addEventListener("click",()=>{ setEnd(+($("srcVideo").currentTime||0)); apply(endT(),true); });
   $("trPrev").addEventListener("click",()=>previewScene(SELIDX));
+  // zoom + jump-to-playhead (Premiere-style) — recompute the visible window without rebuilding the panel
+  function recompWin(){
+    span=Math.max(0.2, dur*Math.pow(tight/dur, Math.max(0,Math.min(1,_trZoom))));
+    lo=Math.max(0, Math.min(s.start+s.len/2-span/2, dur-span)); hi=Math.min(dur, lo+span);
+    _trWin={lo,hi,span}; $("trLo").textContent=fmtTime(lo); $("trHi").textContent=fmtTime(hi); paint();
+  }
+  $("trZoom").addEventListener("input",e=>{ _trZoom=Math.max(0,Math.min(1,(+e.target.value||0)/100)); recompWin(); });
+  $("trFit").addEventListener("click",()=>{ _trZoom=0; $("trZoom").value=0; recompWin(); });
+  $("trZs").addEventListener("click",()=>{ _trZoom=1; $("trZoom").value=100; recompWin(); });
+  $("trJump").addEventListener("click",()=>{ const t=+($("srcVideo").currentTime||0); const ns=Math.max(0,Math.min(t,dur-s.len)); s.start=+ns.toFixed(2); delete THUMBS[s.start.toFixed(2)]; renderScenes(); });
   // track drag stays for coarse positioning
   const track=$("trTrack");
   const timeAt=x=>{ const r=track.getBoundingClientRect(); return lo+Math.max(0,Math.min(1,(x-r.left)/r.width))*span; };
@@ -747,14 +784,18 @@ function mountCropBox(s,fr){
 }
 
 // ── 3 · template ──
-const DEFAULT_TPL={size:"1080x1920",bg:"#C7A876",band:{scale:1000,y:560},caption:[{text:"Nothing is Perfect-",y:150},{text:"Me: -",y:245}],fontSize:72,fontColor:"black"};
+let BGIMG="";   // optional background-image data URI (overrides bg colour)
+const DEFAULT_TPL={size:"1080x1920",bg:"#C7A876",band:{scale:1000,y:560},caption:[{text:"Nothing is Perfect-",y:150},{text:"Me: -",y:245}],fontSize:72,fontColor:"black",transition:{type:"none",dur:0.5},endFade:{type:"none",dur:0.8}};
 function applyTpl(cfg){
   cfg=cfg||DEFAULT_TPL;
   $("cap1").value=(cfg.caption&&cfg.caption[0]&&cfg.caption[0].text)||"";
   $("cap2").value=(cfg.caption&&cfg.caption[1]&&cfg.caption[1].text)||"";
   $("bg").value=cfg.bg||"#C7A876";
+  BGIMG=cfg.bgImage||""; $("bgImgClear").style.display=BGIMG?"":"none"; if($("bgImgFile")) $("bgImgFile").value="";
   $("band").value=String((cfg.band&&cfg.band.scale)||1000);
   const by=(cfg.band&&cfg.band.y)!=null?cfg.band.y:560; $("bandY").value=by; $("bandYv").textContent=by;
+  const tx=cfg.transition||{}; $("txScene").value=tx.type||"none"; $("txDur").value=tx.dur!=null?tx.dur:0.5;
+  const ef=cfg.endFade||{}; $("txEnd").value=ef.type||"none"; $("txEndDur").value=ef.dur!=null?ef.dur:0.8;
   OVERLAYS=(cfg.overlays||[]).filter(o=>o&&o.data).map(o=>({data:o.data,kind:o.kind||"character",name:o.name||"",
     x:o.x!=null?o.x:(o.kind==="emoji"?390:620), y:o.y!=null?o.y:(o.kind==="emoji"?300:1180), w:o.w||(o.kind==="emoji"?300:420)}));
   renderOverlays();
@@ -766,15 +807,73 @@ function currentTpl(){
   if($("cap1").value.trim()) cap.push({text:$("cap1").value.trim(),y:y1});
   if($("cap2").value.trim()) cap.push({text:$("cap2").value.trim(),y:y2});
   const overlays=OVERLAYS.map(o=>({data:o.data,x:Math.round(o.x||0),y:Math.round(o.y||0),w:Math.round(o.w||240),kind:o.kind,name:o.name}));
-  return {size:"1080x1920",bg:$("bg").value,band:{scale:+$("band").value,y:+$("bandY").value},caption:cap,fontSize:72,fontColor:"black",overlays,music:{id:$("musicSelect").value||"",start:+$("musicStart").value||0}};
+  const transition={type:$("txScene").value||"none",dur:Math.max(0.1,Math.min(2,+$("txDur").value||0.5))};
+  const endFade={type:$("txEnd").value||"none",dur:Math.max(0.2,Math.min(3,+$("txEndDur").value||0.8))};
+  const t={size:"1080x1920",bg:$("bg").value,band:{scale:+$("band").value,y:+$("bandY").value},caption:cap,fontSize:72,fontColor:"black",overlays,music:{id:$("musicSelect").value||"",start:+$("musicStart").value||0},transition,endFade};
+  if(BGIMG) t.bgImage=BGIMG;
+  return t;
+}
+// ── background image: client-resize to a 1080×1920 cover JPEG, keep it as a data URI ──
+function onBgImagePick(){
+  const f=$("bgImgFile").files[0]; if(!f) return;
+  if(f.size>12*1024*1024){ show($("tplMsg"),"err","Image too big (max 12MB)."); $("bgImgFile").value=""; return; }
+  const img=new Image(), u=URL.createObjectURL(f);
+  img.onload=()=>{
+    const W=1080,H=1920,c=document.createElement("canvas"); c.width=W; c.height=H; const g=c.getContext("2d");
+    const s=Math.max(W/img.width,H/img.height), dw=img.width*s, dh=img.height*s;   // cover
+    g.drawImage(img,(W-dw)/2,(H-dh)/2,dw,dh); URL.revokeObjectURL(u);
+    BGIMG=c.toDataURL("image/jpeg",0.82); $("bgImgClear").style.display=""; renderMockup();
+    show($("tplMsg"),"ok","Background image set — it overrides the colour. Save the template to keep it.");
+  };
+  img.onerror=()=>{ URL.revokeObjectURL(u); show($("tplMsg"),"err","Couldn't read that image."); };
+  img.src=u;
+}
+function clearBgImage(){ BGIMG=""; $("bgImgFile").value=""; $("bgImgClear").style.display="none"; renderMockup(); }
+// ── transition tester: play the scene frames with the chosen transition on the preview ──
+let _txTesting=false;
+function sceneFrame(i){ const s=SCENES[i]; if(!s) return null; const c=CROPFRAMES[s.start.toFixed(2)]; return (c&&c.url)||THUMBS[s.start.toFixed(2)]||null; }
+async function testTransitions(){
+  const btn=$("txTestBtn");
+  if(_txTesting){ _txTesting=false; return; }
+  const frames=SCENES.map((_,i)=>sceneFrame(i)).filter(Boolean);
+  if(!frames.length){ show($("tplMsg"),"warn","Add scenes (and let their frames load) to test transitions."); return; }
+  const el=$("mock"); if(!el) return;
+  const tx=$("txScene").value, txd=Math.max(0.1,+$("txDur").value||0.5)*1000;
+  const ef=$("txEnd").value, efd=Math.max(0.2,+$("txEndDur").value||0.8)*1000;
+  _txTesting=true; if(btn) btn.textContent="⏹ Stop";
+  const layer=document.createElement("div");
+  layer.style.cssText="position:absolute;inset:0;z-index:5;background:#000;overflow:hidden;border-radius:9px";
+  const cover="position:absolute;inset:0;width:100%;height:100%;object-fit:cover";
+  const a=document.createElement("img"), b=document.createElement("img"), black=document.createElement("div");
+  a.style.cssText=cover; b.style.cssText=cover+";opacity:0"; black.style.cssText="position:absolute;inset:0;background:#000;opacity:0";
+  layer.append(a,b,black); el.style.position="relative"; el.appendChild(layer);
+  const wait=ms=>new Promise(r=>setTimeout(r,ms));
+  try{
+    for(let i=0;i<frames.length&&_txTesting;i++){
+      a.src=frames[i]; a.style.transition="none"; a.style.opacity="1"; b.style.opacity="0"; black.style.transition="none"; black.style.opacity="0";
+      await wait(650); if(!_txTesting) break;
+      const next=frames[i+1];
+      if(next&&tx!=="none"){
+        if(tx==="dissolve"){
+          b.src=next; await wait(20); b.style.transition=`opacity ${txd}ms linear`; requestAnimationFrame(()=>b.style.opacity="1");
+          await wait(txd); a.src=next; a.style.opacity="1"; b.style.transition="none"; b.style.opacity="0";
+        } else if(tx==="fade"){
+          black.style.transition=`opacity ${txd/2}ms linear`; requestAnimationFrame(()=>black.style.opacity="1");
+          await wait(txd/2); a.src=next; requestAnimationFrame(()=>black.style.opacity="0"); await wait(txd/2);
+        }
+      }
+    }
+    if(_txTesting&&ef==="fade"){ black.style.transition=`opacity ${efd}ms linear`; requestAnimationFrame(()=>black.style.opacity="1"); await wait(efd+120); }
+  } finally { _txTesting=false; if(btn) btn.textContent="▶ Test"; layer.remove(); renderMockup(); }
 }
 // live 9:16 mockup of the actual reel frame; stickers are drag-to-move + corner-resize
 function renderMockup(){
   const el=$("mock"); if(!el) return;
   const PW=el.clientWidth||230, sc=PW/1080, tpl=currentTpl();
   const hasContent=SCENES.length||OVERLAYS.length||(tpl.caption&&tpl.caption.length);
-  if(!hasContent){ el.style.background="#0d1018"; el.innerHTML=`<div class="mockempty">Load a video &amp; add scenes to preview the reel frame.</div>`; return; }
-  el.style.background=tpl.bg||"#C7A876";
+  if(!hasContent){ el.style.background="#0d1018"; el.style.backgroundImage="none"; el.innerHTML=`<div class="mockempty">Load a video &amp; add scenes to preview the reel frame.</div>`; return; }
+  el.style.backgroundColor=tpl.bg||"#C7A876";
+  el.style.backgroundImage=BGIMG?`url("${BGIMG}")`:"none"; el.style.backgroundSize="cover"; el.style.backgroundPosition="center";
   const idx=SELIDX>=0?SELIDX:0, scn=SCENES[idx];
   const bw=(tpl.band.scale||1000)*sc, bx=((1080-(tpl.band.scale||1000))/2)*sc, by=(tpl.band.y||560)*sc, bh=bw*9/16;
   const cf=scn?CROPFRAMES[scn.start.toFixed(2)]:null;
@@ -881,16 +980,35 @@ async function loadTemplates(){
 }
 function onTplSelect(){
   const id=$("tplSelect").value;
+  $("updTplBtn").disabled=!id; $("delTplBtn").disabled=!id;
   if(!id){ return; }
   const t=TEMPLATES.find(x=>x.id===id); if(t){ applyTpl(t.config||{}); $("tplName").value=t.name; }
 }
 async function saveTemplate(){
   const name=$("tplName").value.trim(); if(!name){ show($("tplMsg"),"err","Enter a template name."); return; }
   $("saveTplBtn").disabled=true;
-  try{ await api("/api/admin/templates",{method:"POST",body:JSON.stringify({name,kind:"reel",config:currentTpl()})});
-    show($("tplMsg"),"ok","Template saved."); await loadTemplates();
+  try{ const d=await api("/api/admin/templates",{method:"POST",body:JSON.stringify({name,kind:"reel",config:currentTpl()})});
+    show($("tplMsg"),"ok","Template saved as new."); await loadTemplates();
+    if(d&&d.template&&d.template.id){ $("tplSelect").value=d.template.id; onTplSelect(); }
   }catch(e){ show($("tplMsg"),"err",e.message||"Failed"); }
   finally{ $("saveTplBtn").disabled=false; }
+}
+async function updateTemplate(){
+  const id=$("tplSelect").value; if(!id){ show($("tplMsg"),"err","Pick a saved template first."); return; }
+  const name=$("tplName").value.trim()||undefined;
+  $("updTplBtn").disabled=true;
+  try{ await api("/api/admin/templates/"+encodeURIComponent(id),{method:"PUT",body:JSON.stringify({name,config:currentTpl()})});
+    show($("tplMsg"),"ok","Template updated."); await loadTemplates(); $("tplSelect").value=id; onTplSelect();
+  }catch(e){ show($("tplMsg"),"err",e.message||"Failed"); $("updTplBtn").disabled=false; }
+}
+async function deleteTemplate(){
+  const id=$("tplSelect").value; if(!id) return;
+  const t=TEMPLATES.find(x=>x.id===id);
+  if(!confirm(`Delete template “${t?t.name:id}”? This can't be undone.`)) return;
+  $("delTplBtn").disabled=true;
+  try{ await api("/api/admin/templates/"+encodeURIComponent(id),{method:"DELETE"});
+    show($("tplMsg"),"ok","Template deleted."); $("tplSelect").value=""; $("tplName").value=""; await loadTemplates(); onTplSelect();
+  }catch(e){ show($("tplMsg"),"err",e.message||"Failed"); $("delTplBtn").disabled=false; }
 }
 
 // ── music ──
