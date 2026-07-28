@@ -14,6 +14,13 @@
 <link rel="preconnect" href="https://api.34vault.com" />
 <link rel="preconnect" href="https://cdn.34vault.com" />
 <link rel="stylesheet" href="/shared.css" />
+  <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
+  <!-- Clash Display was referenced by --font-display on both sites but never actually
+       loaded, so every heading silently fell back to Segoe UI — the brand typeface has
+       never rendered. Fontshare is its publisher; free for commercial use. -->
+  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=clash-display@600,500,700&display=swap">
+
 <title>Loading... | 34VaultVideo</title>
 <meta name="description" content="" />
 <meta name="rating" content="adult" />

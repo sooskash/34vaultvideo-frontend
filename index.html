@@ -14,6 +14,13 @@
 <link rel="preconnect" href="https://rule34video.com" />
 <link rel="dns-prefetch" href="https://rule34video.com" />
 <link rel="stylesheet" href="/shared.css" />
+  <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.fontshare.com" crossorigin>
+  <!-- Clash Display was referenced by --font-display on both sites but never actually
+       loaded, so every heading silently fell back to Segoe UI — the brand typeface has
+       never rendered. Fontshare is its publisher; free for commercial use. -->
+  <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=clash-display@600,500,700&display=swap">
+
 <title>34VaultVideo - Free Rule34 &amp; Hentai Videos</title>
 <meta name="description" content="Watch thousands of free rule34 videos, hentai animations, and NSFW video clips. Streamed in up to 1080p, updated daily. Filter by tag, search, and sort by newest or most viewed." />
 <meta name="keywords" content="rule34 videos, hentai videos, r34 video, porn videos, nsfw animation, rule 34 porn, hentai animation, adult videos, xxx animation, free hentai videos, cartoon porn videos" />
@@ -1473,12 +1480,14 @@ function calcAvgViewsPerDay(){
 
 function getBadge(v){
   const now=Date.now();
+  // On the newest-first feed every item is by definition new — a badge on all of them is
+  // wallpaper. HOT still shows, because it's earned.
   const createdMs=v.createdAt?new Date(v.createdAt).getTime():0;
   const DAY=86400000;
   const daysSince=createdMs?Math.max(0.04,(now-createdMs)/DAY):null;
   const viewsPerDay=daysSince?Number(v.views||0)/daysSince:0;
   if(viewsPerDay>_avgViewsPerDay*3) return{text:"HOT",cls:"badge-hot"};
-  if(createdMs&&(now-createdMs)<2*DAY) return{text:"NEW",cls:"badge-new"};
+  if(createdMs&&(now-createdMs)<2*DAY&&sortMode!=="new") return{text:"NEW",cls:"badge-new"};
   return null;
 }
 
@@ -1499,7 +1508,6 @@ function mkCard(v,favs){
         <img class="c-img" src="${esc(thumb)}" alt="${esc(title)}" loading="lazy" decoding="async" referrerpolicy="no-referrer"
           onerror="__thumbFall(this,'${esc(String(v.sourceId||""))}')" />
         ${v.duration?`<div class="c-dur"><svg viewBox="0 0 24 24"><polygon points="7 4 20 12 7 20 7 4"/></svg>${fmtDur(v.duration)}</div>`:""}
-        <div class="c-hd">HD</div>
         <div class="c-play"><span><svg viewBox="0 0 24 24"><polygon points="7 4 20 12 7 20 7 4"/></svg></span></div>
       </div>
       <div class="c-title">${esc(title)}</div>
