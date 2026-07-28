@@ -622,6 +622,23 @@ async function load(){
       fetch(`${API}/api/videos/slug/${encodeURIComponent(v.slug)}/view`,{method:"POST"}).catch(()=>{});
     },{once:true});
 
+    // The <video> starts on /stream, which 502s for anything not yet mirrored (and for
+    // everything when the proxy pool is down). prepareOnDemand() existed to handle exactly
+    // that but was never wired up, so a failed source left a dead player with no message —
+    // the page looked "broken" rather than "loading". Now the error kicks off hosting and
+    // shows the overlay.
+    let _prepTried=false;
+    vid.addEventListener("error",function(){
+      if(_prepTried) return; _prepTried=true;
+      prepareOnDemand(v.slug,vid);
+    });
+    // Some browsers stall without firing 'error' — treat a source that never produces
+    // metadata as the same failure.
+    setTimeout(function(){
+      if(_prepTried) return;
+      if(vid.readyState===0 && vid.networkState===vid.NETWORK_NO_SOURCE){ _prepTried=true; prepareOnDemand(v.slug,vid); }
+    },6000);
+
     // Arrived via an "Up next" auto-advance → start playback right away (best-effort;
     // autoplay-with-sound may be blocked, in which case the poster + play button stay).
     if(new URLSearchParams(location.search).get("autoplay")==="1"){ vid.play().catch(()=>{}); }
