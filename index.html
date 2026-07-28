@@ -842,12 +842,17 @@ button{font-family:inherit}
   .disc-title{font-size:19px!important;font-weight:700!important;letter-spacing:-.4px!important}
   .disc-titles{margin-bottom:0!important}
 
-  /* sort pills were wrapping to two lines — one scrolling row instead */
-  .disc-sorts,.sort-row{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;
-    gap:6px!important;scrollbar-width:none;-webkit-overflow-scrolling:touch}
-  .disc-sorts::-webkit-scrollbar,.sort-row::-webkit-scrollbar{display:none}
-  .disc-sorts>*,.sort-row>*{flex-shrink:0!important;white-space:nowrap!important;
-    height:34px!important;padding:0 12px!important;font-size:12.5px!important}
+  /* The real culprit, measured on device: .sort-tab buttons were 50px tall and
+     wrapping onto two lines ("Most viewed" breaking mid-phrase), making .head-ctl
+     58px. One non-wrapping scrolling row at 34px instead. */
+  .sort-tabs,.head-ctl{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;
+    gap:6px!important;scrollbar-width:none;-webkit-overflow-scrolling:touch;height:auto!important}
+  .sort-tabs::-webkit-scrollbar,.head-ctl::-webkit-scrollbar{display:none}
+  .sort-tab{flex-shrink:0!important;white-space:nowrap!important;height:34px!important;
+    padding:0 13px!important;font-size:12.5px!important;line-height:34px!important}
+
+  /* The h1 repeats whatever the active sort tab already says — 30px for nothing. */
+  .disc-titles{display:none!important}
 
   .filter-strip .filter-inner{padding:0 10px!important}
   .grid{gap:9px!important}
