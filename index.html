@@ -822,6 +822,18 @@ button{font-family:inherit}
   content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;
   background:linear-gradient(90deg,transparent,rgba(245,158,11,.55) 22%,rgba(245,158,11,.55) 78%,transparent);
 }
+
+/* Card meta: freshness always, views only when there are any, and the leading tag
+   as a chip on the artwork — so a card says what it is, how fresh and how popular
+   instead of just "0 views". */
+.c-meta2{display:inline-flex;align-items:center;gap:8px;flex-shrink:0}
+.c-when{font-size:10.5px;font-weight:700;color:var(--sub);opacity:.85;white-space:nowrap}
+.c-tagchip{
+  position:absolute;left:7px;bottom:7px;z-index:2;max-width:62%;
+  padding:2px 7px;border-radius:5px;font-size:10px;font-weight:800;letter-spacing:.2px;
+  background:rgba(8,9,12,.78);backdrop-filter:blur(4px);color:#dfe4ee;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-transform:capitalize;
+}
 </style>
 </head>
 <body><noscript><div style="padding:40px 20px;text-align:center;font-family:sans-serif;color:#f0f0f0;background:#0a0b0e;min-height:100vh"><h1>34VaultVideo</h1><p style="margin-top:16px;color:#8b8fa8">This site requires JavaScript to function. Please enable JavaScript in your browser settings.</p></div></noscript>
@@ -1534,17 +1546,16 @@ function mkCard(v,favs){
           onerror="__thumbFall(this,'${esc(String(v.sourceId||""))}')" />
         ${v.duration?`<div class="c-dur"><svg viewBox="0 0 24 24"><polygon points="7 4 20 12 7 20 7 4"/></svg>${fmtDur(v.duration)}</div>`:""}
         <div class="c-play"><span><svg viewBox="0 0 24 24"><polygon points="7 4 20 12 7 20 7 4"/></svg></span></div>
+        ${tags.length?`<div class="c-tagchip">${esc(tags[0])}</div>`:""}
       </div>
       <div class="c-title">${esc(title)}</div>
     </a>
     <div class="c-bk${isFav?" on":""}" data-slug="${esc(slug)}">${isFav?"&#9733;":"&#9734;"}</div>
     <div class="c-foot">
       <div class="c-tag1${(Array.isArray(v.artists)&&v.artists.length)?" c-by":""}">${(Array.isArray(v.artists)&&v.artists.length)?esc(v.artists[0]):(tags.length?esc(tags[0]):"")}</div>
-      <span class="c-views">
-        <svg class="c-ico" viewBox="0 0 24 24">
-          <path d="M2 12c2.5-5 6-7.5 10-7.5S19.5 7 22 12c-2.5 5-6 7.5-10 7.5S4.5 17 2 12Z"/>
-          <circle cx="12" cy="12" r="2.6"/>
-        </svg>${fmtNum(v.views)}
+      <span class="c-meta2">
+        ${v.createdAt?`<span class="c-when">${fmtAgo(v.createdAt)}</span>`:""}
+        ${Number(v.views)>0?`<span class="c-views"><svg class="c-ico" viewBox="0 0 24 24"><path d="M2 12c2.5-5 6-7.5 10-7.5S19.5 7 22 12c-2.5 5-6 7.5-10 7.5S4.5 17 2 12Z"/><circle cx="12" cy="12" r="2.6"/></svg>${fmtNum(v.views)}</span>`:""}
       </span>
     </div>
   `;
@@ -1833,6 +1844,19 @@ sortSel.addEventListener("change",()=>{ sortMode=sortSel.value; page=1; loadedCo
 
 function normTags(t){ if(!t)return[]; if(Array.isArray(t))return t.map(x=>String(x).trim()).filter(Boolean); return String(t).split(",").map(x=>x.trim()).filter(Boolean); }
 function esc(s){ return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+// Newest videos have no views yet (1 in 20), so a views-only card reads "0 views"
+// and looks dead. Freshness is the signal that actually exists for every video —
+// it's what rule34video leads with ("45 minutes ago").
+function fmtAgo(iso){
+  if(!iso) return "";
+  const s=Math.max(0,(Date.now()-new Date(iso).getTime())/1000);
+  if(s<3600) return Math.max(1,Math.floor(s/60))+"m ago";
+  if(s<86400) return Math.floor(s/3600)+"h ago";
+  if(s<2592000) return Math.floor(s/86400)+"d ago";
+  if(s<31536000) return Math.floor(s/2592000)+"mo ago";
+  return Math.floor(s/31536000)+"y ago";
+}
+
 function fmtNum(n){
   n=Number(n||0);
   if(n>=1000000) return(n/1000000).toFixed(1).replace(/\.0$/,"")+"M";
