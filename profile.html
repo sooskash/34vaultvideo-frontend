@@ -74,6 +74,31 @@ body{padding-top:var(--topH);padding-bottom:60px}
 .tool .ds{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.4}
 .tool.soon{opacity:.6;cursor:default;pointer-events:none}
 .tool .soon-tag{font-size:9.5px;font-weight:900;color:var(--accent);text-transform:uppercase;letter-spacing:.4px}
+
+/* ── BRAND LOCKUP ────────────────────────────────────────────────────────────
+   The mark used to be 34<span>Vault</span><span>Video</span>, which put BOTH
+   words in the amber gradient — so it read as one invented word, "34VaultVideo",
+   and the actual brand disappeared. Now it matches 34vault.com exactly (34 +
+   amber Vault) with VIDEO demoted to a product chip beside it. Same mark, two
+   properties. Clash Display now that the font actually loads.
+   ──────────────────────────────────────────────────────────────────────────── */
+.brand{display:inline-flex;align-items:center;gap:7px}
+.brand-tag{
+  font-family:var(--font-ui,system-ui),sans-serif;font-style:normal;
+  font-size:9px;font-weight:900;letter-spacing:1.4px;
+  padding:3px 6px;border-radius:5px;line-height:1;
+  background:var(--grad-accent);color:#241a08;
+  position:relative;top:1px;
+}
+@media(max-width:380px){.brand-tag{display:none}}
+
+/* Header: a 1px amber hairline under the bar — the same signal the comic site's
+   accent gives, so both properties read as one brand at a glance. */
+.topbar{position:relative}
+.topbar::after{
+  content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(245,158,11,.55) 22%,rgba(245,158,11,.55) 78%,transparent);
+}
 </style>
 </head>
 <body>
@@ -82,7 +107,7 @@ body{padding-top:var(--topH);padding-bottom:60px}
     <div class="ico-btn" onclick="location.href='index.html'">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
     </div>
-    <div class="brand" onclick="location.href='index.html'">34<span>Vault</span><span>Video</span></div>
+    <div class="brand" onclick="location.href='index.html'">34<span>Vault</span><i class="brand-tag">VIDEO</i></div>
     <div class="spacer"></div>
     <div class="desktop-nav"><a href="index.html">Videos</a><a href="artists.html">Artists</a><a href="upload.html">Upload</a><a href="request.html">Requests</a></div>
     <div id="acctMount"></div>
